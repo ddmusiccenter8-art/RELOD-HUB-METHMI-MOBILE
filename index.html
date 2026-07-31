@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Shop Payment Tracker - Mobile Reload, Bill Payment, Mobile Loan & Bank Payment Management System">
+  <title>Shop Payment Tracker | සාප්පු ගෙවීම් ට්‍රැකර්</title>
+  
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1c23">
+  
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Mobile Hamburger -->
+  <button class="hamburger" id="hamburgerBtn" aria-label="Menu">☰</button>
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <div class="app-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      
+      <!-- Language Selector -->
+      <div style="padding: 10px; display: flex; justify-content: flex-end;">
+        <select id="langSelector" style="background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">
+          <option value="si">සිංහල</option>
+          <option value="en">English</option>
+          <option value="ta">தமிழ்</option>
+        </select>
+      </div>
+
+      <div class="sidebar-logo">
+        <div class="logo-icon">💰</div>
+        <div class="logo-text" data-i18n="app_title">Shop Tracker</div>
+      </div>
+
+      <!-- Shop Selector & Add Button -->
+      <div class="shop-selector" style="display: flex; gap: 8px;">
+        <select id="shopSelector" class="form-select" title="Select Shop" style="flex: 1;" data-i18n="select_shop">
+          <option value="">-- සාප්පුව තෝරන්න --</option>
+        </select>
+        <button id="quickAddShopBtn" class="btn btn-primary" style="padding: 0 12px; font-size: 1.2rem; font-weight: bold;" title="Add Shop">+</button>
+      </div>
+
+      <!-- Navigation -->
+      <ul class="nav-links">
+        <li><a href="#" data-page="dashboard" class="active"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
+        <li><a href="#" data-page="update"><span class="nav-icon">➕</span> <span data-i18n="nav_update">Update කරන්න</span></a></li>
+        <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update ඉතිහාසය</span></a></li>
+        <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">සාප්පු</span></a></li>
+        <li><a href="#" data-page="reports"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">වාර්තා</span></a></li>
+      </ul>
+
+      <!-- Backup Status -->
+      <div style="padding:10px 4px;margin-bottom:8px;">
+        <div style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;" data-i18n="backup_status">🛡️ Backup Status</div>
+        <div id="backupStatus" style="font-size:0.8rem;font-weight:500;color:var(--text-secondary);">
+          <span style="color:var(--accent-red);">⚠️</span> Backup නැහැ
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <button id="exportBtn" data-i18n="btn_export">📤 Data Backup / Export</button>
+        <button id="importBtn" style="margin-top:8px;" data-i18n="btn_import">📥 Data Import / Restore</button>
+        <input type="file" id="importFile" accept=".json" style="display:none;">
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <!-- ===== DASHBOARD PAGE ===== -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <h1><span class="header-icon">📊</span> <span data-i18n="dash_title">Dashboard</span></h1>
+          <div class="header-actions">
+            <span class="date-pill" id="todayDate">📅 Today</span>
+          </div>
+        </div>
+
+        <!-- Overall Card -->
+        <div id="overallCard" class="card overall-card neutral-card" style="margin-bottom: 24px;">
+          <div class="overall-label" data-i18n="dash_overall">මුළු ලාභය / අලාභය (Overall Profit/Loss)</div>
+          <div class="overall-value neutral" id="overallValue">Rs.0.00</div>
+          <div class="overall-type" id="overallType" data-i18n="dash_no_data">NO DATA</div>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-grid" id="summaryCards">
+          <!-- Reload Card -->
+          <div class="card accent-blue animate-slide-up">
+            <div class="card-header">
+              <span class="card-title" data-i18n="dash_reload">🔄 Reload</span>
+              <div class="card-icon">🔄</div>
+            </div>
+            <div class="card-value" id="dashReloadTotal">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashReloadDiff">➖ Rs.0.00</div>
+          </div>
+          <!-- Mobile Rental Card -->
+          <div class="card accent-purple animate-slide-up">
+            <div class="card-header">
+              <span class="card-title" data-i18n="dash_mobile">📱 Mobile Rental</span>
+              <div class="card-icon">📱</div>
+            </div>
+            <div class="card-value" id="dashMobileTotal">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashMobileDiff">➖ Rs.0.00</div>
+          </div>
+          <!-- Update Count -->
+          <div class="card accent-green animate-slide-up">
+            <div class="card-header">
+              <span class="card-title" data-i18n="dash_today_updates">📌 අද Updates</span>
+              <div class="card-icon">📌</div>
+            </div>
+            <div class="card-value" id="dashUpdateCount">0</div>
+            <div style="font-size:0.85rem;color:var(--text-muted);" id="dashLastUpdateTime">Last: --</div>
+          </div>
+        </div>
+
+        <!-- Bank Wise Breakdown -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header">
+            <span class="card-title" data-i18n="dash_bank_breakdown">🏦 Bank Wise Breakdown</span>
+          </div>
+          <div id="dashBankBreakdown" class="result-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
+            <div class="empty-state" style="padding:20px;grid-column:1/-1;">
+              <div class="empty-sub" data-i18n="dash_no_data">No bank data yet</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Updates -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title" data-i18n="dash_recent_updates">📜 මෑත Updates</span>
+          </div>
+          <div id="dashRecentUpdates">
+            <div class="empty-state" style="padding:30px;">
+              <div class="empty-icon">📭</div>
+              <div class="empty-text" data-i18n="dash_no_data">Updates නැහැ</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== UPDATE PAGE ===== -->
+      <div class="page" id="page-update">
+        <div class="page-header">
+          <h1><span class="header-icon">➕</span> <span data-i18n="upd_title">Update කරන්න</span></h1>
+        </div>
+
+        <!-- Previous Update Info -->
+        <div class="card" id="prevUpdateInfo" style="margin-bottom:24px; display:none;">
+          <div class="card-header">
+            <span class="card-title">📌 පෙර Update එක</span>
+            <span class="date-pill" id="prevUpdateTime">--</span>
+          </div>
+          <div class="result-grid" id="prevUpdateSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;"></div>
+        </div>
+
+        <form id="updateForm" class="card">
+          
+          <!-- EMPLOYEE SECTION -->
+          <div class="section-divider">
+            <div class="divider-icon">🧑‍💼</div>
+            <div class="divider-text" data-i18n="upd_emp_details">සේවක තොරතුරු</div>
+            <div class="divider-line"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" data-i18n="upd_emp_name">සේවකයාගේ නම</label>
+              <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="සේවකයාගේ නම" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" data-i18n="upd_job_role">තනතුර</label>
+              <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="තනතුර (උදා: Cashier)">
+            </div>
+          </div>
+
+          <!-- RELOAD SECTION -->
+          <div class="section-divider blue">
+            <div class="divider-icon">🔄</div>
+            <div class="divider-text" data-i18n="upd_reload_title">Reload (රීලෝඩ්)</div>
+            <div class="divider-line"></div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Dialog</label>
+              <input type="number" class="form-input reload-input" id="reloadDialog" placeholder="0.00" step="0.01" min="0">
+              <div class="prev-value" id="prevDialog"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Airtel</label>
+              <input type="number" class="form-input reload-input" id="reloadAirtel" placeholder="0.00" step="0.01" min="0">
+              <div class="prev-value" id="prevAirtel"></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Mobitel</label>
+              <input type="number" class="form-input reload-input" id="reloadMobitel" placeholder="0.00" step="0.01" min="0">
+              <div class="prev-value" id="prevMobitel"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Hutch</label>
+              <input type="number" class="form-input reload-input" id="reloadHutch" placeholder="0.00" step="0.01" min="0">
+              <div class="prev-value" id="prevHutch"></div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="upd_cash_drawer">💵 Cash in Drawer (ලාච්චුවේ සල්ලි)</label>
+            <input type="number" class="form-input reload-input" id="reloadCash" placeholder="0.00" step="0.01" min="0">
+            <div class="prev-value" id="prevReloadCash"></div>
+          </div>
+
+          <div class="auto-total">
+            <span class="total-label" data-i18n="upd_reload_total">🔄 Reload Total</span>
+            <span class="total-value" id="reloadTotal">Rs.0.00</span>
+          </div>
+          <div id="reloadDiffDisplay" style="display:none;"></div>
+
+          <!-- MOBILE RENTAL SECTION -->
+          <div class="section-divider purple" style="margin-top:36px;">
+            <div class="divider-icon">📱</div>
+            <div class="divider-text" data-i18n="upd_mobile_title">Mobile Rental (මොබයිල් රෙන්ටල්)</div>
+            <div class="divider-line"></div>
+          </div>
+
+          <div class="bank-entries" id="bankEntries">
+            <!-- Bank entries will be added dynamically -->
+          </div>
+
+          <button type="button" class="btn btn-ghost" id="addBankBtn" style="margin-top:14px;" data-i18n="upd_add_bank">
+            ➕ Bank එකක් එකතු කරන්න
+          </button>
+
+          <div class="auto-total" style="margin-top:14px;">
+            <span class="total-label" data-i18n="upd_mobile_total">📱 Mobile Rental Total</span>
+            <span class="total-value" id="mobileTotal">Rs.0.00</span>
+          </div>
+          <div id="mobileDiffDisplay" style="display:none;"></div>
+
+          <!-- OVERALL SUMMARY -->
+          <div class="section-divider green" style="margin-top:36px;">
+            <div class="divider-icon">📊</div>
+            <div class="divider-text" data-i18n="upd_grand_total">Overall Summary</div>
+            <div class="divider-line"></div>
+          </div>
+
+          <div id="overallSummaryPreview" style="display:none;"></div>
+
+          <div style="margin-top:24px; display:flex; gap:12px;">
+            <button type="submit" class="btn btn-success btn-lg" style="flex:1;" data-i18n="btn_save_update">
+              💾 Update Save කරන්න
+            </button>
+            <button type="button" class="btn btn-ghost btn-lg" id="clearFormBtn">
+              🔄 Clear
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- ===== HISTORY PAGE ===== -->
+      <div class="page" id="page-history">
+        <div class="page-header">
+          <h1><span class="header-icon">📜</span> <span data-i18n="hist_title">Update ඉතිහාසය</span></h1>
+        </div>
+
+        <div class="filter-bar">
+          <input type="date" class="form-input" id="historyDateFilter">
+          <button class="btn btn-ghost btn-sm" id="historyTodayBtn" data-i18n="rep_preset_today">අද</button>
+          <button class="btn btn-ghost btn-sm" id="historyAllBtn" data-i18n="hist_btn_all">සියල්ල</button>
+        </div>
+
+        <div id="historyList">
+          <div class="empty-state">
+            <div class="empty-icon">📭</div>
+            <div class="empty-text" data-i18n="dash_no_data">Updates නැහැ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SHOPS PAGE ===== -->
+      <div class="page" id="page-shops">
+        <div class="page-header">
+          <h1><span class="header-icon">🏪</span> <span data-i18n="nav_shops">සාප්පු කළමනාකරණය</span></h1>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="addShopBtn">➕ නව සාප්පුවක්</button>
+          </div>
+        </div>
+
+        <div class="shop-list" id="shopList">
+          <div class="empty-state">
+            <div class="empty-icon">🏪</div>
+            <div class="empty-text" data-i18n="dash_no_data">සාප්පු නැහැ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== REPORTS PAGE ===== -->
+      <div class="page" id="page-reports">
+        <div class="page-header">
+          <h1><span class="header-icon">📈</span> <span data-i18n="rep_title">වාර්තා</span></h1>
+        </div>
+
+        <div class="card" style="margin-bottom: 24px;">
+            <div class="filter-bar" style="flex-wrap: wrap;">
+                <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 150px;">
+                    <label class="form-label" style="margin-bottom:4px;" data-i18n="rep_date_range">Date Range</label>
+                    <select id="reportPresetFilter" class="form-select">
+                        <option value="custom" data-i18n="hist_filter_date">Custom</option>
+                        <option value="today" data-i18n="rep_preset_today">Today</option>
+                        <option value="yesterday" data-i18n="rep_preset_yesterday">Yesterday</option>
+                        <option value="thisWeek" data-i18n="rep_preset_this_week">This Week</option>
+                        <option value="thisMonth" data-i18n="rep_preset_this_month">This Month</option>
+                        <option value="last3Months" data-i18n="rep_preset_last_3">Last 3 Months</option>
+                        <option value="allTime" data-i18n="rep_preset_all">All Time</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 130px;">
+                    <label class="form-label" style="margin-bottom:4px;" data-i18n="rep_from">From</label>
+                    <input type="date" class="form-input" id="reportStartDate">
+                </div>
+                <div class="form-group" style="margin-bottom:0; flex: 1; min-width: 130px;">
+                    <label class="form-label" style="margin-bottom:4px;" data-i18n="rep_to">To</label>
+                    <input type="date" class="form-input" id="reportEndDate">
+                </div>
+                <button class="btn btn-primary btn-sm" id="reportFilterBtn" style="align-self:flex-end;" data-i18n="hist_btn_filter">🔍 Filter</button>
+            </div>
+        </div>
+
+        <div id="reportResults">
+          <div class="empty-state">
+            <div class="empty-icon">📈</div>
+            <div class="empty-text" data-i18n="dash_no_data">Date range එකක් select කරන්න</div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="modalContent">
+      <div class="modal-title" id="modalTitle">Modal</div>
+      <div id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <!-- Firebase Core and Firestore -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  
+  <script src="js/i18n.js"></script>
+  <script src="js/firebase-init.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  
+  <!-- Register Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+          console.log('ServiceWorker registration successful');
+        }).catch(err => {
+          console.log('ServiceWorker registration failed: ', err);
+        });
+      });
+    }
+  </script>
+
+</body>
+</html>

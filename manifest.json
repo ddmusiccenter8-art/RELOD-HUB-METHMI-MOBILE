@@ -1,0 +1,16 @@
+{
+  "name": "Shop Payment Tracker",
+  "short_name": "Shop Tracker",
+  "description": "Mobile Reload, Bill Payment, Mobile Loan & Bank Payment Management System",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0e1a",
+  "theme_color": "#0a0e1a",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
