@@ -3,10 +3,10 @@ const ASSETS = [
   './',
   './index.html',
   './style.css',
-  './js/app.js',
-  './js/data.js',
-  './js/i18n.js',
-  './js/firebase-init.js',
+  './app.js',
+  './data.js',
+  './i18n.js',
+  './firebase-init.js',
   './manifest.json',
   './icon.png'
 ];
