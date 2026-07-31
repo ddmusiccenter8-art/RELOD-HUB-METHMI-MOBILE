@@ -290,20 +290,49 @@ const App = {
   },
 
   renderNoDashboard() {
-    document.getElementById('overallValue').textContent = 'Rs.0.00';
-    document.getElementById('overallValue').className = 'overall-value neutral';
-    document.getElementById('overallType').textContent = 'NO DATA';
-    document.getElementById('overallCard').className = 'card overall-card neutral-card';
-    document.getElementById('dashReloadTotal').textContent = 'Rs.0.00';
-    document.getElementById('dashReloadDiff').textContent = '➖ Rs.0.00';
-    document.getElementById('dashReloadDiff').className = 'card-diff neutral';
-    document.getElementById('dashMobileTotal').textContent = 'Rs.0.00';
-    document.getElementById('dashMobileDiff').textContent = '➖ Rs.0.00';
-    document.getElementById('dashMobileDiff').className = 'card-diff neutral';
-    document.getElementById('dashUpdateCount').textContent = '0';
-    document.getElementById('dashLastUpdateTime').textContent = 'Last: --';
-    document.getElementById('dashBankBreakdown').innerHTML = '<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">No bank data yet</div></div>';
-    document.getElementById('dashRecentUpdates').innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div><div class="empty-sub">පළමු update එක ගන්න ➕ බොත්තම ඔබන්න</div></div>';
+    const stats = DB.getGlobalStats();
+    if (stats.hasData) {
+      const overallDiff = stats.diffs.overall;
+      const overallType = overallDiff > 0 ? 'profit' : overallDiff < 0 ? 'loss' : 'neutral';
+      document.getElementById('overallValue').textContent = DB.formatCurrency(Math.abs(overallDiff));
+      document.getElementById('overallValue').className = `overall-value ${overallType}`;
+      document.getElementById('overallType').textContent = 'ALL SHOPS (මුළු එකතුව)';
+      document.getElementById('overallType').style.color = 'var(--accent-blue)';
+      document.getElementById('overallCard').className = `card overall-card ${overallType === 'profit' ? 'profit-card' : overallType === 'loss' ? 'loss-card' : 'neutral-card'}`;
+
+      document.getElementById('dashReloadTotal').textContent = DB.formatCurrency(stats.reloadTotal);
+      const rd = stats.diffs.reload;
+      const rdType = rd > 0 ? 'profit' : rd < 0 ? 'loss' : 'neutral';
+      document.getElementById('dashReloadDiff').textContent = `${rdType === 'profit' ? '▲' : rdType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(rd))}`;
+      document.getElementById('dashReloadDiff').className = `card-diff ${rdType}`;
+
+      document.getElementById('dashMobileTotal').textContent = DB.formatCurrency(stats.mobileTotal);
+      const md = stats.diffs.mobile;
+      const mdType = md > 0 ? 'profit' : md < 0 ? 'loss' : 'neutral';
+      document.getElementById('dashMobileDiff').textContent = `${mdType === 'profit' ? '▲' : mdType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(md))}`;
+      document.getElementById('dashMobileDiff').className = `card-diff ${mdType}`;
+
+      document.getElementById('dashUpdateCount').textContent = stats.todayUpdatesCount;
+      document.getElementById('dashLastUpdateTime').textContent = 'All Shops Summary';
+      document.getElementById('dashBankBreakdown').innerHTML = '<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">Select a shop to view banks</div></div>';
+      document.getElementById('dashRecentUpdates').innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">🏪</div><div class="empty-text">Select a Shop</div><div class="empty-sub">Please select a shop from the menu to see recent updates</div></div>';
+    } else {
+      document.getElementById('overallValue').textContent = 'Rs.0.00';
+      document.getElementById('overallValue').className = 'overall-value neutral';
+      document.getElementById('overallType').textContent = 'NO DATA';
+      document.getElementById('overallType').style.color = 'var(--text-muted)';
+      document.getElementById('overallCard').className = 'card overall-card neutral-card';
+      document.getElementById('dashReloadTotal').textContent = 'Rs.0.00';
+      document.getElementById('dashReloadDiff').textContent = '➖ Rs.0.00';
+      document.getElementById('dashReloadDiff').className = 'card-diff neutral';
+      document.getElementById('dashMobileTotal').textContent = 'Rs.0.00';
+      document.getElementById('dashMobileDiff').textContent = '➖ Rs.0.00';
+      document.getElementById('dashMobileDiff').className = 'card-diff neutral';
+      document.getElementById('dashUpdateCount').textContent = '0';
+      document.getElementById('dashLastUpdateTime').textContent = 'Last: --';
+      document.getElementById('dashBankBreakdown').innerHTML = '<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">No bank data yet</div></div>';
+      document.getElementById('dashRecentUpdates').innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div><div class="empty-sub">පළමු update එක ගන්න ➕ බොත්තම ඔබන්න</div></div>';
+    }
   },
 
   renderBankBreakdown(lastUpdate) {
@@ -1012,12 +1041,24 @@ const App = {
     shops.forEach(s => {
       const updates = DB.getUpdatesForShop(s.id);
       const isActive = s.id === activeId;
+      const comp = DB.getShopLatestComparison(s.id);
+      let profitHtml = '';
+      if (comp) {
+         const diff = comp.overall.diff;
+         const type = comp.overall.type;
+         profitHtml = `<div style="margin-top: 6px; font-weight: 800; font-size: 0.95rem; color: ${type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)'}">
+           ${type === 'profit' ? '✅ Profit: ' : type === 'loss' ? '❌ Loss: ' : '➖ '}${DB.formatCurrency(Math.abs(diff))}
+         </div>`;
+      } else {
+         profitHtml = `<div style="margin-top: 6px; font-size: 0.85rem; color: var(--text-muted);">➖ No Data Yet</div>`;
+      }
 
       html += `
         <div class="shop-card ${isActive ? 'active' : ''}">
           <div class="shop-name">${isActive ? '✅' : '🏪'} ${s.name}</div>
-          <div class="shop-meta">📌 Updates: ${updates.length} | 📅 Created: ${DB.formatDate(s.createdAt.split('T')[0])}</div>
-          <div class="shop-actions">
+          <div class="shop-meta" style="margin-bottom: 8px;">📌 Updates: ${updates.length} | 📅 Created: ${DB.formatDate(s.createdAt.split('T')[0])}</div>
+          ${profitHtml}
+          <div class="shop-actions" style="margin-top: 14px;">
             ${!isActive ? `<button class="btn btn-primary btn-sm" onclick="App.switchShop('${s.id}')">🔄 Select</button>` : '<span class="date-pill">✅ Active</span>'}
             <button class="btn btn-ghost btn-sm" onclick="App.editShop('${s.id}')">✏️ Edit</button>
             <button class="btn btn-danger btn-sm" onclick="App.confirmDeleteShop('${s.id}', '${s.name.replace(/'/g, "\\'")}')">🗑️</button>

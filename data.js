@@ -482,6 +482,52 @@ const DB = {
     };
   },
 
+  getShopLatestComparison(shopId) {
+    const lastUpdate = this.getLastUpdate(shopId);
+    if (!lastUpdate || !lastUpdate.comparison || lastUpdate.comparison.isFirst) return null;
+    return lastUpdate.comparison;
+  },
+
+  getGlobalStats() {
+    const shops = this.getShops();
+    let totalOverallDiff = 0;
+    let totalReloadDiff = 0;
+    let totalMobileDiff = 0;
+    let reloadTotal = 0;
+    let mobileTotal = 0;
+    let hasData = false;
+    let updatesCount = 0;
+
+    shops.forEach(shop => {
+      const lastUpdate = this.getLastUpdate(shop.id);
+      if (lastUpdate) {
+        hasData = true;
+        reloadTotal += this.calculateReloadTotal(lastUpdate.reload);
+        mobileTotal += this.calculateMobileRentalGrandTotal(lastUpdate.mobileRental);
+        
+        if (lastUpdate.comparison && !lastUpdate.comparison.isFirst) {
+           totalOverallDiff += lastUpdate.comparison.overall.diff || 0;
+           totalReloadDiff += lastUpdate.comparison.reload.diff || 0;
+           totalMobileDiff += lastUpdate.comparison.mobileRental.diff || 0;
+        }
+      }
+      const today = this.getTodayDate();
+      updatesCount += this.getUpdatesForShopByDate(shop.id, today).length;
+    });
+
+    return {
+      hasData,
+      reloadTotal,
+      mobileTotal,
+      todayUpdatesCount: updatesCount,
+      diffs: {
+        overall: totalOverallDiff,
+        reload: totalReloadDiff,
+        mobile: totalMobileDiff
+      }
+    };
+  },
+
   // ---- Auto Backup System ----
 
   autoBackup() {
