@@ -1054,7 +1054,7 @@ const App = {
       }
 
       html += `
-        <div class="shop-card ${isActive ? 'active' : ''}">
+        <div class="shop-card ${isActive ? 'active' : ''}" style="cursor: pointer;" onclick="if(event.target.tagName !== 'BUTTON') App.switchShop('${s.id}')">
           <div class="shop-name">${isActive ? '✅' : '🏪'} ${s.name}</div>
           <div class="shop-meta" style="margin-bottom: 8px;">📌 Updates: ${updates.length} | 📅 Created: ${DB.formatDate(s.createdAt.split('T')[0])}</div>
           ${profitHtml}
@@ -1071,7 +1071,7 @@ const App = {
   switchShop(shopId) {
     DB.setActiveShop(shopId);
     this.refreshShopSelector();
-    this.renderShops();
+    this.navigateTo('dashboard');
     this.showToast('🏪 Shop switch කරා!', 'success');
   },
 
