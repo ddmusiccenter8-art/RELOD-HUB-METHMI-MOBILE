@@ -1344,6 +1344,16 @@ const App = {
         ${bankHtml}
       </div>` : ''}
 
+      <!-- Chart Breakdown -->
+      <div class="card" style="margin-top:20px; padding: 10px;">
+        <div class="card-header" style="margin-bottom: 10px;">
+          <span class="card-title">📈 Profit/Loss Chart (ලාභ/අලාභ ප්‍රස්ථාරය)</span>
+        </div>
+        <div style="width: 100%; height: 300px; position: relative;">
+          <canvas id="reportChart"></canvas>
+        </div>
+      </div>
+
       <!-- Daily Details -->
       <div class="card" style="margin-top:20px;">
         <div class="card-header">
@@ -1384,6 +1394,59 @@ const App = {
         </div>
       </div>
     `;
+
+    const chartLabels = uniqueDates.map(d => DB.formatDate(d));
+    const chartDataProfit = [];
+    const chartDataLoss = [];
+
+    uniqueDates.forEach(date => {
+      let dailyProfit = 0;
+      let dailyLoss = 0;
+      const dayUpdates = updates.filter(u => u.date === date);
+      dayUpdates.forEach(u => {
+        if (u.comparison && !u.comparison.isFirst) {
+          const diff = u.comparison.overall.diff;
+          if (diff > 0) dailyProfit += diff;
+          else dailyLoss += Math.abs(diff);
+        }
+      });
+      chartDataProfit.push(dailyProfit);
+      chartDataLoss.push(dailyLoss);
+    });
+
+    if (window.reportChartInstance) {
+      window.reportChartInstance.destroy();
+    }
+    const ctx = document.getElementById('reportChart').getContext('2d');
+    window.reportChartInstance = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: 'Profit (ලාභ)',
+            data: chartDataProfit,
+            backgroundColor: 'rgba(22, 163, 74, 0.7)',
+            borderColor: 'rgba(22, 163, 74, 1)',
+            borderWidth: 1
+          },
+          {
+            label: 'Loss (අලාභ)',
+            data: chartDataLoss,
+            backgroundColor: 'rgba(228, 0, 43, 0.7)',
+            borderColor: 'rgba(228, 0, 43, 1)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
   },
 
   // ================================================================
