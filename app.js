@@ -467,6 +467,7 @@ const App = {
       document.getElementById('prevAirtel').textContent = `පෙර: ${DB.formatCurrency(prevUpdate.reload.airtel)}`;
       document.getElementById('prevMobitel').textContent = `පෙර: ${DB.formatCurrency(prevUpdate.reload.mobitel)}`;
       document.getElementById('prevHutch').textContent = `පෙර: ${DB.formatCurrency(prevUpdate.reload.hutch)}`;
+      document.getElementById('prevEzcash').textContent = `පෙර: ${DB.formatCurrency(prevUpdate.reload.ezcash || 0)}`;
       document.getElementById('prevReloadCash').textContent = `පෙර: ${DB.formatCurrency(prevUpdate.reload.cashInDrawer)}`;
 
       // Pre-populate bank entries from previous
@@ -483,6 +484,7 @@ const App = {
       document.getElementById('prevAirtel').textContent = '';
       document.getElementById('prevMobitel').textContent = '';
       document.getElementById('prevHutch').textContent = '';
+      document.getElementById('prevEzcash').textContent = '';
       document.getElementById('prevReloadCash').textContent = '';
 
       // Add one default bank entry
@@ -555,6 +557,7 @@ const App = {
                   (parseFloat(document.getElementById('reloadAirtel').value) || 0) +
                   (parseFloat(document.getElementById('reloadMobitel').value) || 0) +
                   (parseFloat(document.getElementById('reloadHutch').value) || 0) +
+                  (parseFloat(document.getElementById('reloadEzcash').value) || 0) +
                   (parseFloat(document.getElementById('reloadCash').value) || 0);
 
     document.getElementById('reloadTotal').textContent = DB.formatCurrency(total);
@@ -641,6 +644,7 @@ const App = {
                         (parseFloat(document.getElementById('reloadAirtel').value) || 0) +
                         (parseFloat(document.getElementById('reloadMobitel').value) || 0) +
                         (parseFloat(document.getElementById('reloadHutch').value) || 0) +
+                        (parseFloat(document.getElementById('reloadEzcash').value) || 0) +
                         (parseFloat(document.getElementById('reloadCash').value) || 0);
 
     let mobileTotal = 0;
@@ -706,9 +710,10 @@ const App = {
       airtel: parseFloat(document.getElementById('reloadAirtel').value) || 0,
       mobitel: parseFloat(document.getElementById('reloadMobitel').value) || 0,
       hutch: parseFloat(document.getElementById('reloadHutch').value) || 0,
+      ezcash: parseFloat(document.getElementById('reloadEzcash').value) || 0,
       cashInDrawer: parseFloat(document.getElementById('reloadCash').value) || 0
     };
-    reload.total = reload.dialog + reload.airtel + reload.mobitel + reload.hutch + reload.cashInDrawer;
+    reload.total = reload.dialog + reload.airtel + reload.mobitel + reload.hutch + reload.ezcash + reload.cashInDrawer;
 
     // Gather bank data
     const banks = [];
@@ -947,6 +952,9 @@ const App = {
         <div style="padding:6px 10px;background:var(--bg-glass);border-radius:var(--radius-sm);font-size:0.85rem;">
           Hutch: <span style="font-weight:700;">${DB.formatCurrency(u.reload.hutch)}</span>
         </div>
+        <div style="padding:6px 10px;background:var(--bg-glass);border-radius:var(--radius-sm);font-size:0.85rem;">
+          eZ Cash: <span style="font-weight:700;">${DB.formatCurrency(u.reload.ezcash || 0)}</span>
+        </div>
       </div>
       <div style="padding:6px 10px;background:var(--bg-glass);border-radius:var(--radius-sm);font-size:0.85rem;margin-bottom:8px;">
         Cash: <span style="font-weight:700;">${DB.formatCurrency(u.reload.cashInDrawer)}</span>
@@ -1066,6 +1074,12 @@ const App = {
         </div>`;
     });
     container.innerHTML = html;
+  },
+
+  showMainDashboard() {
+    DB.setActiveShop('');
+    this.refreshShopSelector();
+    this.navigateTo('dashboard');
   },
 
   switchShop(shopId) {

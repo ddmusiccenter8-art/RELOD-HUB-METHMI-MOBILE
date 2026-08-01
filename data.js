@@ -400,6 +400,7 @@ const DB = {
            (parseFloat(reload.airtel) || 0) +
            (parseFloat(reload.mobitel) || 0) +
            (parseFloat(reload.hutch) || 0) +
+           (parseFloat(reload.ezcash) || 0) +
            (parseFloat(reload.cashInDrawer) || 0);
   },
 

@@ -7,43 +7,43 @@
 
 /* ---- CSS Variables ---- */
 :root {
-  --bg-primary: #0a0e1a;
-  --bg-secondary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.8);
-  --bg-glass: rgba(255, 255, 255, 0.03);
-  --bg-glass-hover: rgba(255, 255, 255, 0.06);
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --border-glass-hover: rgba(255, 255, 255, 0.15);
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-glass: #ffffff;
+  --bg-glass-hover: #f1f5f9;
+  --border-glass: #e2e8f0;
+  --border-glass-hover: #cbd5e1;
 
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
+  --text-primary: #1e293b;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
 
-  --accent-blue: #3b82f6;
-  --accent-blue-glow: rgba(59, 130, 246, 0.3);
-  --accent-green: #10b981;
-  --accent-green-glow: rgba(16, 185, 129, 0.3);
-  --accent-red: #ef4444;
-  --accent-red-glow: rgba(239, 68, 68, 0.3);
-  --accent-purple: #8b5cf6;
-  --accent-purple-glow: rgba(139, 92, 246, 0.3);
-  --accent-gold: #f59e0b;
-  --accent-gold-glow: rgba(245, 158, 11, 0.3);
-  --accent-cyan: #06b6d4;
+  --accent-blue: #0284c7;
+  --accent-blue-glow: rgba(2, 132, 199, 0.2);
+  --accent-green: #16a34a;
+  --accent-green-glow: rgba(22, 163, 74, 0.2);
+  --accent-red: #e4002b;
+  --accent-red-glow: rgba(228, 0, 43, 0.2);
+  --accent-purple: #7c3aed;
+  --accent-purple-glow: rgba(124, 58, 237, 0.2);
+  --accent-gold: #d97706;
+  --accent-gold-glow: rgba(217, 119, 6, 0.2);
+  --accent-cyan: #0891b2;
 
-  --gradient-profit: linear-gradient(135deg, #10b981, #059669);
-  --gradient-loss: linear-gradient(135deg, #ef4444, #dc2626);
-  --gradient-neutral: linear-gradient(135deg, #64748b, #475569);
-  --gradient-blue: linear-gradient(135deg, #3b82f6, #2563eb);
-  --gradient-purple: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  --gradient-gold: linear-gradient(135deg, #f59e0b, #d97706);
+  --gradient-profit: linear-gradient(135deg, #16a34a, #15803d);
+  --gradient-loss: linear-gradient(135deg, #e4002b, #b91c1c);
+  --gradient-neutral: linear-gradient(135deg, #94a3b8, #64748b);
+  --gradient-blue: linear-gradient(135deg, #e4002b, #dc2626); /* Dialog uses red for main accents */
+  --gradient-purple: linear-gradient(135deg, #7c3aed, #6d28d9);
+  --gradient-gold: linear-gradient(135deg, #d97706, #b45309);
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 40px rgba(0, 0, 0, 0.5);
-  --shadow-glow-green: 0 0 30px rgba(16, 185, 129, 0.15);
-  --shadow-glow-red: 0 0 30px rgba(239, 68, 68, 0.15);
-  --shadow-glow-blue: 0 0 30px rgba(59, 130, 246, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-glow-green: 0 0 20px rgba(22, 163, 74, 0.1);
+  --shadow-glow-red: 0 0 20px rgba(228, 0, 43, 0.15);
+  --shadow-glow-blue: 0 0 20px rgba(228, 0, 43, 0.15); /* Match red */
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -88,7 +88,7 @@ body::before, body::after {
 body::before {
   width: 500px;
   height: 500px;
-  background: rgba(59, 130, 246, 0.08);
+  background: rgba(228, 0, 43, 0.04);
   top: -200px;
   right: -100px;
 }
@@ -96,7 +96,7 @@ body::before {
 body::after {
   width: 400px;
   height: 400px;
-  background: rgba(139, 92, 246, 0.06);
+  background: rgba(0, 0, 0, 0.02);
   bottom: -100px;
   left: -100px;
 }
@@ -153,7 +153,7 @@ body::after {
 }
 
 .sidebar-logo .logo-text span {
-  color: var(--accent-blue);
+  color: var(--accent-red);
 }
 
 /* Shop Selector */
@@ -179,10 +179,10 @@ body::after {
   background-position: right 12px center;
 }
 
-.shop-selector select:hover, .shop-selector select:focus {
-  border-color: var(--accent-blue);
+.shop-selector select:hover, .form-input:focus, .form-select:focus {
+  border-color: var(--accent-red);
   outline: none;
-  box-shadow: 0 0 0 3px var(--accent-blue-glow);
+  box-shadow: 0 0 0 3px var(--accent-red-glow);
 }
 
 .shop-selector select option {
@@ -222,7 +222,7 @@ body::after {
   top: 0;
   bottom: 0;
   width: 3px;
-  background: var(--accent-blue);
+  background: var(--accent-red);
   border-radius: 0 3px 3px 0;
   transform: scaleY(0);
   transition: var(--transition);
@@ -234,8 +234,8 @@ body::after {
 }
 
 .nav-links a.active {
-  color: var(--text-primary);
-  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent-red);
+  background: rgba(228, 0, 43, 0.08);
 }
 
 .nav-links a.active::before {
@@ -319,6 +319,7 @@ body::after {
   backdrop-filter: blur(20px);
   padding: 24px;
   transition: var(--transition);
+  box-shadow: var(--shadow-sm);
 }
 
 .card:hover {
@@ -458,6 +459,9 @@ body::after {
 
 .overall-card .overall-value {
   font-size: 2rem;
+  background: var(--gradient-blue);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   font-weight: 900;
   letter-spacing: -1px;
 }
@@ -492,13 +496,13 @@ body::after {
 
 .btn-primary {
   background: var(--gradient-blue);
-  color: white;
-  box-shadow: 0 4px 15px var(--accent-blue-glow);
+  color: #ffffff;
+  box-shadow: 0 4px 12px var(--accent-red-glow);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 25px var(--accent-blue-glow);
+  box-shadow: 0 6px 16px var(--accent-red-glow);
 }
 
 .btn-success {
@@ -530,7 +534,7 @@ body::after {
 
 .btn-ghost:hover {
   background: var(--bg-glass-hover);
-  color: var(--text-primary);
+  color: var(--accent-red);
   border-color: var(--border-glass-hover);
 }
 
@@ -650,8 +654,8 @@ select option {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.15);
+  background: rgba(228, 0, 43, 0.04);
+  border: 1px solid rgba(228, 0, 43, 0.15);
   border-radius: var(--radius-md);
   margin-top: 8px;
 }
@@ -665,7 +669,7 @@ select option {
 .auto-total .total-value {
   font-size: 1.1rem;
   font-weight: 800;
-  color: var(--accent-blue);
+  color: var(--accent-red);
   font-variant-numeric: tabular-nums;
 }
 

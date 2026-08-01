@@ -46,7 +46,7 @@
 
       <!-- Navigation -->
       <ul class="nav-links">
-        <li><a href="#" data-page="dashboard" class="active"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
+        <li><a href="#" data-page="dashboard" class="active" onclick="App.showMainDashboard()"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
         <li><a href="#" data-page="update"><span class="nav-icon">➕</span> <span data-i18n="nav_update">Update කරන්න</span></a></li>
         <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update ඉතිහාසය</span></a></li>
         <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">සාප්පු</span></a></li>
@@ -210,10 +210,17 @@
               <div class="prev-value" id="prevHutch"></div>
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label" data-i18n="upd_cash_drawer">💵 Cash in Drawer (ලාච්චුවේ සල්ලි)</label>
-            <input type="number" class="form-input reload-input" id="reloadCash" placeholder="0.00" step="0.01" min="0">
-            <div class="prev-value" id="prevReloadCash"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">eZ Cash</label>
+              <input type="number" class="form-input reload-input" id="reloadEzcash" placeholder="0.00" step="0.01" min="0">
+              <div class="prev-value" id="prevEzcash"></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" data-i18n="upd_cash_drawer">💵 Cash in Drawer (ලාච්චුවේ සල්ලි)</label>
+              <input type="number" class="form-input reload-input" id="reloadCash" placeholder="0.00" step="0.01" min="0">
+              <div class="prev-value" id="prevReloadCash"></div>
+            </div>
           </div>
 
           <div class="auto-total">
