@@ -386,6 +386,31 @@ const DB = {
     return update;
   },
 
+  editUpdate(updateId, updateData) {
+    const updates = this.getUpdates();
+    const index = updates.findIndex(u => u.id === updateId);
+    if (index === -1) return null;
+
+    const existingUpdate = updates[index];
+    
+    // Update data while preserving original ID, timestamp, date
+    existingUpdate.empName = updateData.empName || existingUpdate.empName;
+    existingUpdate.jobRole = updateData.jobRole || existingUpdate.jobRole;
+    existingUpdate.reload = updateData.reload;
+    existingUpdate.mobileRental = updateData.mobileRental;
+
+    // Recalculate comparison with the update immediately preceding it
+    const prevUpdate = this.getLastUpdateBefore(existingUpdate.shopId, existingUpdate.timestamp);
+    existingUpdate.comparison = this.calculateComparison(existingUpdate, prevUpdate);
+
+    // Save
+    this.saveUpdates(updates);
+    this._syncToFirebase('payment_tracker_updates', existingUpdate.id, existingUpdate);
+    this.autoBackup();
+
+    return existingUpdate;
+  },
+
   deleteUpdate(updateId) {
     let updates = this.getUpdates();
     updates = updates.filter(u => u.id !== updateId);

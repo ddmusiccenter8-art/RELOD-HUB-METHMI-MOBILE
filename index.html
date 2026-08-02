@@ -86,6 +86,9 @@
           <div class="overall-label" data-i18n="dash_overall">මුළු ලාභය / අලාභය (Overall Profit/Loss)</div>
           <div class="overall-value neutral" id="overallValue">Rs.0.00</div>
           <div class="overall-type" id="overallType" data-i18n="dash_no_data">NO DATA</div>
+          <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.1);">
+            <div style="font-size:0.95rem; color:var(--text-secondary); font-weight:700;">මුළු මුදල (Total Balance): <span id="overallTotalCapital" style="color:var(--text-primary); font-size:1.1rem;">Rs.0.00</span></div>
+          </div>
         </div>
 
         <!-- Summary Cards -->
@@ -116,6 +119,18 @@
             </div>
             <div class="card-value" id="dashUpdateCount">0</div>
             <div style="font-size:0.85rem;color:var(--text-muted);" id="dashLastUpdateTime">Last: --</div>
+          </div>
+        </div>
+
+        <!-- Reload Breakdown -->
+        <div class="card" style="margin-bottom: 24px;">
+          <div class="card-header">
+            <span class="card-title">🔄 Reload Breakdown</span>
+          </div>
+          <div id="dashReloadBreakdown" class="result-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;">
+            <div class="empty-state" style="padding:20px;grid-column:1/-1;">
+              <div class="empty-sub" data-i18n="dash_no_data">No reload data yet</div>
+            </div>
           </div>
         </div>
 

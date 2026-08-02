@@ -6,6 +6,7 @@
 const App = {
   currentPage: 'dashboard',
   bankCounter: 0,
+  editingUpdateId: null,
 
   // ---- Initialize ----
   async init() {
@@ -131,6 +132,11 @@ const App = {
       link.addEventListener('click', (e) => {
         e.preventDefault();
         const page = link.getAttribute('data-page');
+        if (page === 'update') {
+          this.editingUpdateId = null;
+          const btn = document.querySelector('#updateForm button[type="submit"]');
+          if (btn) btn.innerHTML = '💾 Save Update (සටහන් කරන්න)';
+        }
         this.navigateTo(page);
         // Close mobile menu
         document.getElementById('sidebar').classList.remove('open');
@@ -254,8 +260,12 @@ const App = {
       overallCard.className = 'card overall-card neutral-card';
     }
 
+    const rTotal = DB.calculateReloadTotal(lastUpdate.reload);
+    const mTotal = DB.calculateMobileRentalGrandTotal(lastUpdate.mobileRental);
+    document.getElementById('overallTotalCapital').textContent = DB.formatCurrency(rTotal + mTotal);
+
     // Reload card
-    const reloadTotal = DB.calculateReloadTotal(lastUpdate.reload);
+    const reloadTotal = rTotal;
     document.getElementById('dashReloadTotal').textContent = DB.formatCurrency(reloadTotal);
     if (comp && !comp.isFirst) {
       const rd = comp.reload;
@@ -282,6 +292,9 @@ const App = {
     document.getElementById('dashUpdateCount').textContent = todayUpdates.length;
     document.getElementById('dashLastUpdateTime').textContent = 'Last: ' + DB.formatTime(lastUpdate.timestamp);
 
+    // Reload Breakdown
+    this.renderReloadBreakdown(lastUpdate);
+
     // Bank breakdown
     this.renderBankBreakdown(lastUpdate);
 
@@ -299,6 +312,7 @@ const App = {
       document.getElementById('overallType').textContent = 'ALL SHOPS (මුළු එකතුව)';
       document.getElementById('overallType').style.color = 'var(--accent-blue)';
       document.getElementById('overallCard').className = `card overall-card ${overallType === 'profit' ? 'profit-card' : overallType === 'loss' ? 'loss-card' : 'neutral-card'}`;
+      document.getElementById('overallTotalCapital').textContent = DB.formatCurrency(stats.reloadTotal + stats.mobileTotal);
 
       document.getElementById('dashReloadTotal').textContent = DB.formatCurrency(stats.reloadTotal);
       const rd = stats.diffs.reload;
@@ -322,6 +336,7 @@ const App = {
       document.getElementById('overallType').textContent = 'NO DATA';
       document.getElementById('overallType').style.color = 'var(--text-muted)';
       document.getElementById('overallCard').className = 'card overall-card neutral-card';
+      document.getElementById('overallTotalCapital').textContent = 'Rs.0.00';
       document.getElementById('dashReloadTotal').textContent = 'Rs.0.00';
       document.getElementById('dashReloadDiff').textContent = '➖ Rs.0.00';
       document.getElementById('dashReloadDiff').className = 'card-diff neutral';
@@ -332,6 +347,62 @@ const App = {
       document.getElementById('dashLastUpdateTime').textContent = 'Last: --';
       document.getElementById('dashBankBreakdown').innerHTML = '<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">No bank data yet</div></div>';
       document.getElementById('dashRecentUpdates').innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div><div class="empty-sub">පළමු update එක ගන්න ➕ බොත්තම ඔබන්න</div></div>';
+    }
+  },
+
+  renderReloadBreakdown(lastUpdate) {
+    const container = document.getElementById('dashReloadBreakdown');
+    if (!lastUpdate || !lastUpdate.reload) {
+      container.innerHTML = '<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">No reload data</div></div>';
+      return;
+    }
+
+    const r = lastUpdate.reload;
+    const items = [
+      { key: 'dialog', label: 'Dialog', val: r.dialog || 0, class: 'dialog' },
+      { key: 'airtel', label: 'Airtel', val: r.airtel || 0, class: 'airtel' },
+      { key: 'mobitel', label: 'Mobitel', val: r.mobitel || 0, class: 'mobitel' },
+      { key: 'hutch', label: 'Hutch', val: r.hutch || 0, class: 'hutch' },
+      { key: 'ezcash', label: 'eZ Cash', val: r.ezcash || 0, class: 'ezcash' },
+      { key: 'cashInDrawer', label: 'Cash (ලාච්චුවේ)', val: r.cashInDrawer || 0, class: 'cash' }
+    ];
+
+    const comp = lastUpdate.comparison;
+    let html = '';
+    
+    items.forEach(item => {
+      let diffHtml = '';
+      if (comp && !comp.isFirst) {
+        // We don't have individual reload diffs calculated in comparison,
+        // Wait, DB.calculateComparison only calculates total reload diff.
+        // I need to calculate individual diff if there's a previous update!
+      }
+      
+      html += `
+        <div style="text-align:center;padding:12px;background:var(--bg-glass);border-radius:var(--radius-sm);border:1px solid var(--border-glass);">
+          <div class="bank-tag ${item.class}" style="margin-bottom:8px;">${item.label}</div>
+          <div style="font-size:1.1rem;font-weight:800;">${DB.formatCurrency(item.val)}</div>
+          <div id="diff_${item.key}"></div>
+        </div>`;
+    });
+    
+    container.innerHTML = html;
+
+    // Calculate individual diffs manually since they aren't stored in comp
+    if (comp && !comp.isFirst) {
+      const prevUpdate = DB.getLastUpdateBefore(lastUpdate.shopId, lastUpdate.timestamp);
+      if (prevUpdate && prevUpdate.reload) {
+        items.forEach(item => {
+          const prevVal = prevUpdate.reload[item.key] || 0;
+          const diff = item.val - prevVal;
+          const type = diff > 0 ? 'profit' : diff < 0 ? 'loss' : 'neutral';
+          const icon = diff > 0 ? '▲' : diff < 0 ? '▼' : '➖';
+          const diffEl = container.querySelector(`#diff_${item.key}`);
+          if (diffEl) {
+            diffEl.innerHTML = `<div style="font-size:0.8rem;font-weight:700;color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">${icon} ${DB.formatCurrency(Math.abs(diff))}</div>`;
+          }
+        });
+      }
     }
   },
 
@@ -744,8 +815,16 @@ const App = {
       return;
     }
 
-    // Save
-    const update = DB.addUpdate({ shopId, empName, jobRole, reload, mobileRental });
+    // Save or Edit
+    let update;
+    if (this.editingUpdateId) {
+      update = DB.editUpdate(this.editingUpdateId, { empName, jobRole, reload, mobileRental });
+      this.editingUpdateId = null;
+      const btn = document.querySelector('#updateForm button[type="submit"]');
+      if (btn) btn.innerHTML = '💾 Save Update (සටහන් කරන්න)';
+    } else {
+      update = DB.addUpdate({ shopId, empName, jobRole, reload, mobileRental });
+    }
 
     // Show result
     const comp = update.comparison;
@@ -971,8 +1050,56 @@ const App = {
 
       ${compSummary}
       `,
-      [{ text: 'වසන්න', class: 'btn-ghost', onClick: () => this.closeModal() }]
+      [
+        { text: 'වසන්න', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: '✏️ Edit', class: 'btn-primary', onClick: () => { this.closeModal(); this.promptEditUpdate(u.id); } }
+      ]
     );
+  },
+
+  promptEditUpdate(updateId) {
+    // A simple prompt for admin password
+    const pwd = prompt('Enter Admin Password to edit:');
+    if (pwd === 'admin') {
+      this.startEditingUpdate(updateId);
+    } else if (pwd !== null) {
+      this.showToast('❌ Incorrect Password', 'error');
+    }
+  },
+
+  startEditingUpdate(updateId) {
+    const shopId = DB.getActiveShopId();
+    const update = DB.getUpdatesForShop(shopId).find(u => u.id === updateId);
+    if (!update) return;
+
+    this.editingUpdateId = updateId;
+    this.navigateTo('update');
+    
+    document.getElementById('empName').value = update.empName || '';
+    document.getElementById('jobRole').value = update.jobRole || '';
+    document.getElementById('reloadDialog').value = update.reload.dialog || '';
+    document.getElementById('reloadAirtel').value = update.reload.airtel || '';
+    document.getElementById('reloadMobitel').value = update.reload.mobitel || '';
+    document.getElementById('reloadHutch').value = update.reload.hutch || '';
+    document.getElementById('reloadEzcash').value = update.reload.ezcash || '';
+    document.getElementById('reloadCash').value = update.reload.cashInDrawer || '';
+
+    document.getElementById('bankEntries').innerHTML = '';
+    this.bankCounter = 0;
+    if (update.mobileRental?.banks?.length > 0) {
+      update.mobileRental.banks.forEach(b => {
+        this.addBankEntry(b.bank, b.accountAmount, b.cashInDrawer);
+      });
+    } else {
+      this.addBankEntry();
+    }
+    
+    // Change submit button text
+    const btn = document.querySelector('#updateForm button[type="submit"]');
+    if (btn) btn.innerHTML = '✏️ Update Data (වෙනස් කරන්න)';
+    
+    this.calculateReloadTotalLive();
+    this.calculateMobileTotalLive();
   },
 
   confirmDeleteUpdate(updateId) {
