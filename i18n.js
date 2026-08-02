@@ -3,7 +3,7 @@
 // ============================================
 
 const I18N = {
-  currentLang: localStorage.getItem('spt_lang') || 'si',
+  currentLang: localStorage.getItem('spt_lang') || 'en',
 
   translations: {
     en: {
@@ -22,7 +22,13 @@ const I18N = {
       
       // Dashboard
       'dash_title': 'Dashboard',
-      'dash_overall': 'OVERALL PROFIT/LOSS',
+      'dash_period_summary': 'PROFIT/LOSS SUMMARY',
+      'period_today': 'Today',
+      'period_week': 'This Week',
+      'period_month': 'This Month',
+      'period_year': 'This Year',
+      'period_all': 'All Time',
+      'dash_overall': 'VS YESTERDAY',
       'dash_no_data': 'NO DATA',
       'dash_reload': '🔄 Reload',
       'dash_mobile': '📱 Mobile Rental',
@@ -94,7 +100,13 @@ const I18N = {
       
       // Dashboard
       'dash_title': 'Dashboard',
-      'dash_overall': 'මුළු ලාභය / අලාභය',
+      'dash_period_summary': 'ලාභ / අලාභ සාරාංශය',
+      'period_today': 'අද දින (Today)',
+      'period_week': 'මෙම සතිය (This Week)',
+      'period_month': 'මෙම මාසය (This Month)',
+      'period_year': 'මෙම වසර (This Year)',
+      'period_all': 'ආරම්භයේ සිට (All Time)',
+      'dash_overall': 'ඊයේ දිනට සාපේක්ෂව',
       'dash_no_data': 'දත්ත නොමැත',
       'dash_reload': '🔄 Reload',
       'dash_mobile': '📱 Mobile Rental',
@@ -166,7 +178,13 @@ const I18N = {
       
       // Dashboard
       'dash_title': 'முகப்பு',
-      'dash_overall': 'மொத்த லாபம் / நஷ்டம்',
+      'dash_period_summary': 'லாபம் / நஷ்டம் சுருக்கம்',
+      'period_today': 'இன்று',
+      'period_week': 'இந்த வாரம்',
+      'period_month': 'இந்த மாதம்',
+      'period_year': 'இந்த வருடம்',
+      'period_all': 'அனைத்து நேரமும்',
+      'dash_overall': 'நேற்றைய தினத்துடன் ஒப்பிடுகையில்',
       'dash_no_data': 'தரவு இல்லை',
       'dash_reload': '🔄 ரீலோட்',
       'dash_mobile': '📱 மொபைல் வாடகை',

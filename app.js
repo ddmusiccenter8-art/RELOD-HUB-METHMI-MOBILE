@@ -34,6 +34,11 @@ const App = {
       this.showAddShopModal();
     });
 
+    // Dash Period Selector
+    document.getElementById('dashPeriodSelector').addEventListener('change', () => {
+      this.updatePeriodSummary(DB.getActiveShopId());
+    });
+
     // Show dashboard
     this.navigateTo('dashboard');
     this.updateTodayDate();
@@ -228,6 +233,7 @@ const App = {
       this.renderNoDashboard();
       return;
     }
+    this.updatePeriodSummary(shopId);
 
     const lastUpdate = DB.getLastUpdate(shopId);
     const today = DB.getTodayDate();
@@ -302,7 +308,32 @@ const App = {
     this.renderRecentUpdates(shopId);
   },
 
+  updatePeriodSummary(shopId) {
+    const period = document.getElementById('dashPeriodSelector').value;
+    const stats = DB.getStatsForPeriod(shopId, period);
+    
+    const valueEl = document.getElementById('dashPeriodValue');
+    const typeEl = document.getElementById('dashPeriodType');
+    const cardEl = document.getElementById('periodSummaryCard');
+
+    if (!stats || (stats.net === 0 && stats.type === 'neutral')) {
+      valueEl.textContent = 'Rs.0.00';
+      valueEl.className = 'overall-value neutral';
+      typeEl.textContent = I18N.get('dash_no_data');
+      typeEl.style.color = 'var(--text-muted)';
+      cardEl.className = 'card neutral-card';
+    } else {
+      valueEl.textContent = DB.formatCurrency(Math.abs(stats.net));
+      valueEl.className = `overall-value ${stats.type}`;
+      typeEl.textContent = stats.type === 'profit' ? '✅ PROFIT (ලාභ)' : stats.type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE';
+      typeEl.style.color = stats.type === 'profit' ? 'var(--accent-green)' : stats.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+      cardEl.className = `card ${stats.type === 'profit' ? 'profit-card' : stats.type === 'loss' ? 'loss-card' : 'neutral-card'}`;
+    }
+  },
+
   renderNoDashboard() {
+    this.updatePeriodSummary(null);
+
     const stats = DB.getGlobalStats();
     if (stats.hasData) {
       const overallDiff = stats.diffs.overall;
@@ -1314,6 +1345,10 @@ const App = {
             const month = new Date();
             month.setDate(1);
             startInput.value = month.toISOString().split('T')[0];
+        } else if (val === 'thisYear') {
+            const year = new Date();
+            year.setMonth(0, 1);
+            startInput.value = year.toISOString().split('T')[0];
         } else if (val === 'last3Months') {
             const month3 = new Date();
             month3.setMonth(month3.getMonth() - 3);

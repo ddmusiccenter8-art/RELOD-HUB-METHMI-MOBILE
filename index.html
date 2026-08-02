@@ -91,6 +91,22 @@
           </div>
         </div>
 
+        <!-- Period Summary Card -->
+        <div id="periodSummaryCard" class="card neutral-card" style="margin-bottom: 24px; padding: 15px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+            <div style="font-weight:700; color:var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;" data-i18n="dash_period_summary">PROFIT / LOSS SUMMARY (කාලය අනුව)</div>
+            <select id="dashPeriodSelector" class="form-input" style="width: auto; padding: 6px 10px; font-size: 0.85rem; height: auto;">
+              <option value="today" data-i18n="period_today">Today</option>
+              <option value="week" data-i18n="period_week">This Week</option>
+              <option value="month" data-i18n="period_month" selected>This Month</option>
+              <option value="year" data-i18n="period_year">This Year</option>
+              <option value="all" data-i18n="period_all">All Time</option>
+            </select>
+          </div>
+          <div class="overall-value neutral" id="dashPeriodValue" style="font-size: 1.8rem; margin-bottom: 5px;">Rs.0.00</div>
+          <div class="overall-type" id="dashPeriodType" style="font-size: 0.9rem;">NO DATA</div>
+        </div>
+
         <!-- Summary Cards -->
         <div class="summary-grid" id="summaryCards">
           <!-- Reload Card -->
@@ -338,6 +354,7 @@
                         <option value="yesterday" data-i18n="rep_preset_yesterday">Yesterday</option>
                         <option value="thisWeek" data-i18n="rep_preset_this_week">This Week</option>
                         <option value="thisMonth" data-i18n="rep_preset_this_month">This Month</option>
+                        <option value="thisYear" data-i18n="period_year">This Year</option>
                         <option value="last3Months" data-i18n="rep_preset_last_3">Last 3 Months</option>
                         <option value="allTime" data-i18n="rep_preset_all">All Time</option>
                     </select>

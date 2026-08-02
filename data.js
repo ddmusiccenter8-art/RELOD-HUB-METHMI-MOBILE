@@ -620,6 +620,45 @@ const DB = {
     };
   },
 
+  getStatsForPeriod(shopId, period) {
+    let updates = shopId ? this.getUpdatesForShop(shopId) : this.getUpdates();
+    
+    const now = new Date();
+    let startDate = '';
+    
+    if (period === 'today') {
+      startDate = now.toISOString().split('T')[0];
+    } else if (period === 'week') {
+      const d = new Date(now);
+      d.setDate(d.getDate() - d.getDay()); // Sunday
+      startDate = d.toISOString().split('T')[0];
+    } else if (period === 'month') {
+      startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    } else if (period === 'year') {
+      startDate = `${now.getFullYear()}-01-01`;
+    }
+    
+    if (period !== 'all') {
+      updates = updates.filter(u => u.date >= startDate);
+    }
+    
+    let totalProfit = 0;
+    let totalLoss = 0;
+    
+    updates.forEach(u => {
+      if (u.comparison && !u.comparison.isFirst) {
+         if (u.comparison.overall.diff > 0) totalProfit += u.comparison.overall.diff;
+         else totalLoss += Math.abs(u.comparison.overall.diff);
+      }
+    });
+    
+    const net = totalProfit - totalLoss;
+    return {
+      net,
+      type: net > 0 ? 'profit' : net < 0 ? 'loss' : 'neutral'
+    };
+  },
+
   // Get unique dates for a shop
   getUniqueDates(shopId) {
     const updates = this.getUpdatesForShop(shopId);
