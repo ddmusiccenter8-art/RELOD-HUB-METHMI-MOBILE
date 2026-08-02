@@ -1058,14 +1058,26 @@ const App = {
   },
 
   promptEditUpdate(updateId) {
-    // A simple prompt for admin password
-    const pwd = prompt('Enter Admin Password to edit:');
-    const cleanedPwd = pwd ? pwd.trim() : '';
-    if (cleanedPwd === '1234') {
-      this.startEditingUpdate(updateId);
-    } else if (pwd !== null) {
-      this.showToast('Incorrect Password (මුරපදය වැරදියි)', 'error');
-    }
+    this.showModal(
+      '🔐 Enter Admin Password',
+      `<div class="form-group" style="margin-top:10px;">
+        <input type="password" id="adminPwdInput" class="form-input" placeholder="Password (මුරපදය)" autofocus>
+      </div>`,
+      [
+        { text: 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: 'OK', class: 'btn-primary', onClick: () => {
+            const pwd = document.getElementById('adminPwdInput').value;
+            const cleanedPwd = pwd ? pwd.trim() : '';
+            if (cleanedPwd === '1234') {
+              this.closeModal();
+              this.startEditingUpdate(updateId);
+            } else {
+              this.showToast('Incorrect Password (මුරපදය වැරදියි)', 'error');
+            }
+          }
+        }
+      ]
+    );
   },
 
   startEditingUpdate(updateId) {
