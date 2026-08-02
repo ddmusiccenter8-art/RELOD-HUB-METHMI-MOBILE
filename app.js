@@ -1060,10 +1060,11 @@ const App = {
   promptEditUpdate(updateId) {
     // A simple prompt for admin password
     const pwd = prompt('Enter Admin Password to edit:');
-    if (pwd !== null && pwd.trim().toLowerCase() === 'admin') {
+    const cleanedPwd = pwd ? pwd.trim() : '';
+    if (cleanedPwd === '1234') {
       this.startEditingUpdate(updateId);
     } else if (pwd !== null) {
-      this.showToast('❌ Incorrect Password', 'error');
+      this.showToast('Incorrect Password (මුරපදය වැරදියි)', 'error');
     }
   },
 
