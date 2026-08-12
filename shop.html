@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Hub | Shop Dashboard</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#e50000">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Sinhala:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root {
+            --primary: #e50000;
+            --primary-hover: #cc0000;
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-muted: #6b7280;
+            --border-color: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --info: #3b82f6;
+            --danger: #ef4444;
+            --accent-purple: #c084fc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Noto Sans Sinhala', sans-serif;
+        }
+
+        body {
+            background: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 1.5rem 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+                .header {
+            width: 100%;
+            max-width: 1350px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            padding: 0.6rem 1.5rem;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .header h1 {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            color: #ef4444;
+            padding: 0.5rem 1.2rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.25s ease;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        .tabs { 
+            margin-top: 0.5rem; 
+            margin-bottom: 1.5rem; 
+            display: flex; 
+            gap: 0.75rem; 
+            width: 100%; 
+            max-width: 1350px; 
+        }
+
+        .tab { 
+            padding: 0.85rem 2rem; 
+            background: #f9fafb; 
+            border-radius: 12px 12px 0 0; 
+            cursor: pointer; 
+            font-weight: 600; 
+            font-size: 0.95rem;
+            border: 1px solid var(--border-color); 
+            border-bottom: none; 
+            color: var(--text-muted); 
+            transition: all 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            user-select: none;
+        }
+
+        .tab:hover {
+            background: #f3f4f6;
+            color: var(--text-main);
+        }
+
+        .tab.active { 
+            background: var(--card-bg); 
+            color: var(--text-main); 
+            border-top: 3px solid var(--primary); 
+            box-shadow: 0 -4px 15px rgba(229, 0, 0, 0.15);
+        }
+
+        .view { 
+            display: none; 
+            width: 100%; 
+            max-width: 1350px; 
+        }
+        
+        .view.active { 
+            display: block; 
+            animation: fadeIn 0.3s ease; 
+        }
+
+        #newEntryView.active {
+            display: grid;
+            grid-template-columns: 1fr 1.8fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 992px) {
+            #newEntryView.active {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .glass-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.8rem;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            margin-bottom: 1.5rem;
+        }
+
+        h2 {
+            margin-bottom: 1.25rem;
+            font-weight: 600;
+            color: var(--text-main);
+            font-size: 1.25rem;
+        }
+
+        .form-group { margin-bottom: 1.1rem; }
+        label { display: block; margin-bottom: 0.4rem; font-size: 0.85rem; color: var(--text-muted); font-weight: 500; }
+        .lang-si { font-size: 0.82rem; opacity: 0.85; }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(11, 15, 25, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            transition: all 0.25s ease;
+        }
+
+        input:focus, select:focus { 
+            outline: none; 
+            border-color: var(--primary); 
+            box-shadow: 0 0 0 3px rgba(229, 0, 0, 0.2);
+            background: #ffffff;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 0.95rem;
+            background: linear-gradient(135deg, var(--primary) 0%, #990000 100%);
+            color: var(--text-main);
+            border: none;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            box-shadow: 0 4px 15px rgba(229, 0, 0, 0.35);
+            transition: all 0.25s ease;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(229, 0, 0, 0.5);
+        }
+
+        .submit-btn:disabled {
+            background: #334155;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .filter-btn { padding: 0.5rem 1rem; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 8px; cursor: pointer; transition: 0.2s; font-size: 0.85rem; }
+        .filter-btn.active { background: var(--primary); border-color: var(--primary); box-shadow: 0 4px 12px rgba(229, 0, 0, 0.3); }
+        .filter-btn:hover:not(.active) { background: #f9fafb; }
+
+        /* Table Styles */
+        .table-container { 
+            overflow-x: auto; 
+            border-radius: 10px; 
+            border: 1px solid var(--border-color);
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 0.9rem 1rem; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 0.88rem; }
+        th { background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); color: var(--text-muted); text-transform: uppercase; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.5px; }
+        tr:hover { background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        
+        .badge { padding: 0.3rem 0.75rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+        .badge-new { background: rgba(59, 130, 246, 0.2); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.4); }
+        .badge-replied { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.4); cursor: pointer; }
+        .badge-sent { background: rgba(192, 132, 252, 0.2); color: var(--accent-purple); border: 1px solid rgba(192, 132, 252, 0.4); cursor: pointer; }
+        .badge-confirmed { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.4); }
+
+        .chart-container {
+            width: 100%;
+            height: 260px;
+            margin-top: 1rem;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        .modal-content {
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 520px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            right: 1.5rem;
+            top: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            transition: 0.2s;
+        }
+        .modal-close:hover { color: var(--text-main); }
+        
+        .reply-box {
+            background: rgba(245, 158, 11, 0.12);
+            border-left: 4px solid var(--warning);
+            padding: 1.2rem;
+            margin-top: 1rem;
+            border-radius: 8px;
+        }
+        .btn-pay {
+            background: linear-gradient(135deg, var(--success) 0%, #059669 100%);
+            color: var(--text-main);
+            border: none;
+            padding: 0.9rem 1.5rem;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 1rem;
+            width: 100%;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: 0.2s;
+        }
+        .btn-pay:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Toast Notifications */
+        #toastContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: #1e293b;
+            color: var(--text-main);
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn 0.3s forwards;
+            max-width: 350px;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            body { padding: 1rem; }
+            .header { flex-direction: column; gap: 1rem; text-align: center; padding: 1rem; }
+            .tabs { flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+            .tab { border-radius: 10px; border-bottom: 1px solid var(--border-color); justify-content: center; }
+            th, td { padding: 0.75rem 0.5rem; font-size: 0.8rem; }
+        }
+    </style>
+</head>
+<body style="display: none;">
+
+    <div class="header">
+        <h1>
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+            METHMI WORK HUB <span style="font-size: 0.95rem; color: var(--text-muted); font-weight: normal;">| Shop Dashboard</span>
+        </h1>
+        <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <select id="langSwitcher" onchange="changeLanguage(this.value)" style="width: auto; background: #f3f4f6; border: 1px solid var(--border-color); color: var(--text-main); padding: 0.4rem 0.8rem; border-radius: 6px; outline: none; cursor: pointer; font-size: 0.85rem;">
+                <option value="en" selected>English</option>
+                <option value="si">Sinhala</option>
+                <option value="ta">Tamil</option>
+            </select>
+            <span id="connectionBadge" style="font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 999px; background: rgba(16,185,129,0.2); color: var(--success); border: 1px solid rgba(16,185,129,0.4); font-weight: 600;">🟢 Firebase Connected</span>
+            <span id="userEmailDisplay" style="color: var(--accent-purple); font-weight: 600; font-size: 0.9rem;"></span>
+            <button class="logout-btn" id="logoutBtn" onclick="doLogout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" data-tab="newEntry" onclick="switchTab('newEntry')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            New Submissions & History
+        </div>
+        <div class="tab" data-tab="myStock" onclick="switchTab('myStock')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+            My Head Office Stock
+        </div>
+    </div>
+
+    <!-- Form Section View -->
+    <div id="newEntryView" class="view active">
+        <!-- New Entry Form -->
+        <div class="glass-panel">
+            <h2>New Entry <span class="lang-si">(නව දත්ත ඇතුලත් කිරීම)</span></h2>
+            
+            <form id="salesForm">
+                <div class="form-group">
+                    <label for="date">Date <span class="lang-si">(දිනය)</span></label>
+                    <input type="date" id="date" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="spNumber">SP Number <span class="lang-si">(SP අංකය)</span></label>
+                    <input type="text" id="spNumber" placeholder="e.g. SP-1024" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="nic">Customer NIC <span class="lang-si">(ජා. හැ. අංකය)</span></label>
+                    <input type="text" id="nic" placeholder="e.g. 199512345678 or 951234567V" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="name">Customer Name <span class="lang-si">(නම)</span></label>
+                    <input type="text" id="name" placeholder="e.g. A.B. Perera" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="imei">IMEI Number <span class="lang-si">(IMEI අංකය)</span></label>
+                    <div style="display: flex; gap: 0.5rem; align-items: stretch; margin-bottom: 0.5rem;">
+                        <input type="text" id="imei" required placeholder="Type or scan IMEI..." style="flex: 1; min-width: 0;">
+                        <button type="button" onclick="startScanner('imei')" style="background: var(--info); color: white; border: none; padding: 0 1.2rem; border-radius: 10px; cursor: pointer; white-space: nowrap; font-weight: 600;">📷 Scan</button>
+                    </div>
+                    <div id="imeiStatus" style="font-size: 0.85rem; min-height: 22px; font-weight: 600;"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="model">Phone Model <span class="lang-si">(දුරකථන මාදිලිය)</span></label>
+                    <input type="text" id="model" placeholder="e.g. Samsung Galaxy A14" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="storage">Storage Capacity <span class="lang-si">(ධාරිතාව)</span></label>
+                    <input type="text" id="storage" placeholder="e.g. 128GB">
+                </div>
+
+                <div class="form-group">
+                    <label for="mrp">MRP <span class="lang-si">(උපරිම සිල්ලර මිල)</span></label>
+                    <input type="number" id="mrp" placeholder="0.00" step="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="downPayment">Down Payment <span class="lang-si">(මූලික ගෙවීම)</span></label>
+                    <input type="number" id="downPayment" placeholder="0.00" step="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="document">Document Fee <span class="lang-si">(ලේඛන ගාස්තුව)</span></label>
+                    <input type="number" id="document" placeholder="0.00" step="0.01">
+                </div>
+
+                <div class="form-group">
+                    <label for="loanAmount">Loan Amount <span class="lang-si">(ණය මුදල)</span></label>
+                    <input type="number" id="loanAmount" placeholder="0.00" step="0.01" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="settlement">Settlement <span class="lang-si">(ගෙවීම)</span></label>
+                    <input type="number" id="settlement" placeholder="0.00" step="0.01" readonly style="background: #f3f4f6; font-weight: bold; color: var(--warning);">
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">Submit Data</button>
+            </form>
+        </div>
+
+        <!-- Data View & Chart Section -->
+        <div>
+            <!-- Financial & Profit Summary Cards -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                <div style="background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 1.2rem; border-radius: 14px; border: 1px solid var(--border-color);">
+                    <h3 style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.35rem; text-transform: uppercase;">Total Loans</h3>
+                    <p style="font-size: 1.4rem; font-weight: 700; color: #818cf8; margin: 0;" id="shopTotalLoans">Rs. 0.00</p>
+                </div>
+                <div style="background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 1.2rem; border-radius: 14px; border: 1px solid var(--border-color);">
+                    <h3 style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.35rem; text-transform: uppercase;">My Earned Profit</h3>
+                    <p style="font-size: 1.4rem; font-weight: 700; color: #10b981; margin: 0;" id="shopTotalProfit">Rs. 0.00</p>
+                    <span style="font-size: 0.72rem; color: var(--text-muted);">HO (4%) + Own (6%)</span>
+                </div>
+                <div style="background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 1.2rem; border-radius: 14px; border: 1px solid var(--border-color);">
+                    <h3 style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.35rem; text-transform: uppercase;">Settlement (Paid)</h3>
+                    <p style="font-size: 1.4rem; font-weight: 700; color: var(--success); margin: 0;" id="shopTotalPaid">Rs. 0.00</p>
+                </div>
+                <div style="background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 1.2rem; border-radius: 14px; border: 1px solid var(--border-color);">
+                    <h3 style="color: var(--text-muted); font-size: 0.8rem; margin-bottom: 0.35rem; text-transform: uppercase;">Settlement (Pending)</h3>
+                    <p style="font-size: 1.4rem; font-weight: 700; color: var(--warning); margin: 0;" id="shopTotalPending">Rs. 0.00</p>
+                </div>
+            </div>
+
+            <div class="glass-panel" style="padding-bottom: 1.2rem;">
+                <h2>Sales Analytics <span class="lang-si">(විකුණුම් විශ්ලේෂණය)</span></h2>
+                <div class="chart-container">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+
+            <div class="glass-panel">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                    <h2 style="margin: 0;">My Submissions <span class="lang-si">(මා විසින් ඇතුලත් කල දත්ත)</span></h2>
+                    <input type="text" id="shopSearchInput" placeholder="Search IMEI, SP, NIC, Model..." onkeyup="renderShopSales()" style="background: #f3f4f6; border: 1px solid var(--border-color); color: var(--text-main); padding: 0.6rem 1rem; border-radius: 8px; width: 100%; max-width: 250px;">
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1.2rem; flex-wrap: wrap;">
+                    <button class="filter-btn active" data-filter="All" onclick="filterShopSalesByStatus('All')">All History</button>
+                    <button class="filter-btn" data-filter="Pending" onclick="filterShopSalesByStatus('Pending')">Pending Payments</button>
+                    <button class="filter-btn" data-filter="Paid" onclick="filterShopSalesByStatus('Paid')">Completed Payments</button>
+                </div>
+
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>SP / Model</th>
+                                <th>Amounts</th>
+                                <th>Status <span class="lang-si">(තත්වය)</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- My Stock View -->
+    <div id="myStockView" class="view" style="background: var(--card-bg); padding: 2rem; border-radius: 16px; border: 1px solid var(--border-color); width: 100%;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 1.25rem;">
+            <h2>My Head Office Stock <span class="lang-si">(ප්‍රධාන කාර්යාල තොගය)</span></h2>
+            <span id="stockBadgeCount" style="background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.4); padding: 0.3rem 0.8rem; border-radius: 999px; font-weight: 600; font-size: 0.85rem;">Checking Stock...</span>
+        </div>
+
+        <div style="margin-bottom: 1.5rem; background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); padding: 1.5rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06);">
+            <label style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.5rem; display: block;">Select Your Branch / Location <span style="color:var(--info); font-size:0.75rem;">(ශාඛාව තෝරන්න)</span></label>
+            <div style="display: flex; gap: 1rem; align-items: stretch; flex-wrap: wrap;">
+                <select id="myBranchName" onchange="loadMyStock(true)" style="max-width: 420px; flex: 1; margin: 0; background: #f3f4f6; border: 1px solid var(--border-color); color: var(--text-main); padding: 0.8rem; border-radius: 10px; font-weight:600; font-size: 0.95rem;">
+                    <option value="">-- Choose Your Branch --</option>
+                </select>
+                <button class="submit-btn" style="width: auto; margin-top: 0; padding: 0 1.8rem;" onclick="loadMyStock(true)">View Stock</button>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 0.6rem;">Phones transferred to your branch from Head Office (Shop receives 4% profit settlement when sold).</p>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>IMEI</th>
+                        <th>Model & Storage</th>
+                        <th>Assigned Branch</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="myStockBody">
+                    <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">Loading branch allocated stock...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Action Modal -->
+    <div id="actionModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle" style="font-size: 1.25rem; color: var(--text-main);">Submission Details</h2>
+            
+            <div id="replySection" class="reply-box" style="display: none;">
+                <strong style="color: var(--warning);">Message from Admin:</strong>
+                <p id="adminReplyText" style="margin-top: 6px; color: var(--text-main); line-height: 1.4;"></p>
+            </div>
+
+            <div id="paymentSection" style="display: none; margin-top: 20px; text-align: center;">
+                <p style="color: var(--text-muted); margin-bottom: 8px;">Admin has marked the settlement payment as sent.</p>
+                <p id="paymentNoteDisplay" style="color: var(--text-main); font-weight: bold; font-size: 1.1rem; margin-bottom: 15px;"></p>
+                <button class="btn-pay" id="confirmPaymentBtn">Confirm Payment Received</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="modal">
+        <div class="modal-content" style="max-width: 440px; text-align: center; padding: 1.2rem;">
+            <span class="modal-close" onclick="stopScanner()">&times;</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem;">
+                <h2 style="margin: 0; color: var(--text-main); font-size: 1.1rem;">📷 Scan Barcode</h2>
+                <select id="cameraSelect" onchange="switchCamera(this.value)" style="display: none; width: auto; max-width: 170px; padding: 0.3rem 0.6rem; font-size: 0.78rem; border-radius: 6px; border: 1px solid var(--border-color); background: #f3f4f6; color: var(--text-main);">
+                </select>
+            </div>
+            <div id="reader" style="width: 100%; min-height: 260px; background: #000; border-radius: 10px; overflow: hidden; margin-bottom: 0.5rem; position: relative;"></div>
+            <div style="font-size: 0.8rem; color: #ef4444; margin-bottom: 0.8rem; font-weight: 600;">🎯 එක IMEI Barcode එකක් පමණක් කොටුව මැදට කෙලින් තබන්න</div>
+            
+            <div style="text-align: left; margin-bottom: 1rem;">
+                <label style="display:block; margin-bottom: 0.4rem; color: var(--text-muted); font-size: 0.85rem;">Or Type Manually</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" id="manualScannerInput" placeholder="Enter IMEI / Barcode" onkeydown="if(event.key==='Enter'){event.preventDefault();submitManualScan();}" style="flex: 1; padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: var(--card-bg); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); color: var(--text-main); outline: none;">
+                    <button onclick="submitManualScan()" style="background: var(--primary); color: white; border: none; padding: 0 1rem; border-radius: 8px; cursor: pointer; font-weight: 600;">OK</button>
+                </div>
+            </div>
+
+            <button onclick="stopScanner()" style="background: #f3f4f6; border: 1px solid var(--border-color); color: var(--text-main); width: 100%; padding: 0.75rem; border-radius: 8px; cursor: pointer; font-weight: 600;">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, updateDoc, getDocs } 
+        from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdSMDIj4Tlt5sRB0Qjnmm1rQRTGKpN7zs",
+            authDomain: "methmi-work-hub.firebaseapp.com",
+            projectId: "methmi-work-hub",
+            storageBucket: "methmi-work-hub.firebasestorage.app",
+            messagingSenderId: "786539502768",
+            appId: "1:786539502768:web:171f0b674108a8555bef75"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Translation Dictionary & Logic
+        const langDict = {
+            "Shop Dashboard": { si: "වෙළඳසැල් පුවරුව", ta: "கடை கட்டுப்பாட்டு பலகை" },
+            "New Submissions & History": { si: "නව ඇතුළත් කිරීම් සහ ඉතිහාසය", ta: "புதிய உள்ளீடுகள் & வரலாறு" },
+            "My Head Office Stock": { si: "මගේ ප්‍රධාන කාර්යාල තොගය", ta: "எனது தலைமை அலுவலக இருப்பு" },
+            "New Entry": { si: "නව ඇතුළත් කිරීම", ta: "புதிய பதிவு" },
+            "Date": { si: "දිනය", ta: "திகதி" },
+            "SP Number": { si: "SP අංකය", ta: "SP எண்" },
+            "Customer NIC": { si: "පාරිභෝගික හැඳුනුම්පත් අංකය", ta: "வாடிக்கையாளர் NIC" },
+            "Customer Name": { si: "පාරිභෝගිකයාගේ නම", ta: "வாடிக்கையாளர் பெயர்" },
+            "IMEI Number": { si: "IMEI අංකය", ta: "IMEI எண்" },
+            "Device Model": { si: "දුරකථන මාදිලිය", ta: "சாதන மாதிரி" },
+            "Storage / RAM": { si: "ධාරිතාව (Storage / RAM)", ta: "சேமிப்பு / RAM" },
+            "Retail Price (MRP)": { si: "සිල්ලර මිල (MRP)", ta: "சில்லறை விலை (MRP)" },
+            "Down Payment": { si: "මූලික ගෙවීම", ta: "முன்பணம்" },
+            "Document Charges": { si: "ලේඛන ගාස්තු", ta: "ஆவணக் கட்டணம்" },
+            "Loan Amount": { si: "ණය මුදල", ta: "கடன் தொகை" },
+            "Stock Source": { si: "තොගය පැමිණි ආකාරය", ta: "இருப்பு மூலம்" },
+            "Shop Stock": { si: "වෙළඳසැලේ තොග", ta: "கடை இருப்பு" },
+            "Shop Own Stock": { si: "වෙළඳසැලේ තොග", ta: "கடை சொந்த இருப்பு" },
+            "Head Office Stock": { si: "ප්‍රධාන කාර්යාල තොග", ta: "தலைமை அலுவலக இருப்பு" },
+            "Branch Name": { si: "ශාඛාවේ නම", ta: "கிளையின் பெயர்" },
+            "Calculated Settlement": { si: "ගණනය කළ බේරුම් මුදල", ta: "கணக்கிடப்பட்ட தீர்வு" },
+            "Submit Sales Entry": { si: "විකුණුම් දත්ත ඇතුළත් කරන්න", ta: "விற்பனை பதிவை சமர்ப்பிக்கவும்" },
+            "Sales Analytics": { si: "විකුණුම් විශ්ලේෂණය", ta: "விற்பனை பகுப்பாய்வு" },
+            "Recent Submissions": { si: "මෑත ඇතුළත් කිරීම්", ta: "சமீபத்திய உள்ளீடுகள்" },
+            "All Entries": { si: "සියලුම ඇතුළත් කිරීම්", ta: "அனைத்து பதிவுகளும்" },
+            "Pending": { si: "ක්‍රියාත්මක වෙමින්", ta: "நிலுவையில்" },
+            "Confirmed": { si: "තහවුරු කරන ලදී", ta: "உறுதிப்படுத்தப்பட்டது" },
+            "Paid": { si: "ගෙවන ලදී", ta: "செலுத்தப்பட்டது" },
+            "Logout": { si: "පිටවීම", ta: "வெளியேறு" },
+            "Status": { si: "තත්වය", ta: "நிலை" },
+            "Action": { si: "ක්‍රියාවලිය", ta: "செயல்பாடு" },
+            "Select Your Branch / Location": { si: "ශාඛාව තෝරන්න", ta: "கிளையைத் தேர்ந்தெடுக்கவும்" },
+            "View Stock": { si: "තොග බලන්න", ta: "இருப்பைப் பார்க்கவும்" },
+            "Assigned Branch": { si: "වෙන් කළ ශාඛාව", ta: "ஒதுக்கப்பட்ட கிளை" },
+            "Model & Storage": { si: "මාදිලිය සහ ධාරිතාව", ta: "மாதிரி & சேமிப்பு" },
+            "Amounts": { si: "මුදල් ප්‍රමාණ", ta: "தொகைகள்" },
+            "SP / Model": { si: "SP / මාදිලිය", ta: "SP / மாதிரி" },
+            "Return to Main": { si: "නැවත Main Shop එකට", ta: "மீண்டும் முதன்மைக்கு" },
+            "Available": { si: "ලබාගත හැක", ta: "கிடைக்கக்கூடியது" },
+            "Sold": { si: "විකිණී ඇත", ta: "விற்கப்பட்டது" },
+            "Type or scan IMEI...": { si: "IMEI අංකය ඇතුළත් කරන්න...", ta: "IMEI ஐ உள்ளிடவும் அல்லது ஸ்கேன் செய்யவும்..." },
+            "e.g. SP-1024": { si: "උදා: SP-1024", ta: "உதா: SP-1024" },
+            "e.g. 199512345678 or 951234567V": { si: "උදා: 199512345678 හෝ 951234567V", ta: "உதா: 199512345678 அல்லது 951234567V" },
+            "e.g. A.B. Perera": { si: "උදා: ඒ.බී. පෙරේරා", ta: "உதா: ஏ.பி. பெரேரா" }
+        };
+
+        window.walkNodeAndTranslate = function(node, lang) {
+            if (node.nodeType === 3) {
+                const text = node.nodeValue.trim();
+                if (text && !text.includes('{') && !text.includes('}')) {
+                    if (!node.originalText) {
+                        node.originalText = node.nodeValue;
+                    }
+                    const key = node.originalText.trim();
+                    if (lang === 'en') {
+                        node.nodeValue = node.originalText;
+                    } else if (langDict[key] && langDict[key][lang]) {
+                        node.nodeValue = node.originalText.replace(key, langDict[key][lang]);
+                    }
+                }
+            } else if (node.nodeType === 1 && node.nodeName !== 'SCRIPT' && node.nodeName !== 'STYLE') {
+                if (node.tagName === 'INPUT' && node.placeholder) {
+                    if (!node.originalPlaceholder) node.originalPlaceholder = node.placeholder;
+                    const pKey = node.originalPlaceholder.trim();
+                    if (lang === 'en') {
+                        node.placeholder = node.originalPlaceholder;
+                    } else if (langDict[pKey] && langDict[pKey][lang]) {
+                        node.placeholder = langDict[pKey][lang];
+                    }
+                }
+                for (let i = 0; i < node.childNodes.length; i++) {
+                    window.walkNodeAndTranslate(node.childNodes[i], lang);
+                }
+            }
+        };
+
+        window.currentLang = localStorage.getItem('preferredLang') || 'en';
+        
+        window.changeLanguage = function(lang) {
+            window.currentLang = lang;
+            localStorage.setItem('preferredLang', lang);
+            document.getElementById('langSwitcher').value = lang;
+            window.walkNodeAndTranslate(document.body, lang);
+        };
+        
+        setTimeout(() => window.changeLanguage(window.currentLang), 500);
+
+        let isTranslating = false;
+        const observer = new MutationObserver((mutations) => {
+            if (isTranslating || window.currentLang === 'en') return;
+            let hasNewNodes = mutations.some(m => m.addedNodes.length > 0);
+            if (hasNewNodes) {
+                isTranslating = true;
+                window.walkNodeAndTranslate(document.body, window.currentLang);
+                setTimeout(() => { isTranslating = false; }, 50);
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Connection Status Listener
+        window.addEventListener('online', () => {
+            const badge = document.getElementById('connectionBadge');
+            if (badge) {
+                badge.style.background = 'rgba(16,185,129,0.2)';
+                badge.style.borderColor = 'rgba(16,185,129,0.4)';
+                badge.style.color = 'var(--success)';
+                badge.innerHTML = '🟢 Firebase Connected';
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            const badge = document.getElementById('connectionBadge');
+            if (badge) {
+                badge.style.background = 'rgba(239,68,68,0.2)';
+                badge.style.borderColor = 'rgba(239,68,68,0.4)';
+                badge.style.color = '#fca5a5';
+                badge.innerHTML = '🔴 Network Offline';
+            }
+        });
+
+        let currentUser = null;
+        let currentModalDocId = null;
+        let currentShopFilter = 'All';
+        let allShopSales = [];
+        let myRegisteredShopProfile = null;
+        let currentStockSource = 'Shop';
+        let matchedInventoryDocId = null;
+        let myChart = null;
+
+        // Toast Helper
+        window.showToast = function(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            
+            let color = 'var(--info)';
+            if (type === 'success') color = 'var(--success)';
+            if (type === 'error') color = 'var(--danger)';
+            if (type === 'warning') color = 'var(--warning)';
+
+            toast.style.borderLeft = `4px solid ${color}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        };
+
+        // Strict Auth Guard
+        onAuthStateChanged(auth, (user) => {
+            if (!user) {
+                window.location.replace('index.html');
+                return;
+            }
+
+            const adminEmails = [
+                'admin@methmi.com', 
+                'methmimobilepvtltd@gmail.com', 
+                'ddmusiccenter8@gmail.com'
+            ];
+            const isAdmin = user.email.toLowerCase().includes('admin') || 
+                            adminEmails.includes(user.email.toLowerCase());
+
+            if (isAdmin) {
+                window.location.replace('admin.html');
+                return;
+            }
+
+            currentUser = user;
+            document.body.style.display = 'block';
+            document.getElementById('userEmailDisplay').innerText = user.email;
+            if (document.getElementById('date')) {
+                document.getElementById('date').valueAsDate = new Date();
+            }
+            loadBranchOptions();
+            loadShopData(user.email);
+        });
+
+        window.doLogout = async function() {
+            try {
+                await signOut(auth);
+            } catch (e) {
+                console.error("Signout error:", e);
+            }
+            window.location.href = 'index.html';
+        };
+
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', window.doLogout);
+        }
+
+        // Tab Switching Logic
+        window.switchTab = function(tabName) {
+            document.querySelectorAll('.tab').forEach(t => {
+                if (t.dataset.tab === tabName) t.classList.add('active');
+                else t.classList.remove('active');
+            });
+            document.querySelectorAll('.view').forEach(v => {
+                v.classList.remove('active');
+            });
+            const targetView = document.getElementById(tabName + 'View');
+            if (targetView) {
+                targetView.classList.add('active');
+            }
+            if (tabName === 'myStock') {
+                loadMyStock(false);
+            }
+        };
+
+        // Set default date to today
+        document.getElementById('date').valueAsDate = new Date();
+
+        // Auto Calculation & Inventory Check Logic
+
+        const imeiInput = document.getElementById('imei');
+        const imeiStatus = document.getElementById('imeiStatus');
+        const modelInput = document.getElementById('model');
+        const storageInput = document.getElementById('storage');
+        const mrpInput = document.getElementById('mrp');
+        const downPaymentInput = document.getElementById('downPayment');
+        const documentInput = document.getElementById('document');
+        const loanAmountInput = document.getElementById('loanAmount');
+        const settlementInput = document.getElementById('settlement');
+
+        // Auto calculate Loan Amount when MRP or DownPayment change
+        mrpInput.addEventListener('input', () => {
+            const mrp = parseFloat(mrpInput.value) || 0;
+            const dp = parseFloat(downPaymentInput.value) || 0;
+            if (mrp > 0 && dp >= 0) {
+                loanAmountInput.value = Math.max(0, mrp - dp).toFixed(2);
+            }
+            calculateSettlement();
+        });
+
+        downPaymentInput.addEventListener('input', () => {
+            const mrp = parseFloat(mrpInput.value) || 0;
+            const dp = parseFloat(downPaymentInput.value) || 0;
+            if (mrp > 0 && dp >= 0) {
+                loanAmountInput.value = Math.max(0, mrp - dp).toFixed(2);
+            }
+            calculateSettlement();
+        });
+
+        documentInput.addEventListener('input', calculateSettlement);
+        loanAmountInput.addEventListener('input', calculateSettlement);
+
+        imeiInput.addEventListener('input', async (e) => {
+            const val = e.target.value.trim();
+            if (val.length < 4) {
+                imeiStatus.innerText = '';
+                currentStockSource = 'Shop';
+                matchedInventoryDocId = null;
+                calculateSettlement();
+                return;
+            }
+            
+            try {
+                const q = query(collection(db, "inventory"), where("imei", "==", val), where("status", "==", "Available"));
+                const snapshot = await getDocs(q);
+                
+                if (!snapshot.empty) {
+                    const invDoc = snapshot.docs[0];
+                    const data = invDoc.data();
+                    
+                    imeiStatus.innerHTML = '<span style="color: var(--success); font-weight: 600;">🟢 Head Office Stock (4% Shop Profit)</span>';
+                    if (data.model) modelInput.value = data.model;
+                    if (data.storage) storageInput.value = data.storage;
+                    
+                    currentStockSource = 'HO';
+                    matchedInventoryDocId = invDoc.id;
+                } else {
+                    imeiStatus.innerHTML = '<span style="color: #3b82f6; font-weight: 600;">🔵 Shop Own Stock (6% Shop Profit)</span>';
+                    currentStockSource = 'Shop';
+                    matchedInventoryDocId = null;
+                }
+            } catch (err) {
+                console.error("IMEI check error:", err);
+            }
+            calculateSettlement();
+        });
+
+        function calculateSettlement() {
+            const mrp = parseFloat(mrpInput.value) || 0;
+            const dp = parseFloat(downPaymentInput.value) || 0;
+            const docCharge = parseFloat(documentInput.value) || 0;
+
+            let settlement = 0;
+            const isHO = (currentStockSource === 'HO');
+            const profitRate = isHO ? 0.04 : 0.06;
+            
+            // Settlement = (MRP - Profit) - Down Payment - Document Fee
+            const discountedMrp = mrp - (mrp * profitRate);
+            settlement = discountedMrp - dp - docCharge;
+
+            if (mrp > 0 || dp > 0 || docCharge > 0) {
+                settlementInput.value = Math.max(0, settlement).toFixed(2);
+            } else {
+                settlementInput.value = '';
+            }
+        }
+
+        // Handle Form Submission
+        const salesForm = document.getElementById('salesForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        salesForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (!currentUser) return;
+
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Submitting Data...';
+
+            const payload = {
+                shopId: currentUser.email,
+                date: document.getElementById('date').value,
+                spNumber: document.getElementById('spNumber').value.trim(),
+                nic: document.getElementById('nic').value.trim(),
+                name: document.getElementById('name').value.trim(),
+                imei: document.getElementById('imei').value.trim(),
+                model: document.getElementById('model').value.trim(),
+                storage: document.getElementById('storage').value.trim(),
+                mrp: parseFloat(document.getElementById('mrp').value) || 0,
+                downPayment: parseFloat(document.getElementById('downPayment').value) || 0,
+                document: parseFloat(document.getElementById('document').value) || 0,
+                loanAmount: parseFloat(document.getElementById('loanAmount').value) || 0,
+                settlement: parseFloat(document.getElementById('settlement').value) || 0,
+                stockSource: currentStockSource,
+                inventoryDocId: matchedInventoryDocId,
+                status: 'New',
+                paymentStatus: 'Pending',
+                timestamp: Date.now()
+            };
+
+            addDoc(collection(db, "sales"), payload).then(async (docRef) => {
+                showToast("Sales entry submitted successfully!", "success");
+                salesForm.reset();
+                document.getElementById('date').valueAsDate = new Date();
+                document.getElementById('imeiStatus').innerText = '';
+                currentStockSource = 'Shop';
+                matchedInventoryDocId = null;
+
+                if (payload.inventoryDocId) {
+                    try {
+                        await updateDoc(doc(db, "inventory", payload.inventoryDocId), {
+                            status: 'Sold',
+                            soldAt: Date.now(),
+                            soldBy: currentUser.email,
+                            salesDocId: docRef.id
+                        });
+                    } catch (invErr) {
+                        console.error("Error marking inventory as sold:", invErr);
+                    }
+                }
+            }).catch(e => {
+                console.error("Submission error:", e);
+                showToast("Submission failed: " + e.message, "error");
+            }).finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Submit Data';
+            });
+        });
+
+        // Filter & Search Functionality for Shop Sales
+
+        window.filterShopSalesByStatus = function(filter) {
+            currentShopFilter = filter;
+            document.querySelectorAll('#newEntryView .filter-btn').forEach(btn => {
+                if (btn.dataset.filter === filter) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            renderShopSales();
+        };
+
+        window.renderShopSales = function() {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            let totalLoan = 0;
+            let totalProfit = 0;
+            let totalPaid = 0;
+            let totalPending = 0;
+
+            allShopSales.forEach(data => {
+                const loan = parseFloat(data.loanAmount) || 0;
+                const setl = parseFloat(data.settlement) || 0;
+                const mrp = parseFloat(data.mrp) || loan || 0;
+                const isHO = (data.stockSource === 'HO' || data.stockSource === 'Head Office');
+                const profitRate = isHO ? 0.04 : 0.06;
+                const profit = mrp * profitRate;
+
+                totalLoan += loan;
+                totalProfit += profit;
+
+                const isPaid = (data.paymentStatus === 'Paid' || data.status === 'Payment Sent' || data.status === 'Confirmed' || data.status === 'Completed');
+                if (isPaid) {
+                    totalPaid += setl;
+                } else {
+                    totalPending += setl;
+                }
+            });
+
+            // Update KPI cards
+            const totalLoansEl = document.getElementById('shopTotalLoans');
+            const totalProfitEl = document.getElementById('shopTotalProfit');
+            const totalPaidEl = document.getElementById('shopTotalPaid');
+            const totalPendingEl = document.getElementById('shopTotalPending');
+
+            if (totalLoansEl) totalLoansEl.innerText = 'Rs. ' + totalLoan.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (totalProfitEl) totalProfitEl.innerText = 'Rs. ' + totalProfit.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (totalPaidEl) totalPaidEl.innerText = 'Rs. ' + totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (totalPendingEl) totalPendingEl.innerText = 'Rs. ' + totalPending.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            const searchTerm = (document.getElementById('shopSearchInput')?.value || '').trim().toLowerCase();
+
+            const filtered = allShopSales.filter(data => {
+                const matchesSearch = (data.imei || '').toString().toLowerCase().includes(searchTerm) || 
+                                      (data.spNumber || '').toString().toLowerCase().includes(searchTerm) || 
+                                      (data.nic || '').toString().toLowerCase().includes(searchTerm) ||
+                                      (data.model || '').toString().toLowerCase().includes(searchTerm) ||
+                                      (data.name || '').toString().toLowerCase().includes(searchTerm);
+                if (!matchesSearch) return false;
+
+                const isPaid = (data.paymentStatus === 'Paid' || data.status === 'Payment Sent' || data.status === 'Confirmed' || data.status === 'Completed');
+                
+                if (currentShopFilter === 'Pending' && isPaid) return false;
+                if (currentShopFilter === 'Paid' && !isPaid) return false;
+                
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">No submission records found.</td></tr>';
+                return;
+            }
+
+            filtered.forEach(data => {
+                const tr = document.createElement('tr');
+                const id = data.id;
+                
+                const mrp = parseFloat(data.mrp) || parseFloat(data.loanAmount) || 0;
+                const isHO = (data.stockSource === 'HO' || data.stockSource === 'Head Office');
+                const profitRate = isHO ? 0.04 : 0.06;
+                const profitAmount = mrp * profitRate;
+                const profitBadge = isHO
+                    ? `<span style="color:#10b981; font-size:0.78rem; font-weight:600; background:rgba(16,185,129,0.1); padding:2px 6px; border-radius:4px;">Profit (4% HO): Rs. ${profitAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>`
+                    : `<span style="color:#3b82f6; font-size:0.78rem; font-weight:600; background:rgba(59,130,246,0.1); padding:2px 6px; border-radius:4px;">Profit (6% Own): Rs. ${profitAmount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</span>`;
+
+                let statusHtml = '';
+                let paymentNote = data.paymentStatus === 'Paid' 
+                    ? '<span style="color:var(--success); font-size:0.78rem; font-weight:bold;">Paid ✓</span>' 
+                    : '<span style="color:var(--warning); font-size:0.78rem; font-weight:bold;">Pending</span>';
+
+                if (data.status === 'New') statusHtml = '<span class="badge badge-new">Submitted</span>';
+                else if (data.status === 'Admin Replied') statusHtml = `<span class="badge badge-replied" onclick="openModal('${id}', 'reply', '${encodeURIComponent(data.adminReply)}')">Message from Admin</span>`;
+                else if (data.status === 'Payment Sent') statusHtml = `<span class="badge badge-sent" onclick="openModal('${id}', 'payment', '${encodeURIComponent(data.fintrexPayment || '')}')">Payment Sent - Confirm</span>`;
+                else if (data.status === 'Confirmed') statusHtml = '<span class="badge badge-confirmed">Confirmed by Shop</span>';
+                else if (data.status === 'Completed') statusHtml = '<span class="badge badge-confirmed" style="background:rgba(16,185,129,0.3)">? Completed</span>';
+
+                tr.innerHTML = `
+                    <td>${data.date || '-'}</td>
+                    <td>
+                        <strong>${data.spNumber || '-'}</strong><br>
+                        <span style="color: var(--text-muted)">${data.model || '-'} (${data.name || ''})</span><br>
+                        ${profitBadge}
+                    </td>
+                    <td>
+                        Loan: Rs. ${parseFloat(data.loanAmount || 0).toLocaleString()}<br>
+                        Setl: Rs. ${parseFloat(data.settlement || 0).toLocaleString()} <span style="font-size:0.75rem;">(${paymentNote})</span>
+                    </td>
+                    <td>${statusHtml}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        };
+
+        // Load Data & Chart
+        function loadShopData(email) {
+            if (!email) return;
+            const targetEmail = email.toLowerCase().trim();
+            const targetPrefix = targetEmail.split('@')[0].toLowerCase().trim();
+            
+            onSnapshot(collection(db, "sales"), (snapshot) => {
+                allShopSales = [];
+                let salesByDate = {};
+
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    data.id = docSnap.id;
+                    const itemShop = (data.shopId || '').toLowerCase().trim();
+                    const itemPrefix = itemShop.split('@')[0].toLowerCase().trim();
+                    const regName = (myRegisteredShopProfile?.name || '').toLowerCase().trim();
+
+                    // Robust matching for this shop
+                    const isMatch = (itemShop === targetEmail) || 
+                                    (itemShop === targetPrefix) ||
+                                    (itemPrefix && targetPrefix && itemPrefix === targetPrefix) ||
+                                    (regName && (itemShop === regName || itemShop.includes(regName))) ||
+                                    (targetEmail.includes('spm') && itemShop.includes('spm'));
+
+                    if (isMatch) {
+                        allShopSales.push(data);
+                    }
+                });
+
+                allShopSales.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+                allShopSales.forEach(data => {
+                    if (data.date) {
+                        const amount = parseFloat(data.loanAmount) || 0;
+                        salesByDate[data.date] = (salesByDate[data.date] || 0) + amount;
+                    }
+                });
+
+                renderShopSales();
+
+                const sortedDates = Object.keys(salesByDate).sort();
+                let labels = [];
+                let revenueData = [];
+                let maxLoan = 0;
+                
+                sortedDates.forEach(d => {
+                    labels.push(d);
+                    revenueData.push(salesByDate[d]);
+                    if (salesByDate[d] > maxLoan) maxLoan = salesByDate[d];
+                });
+
+                updateChart(labels, revenueData, maxLoan);
+            }, (err) => {
+                console.error("Error loading shop data:", err);
+                showToast("Error loading shop data: " + err.message, "error");
+            });
+        }
+
+        // Chart Update Function
+        function updateChart(labels, revenueData, maxLoan) {
+            const ctx = document.getElementById('salesChart');
+            if(!ctx) return;
+            if (myChart) myChart.destroy();
+            
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { 
+                            label: 'Total Loan Amount (Rs.)', 
+                            data: revenueData, 
+                            borderColor: '#e50000', 
+                            backgroundColor: 'rgba(229, 0, 0, 0.15)', 
+                            fill: true, 
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointBackgroundColor: '#818cf8'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            max: maxLoan > 0 ? maxLoan * 1.25 : 100000, 
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }, 
+                            ticks: { color: '#9CA3AF' } 
+                        },
+                        x: { grid: { display: false }, ticks: { color: '#9CA3AF' } }
+                    }
+                }
+            });
+        }
+
+        // Modal Logic
+        window.openModal = function(id, type, replyEncoded) {
+            currentModalDocId = id;
+            const modal = document.getElementById('actionModal');
+            document.getElementById('replySection').style.display = 'none';
+            document.getElementById('paymentSection').style.display = 'none';
+
+            if (type === 'reply') {
+                document.getElementById('modalTitle').innerText = 'Admin Message / Note';
+                document.getElementById('adminReplyText').innerText = decodeURIComponent(replyEncoded);
+                document.getElementById('replySection').style.display = 'block';
+            } else if (type === 'payment') {
+                document.getElementById('modalTitle').innerText = 'Confirm Payment Received';
+                document.getElementById('paymentNoteDisplay').innerText = decodeURIComponent(replyEncoded) || 'Payment has been processed by Admin.';
+                document.getElementById('paymentSection').style.display = 'block';
+            }
+            modal.style.display = 'flex';
+        };
+
+        window.closeModal = function() {
+            document.getElementById('actionModal').style.display = 'none';
+            currentModalDocId = null;
+        };
+
+        // Confirm Payment Action
+        document.getElementById('confirmPaymentBtn').addEventListener('click', async () => {
+            if (!currentModalDocId) return;
+            const btn = document.getElementById('confirmPaymentBtn');
+            btn.innerText = 'Confirming...';
+            btn.disabled = true;
+            try {
+                await updateDoc(doc(db, "sales", currentModalDocId), { status: 'Confirmed' });
+                showToast("Payment receipt confirmed!", "success");
+                closeModal();
+            } catch (e) {
+                console.error(e);
+                showToast("Error confirming payment: " + e.message, "error");
+            } finally {
+                btn.innerText = 'Confirm Payment Received';
+                btn.disabled = false;
+            }
+        });
+
+
+        // Auto-match current shop's OWN branch profile only (hide other branches)
+        async function loadBranchOptions() {
+            try {
+                if (!currentUser) return;
+                const email = currentUser.email.toLowerCase().trim();
+                const emailPrefix = email.split('@')[0].toLowerCase();
+                
+                // 1. Fetch registered shop profile for this email
+                const qShops = query(collection(db, "registered_shops"));
+                const shopSnap = await getDocs(qShops);
+                
+                let foundProfile = null;
+                shopSnap.forEach(docSnap => {
+                    const sData = docSnap.data();
+                    if ((sData.email || '').toLowerCase().trim() === email) {
+                        foundProfile = sData;
+                    }
+                });
+
+                // 2. Fetch inventory locations to find this shop's specific location name if not registered
+                const invSnap = await getDocs(collection(db, "inventory"));
+                const allInvLocations = new Set();
+                invSnap.forEach(docSnap => {
+                    const d = docSnap.data();
+                    const shopLoc = (d.shop || '').trim();
+                    if (shopLoc && shopLoc !== 'MAIN SHOP' && shopLoc !== 'Head Office' && shopLoc !== 'Main Shop') {
+                        allInvLocations.add(shopLoc);
+                    }
+                });
+
+                // 3. Resolve THIS user's specific branch name
+                let myOwnBranchName = '';
+                if (foundProfile && foundProfile.name) {
+                    myOwnBranchName = foundProfile.name.trim();
+                } else {
+                    // Match against inventory locations
+                    const matched = Array.from(allInvLocations).find(b => {
+                        const bLow = b.toLowerCase();
+                        return bLow.includes(emailPrefix) || emailPrefix.includes(bLow) ||
+                               (email.includes('spm') && (bLow.includes('pulasthigama') || bLow.includes('spm')));
+                    });
+                    myOwnBranchName = matched || emailPrefix.toUpperCase();
+                }
+
+                myRegisteredShopProfile = foundProfile;
+
+                // Update shop email/name badge in top header
+                const shopDisplay = document.getElementById('userEmailDisplay');
+                if (shopDisplay) {
+                    shopDisplay.innerHTML = `<strong>${myOwnBranchName}</strong> <span style="font-size:0.8rem; color:var(--text-muted);">(${currentUser.email})</span>`;
+                }
+
+                // 4. Populate dropdown ONLY with HEAD OFFICE and THIS shop's own branch
+                const branchSelect = document.getElementById('myBranchName');
+                if (branchSelect) {
+                    branchSelect.innerHTML = '';
+                    
+                    // User's Own Branch Option (Default)
+                    const myOpt = document.createElement('option');
+                    myOpt.value = myOwnBranchName;
+                    myOpt.innerText = `🏪 ${myOwnBranchName} (My Branch)`;
+                    myOpt.style.fontWeight = 'bold';
+                    branchSelect.appendChild(myOpt);
+
+                    // Head Office Option
+                    const hoOpt = document.createElement('option');
+                    hoOpt.value = 'HEAD OFFICE';
+                    hoOpt.innerText = '🏢 HEAD OFFICE / MAIN SHOP';
+                    hoOpt.style.fontWeight = 'bold';
+                    hoOpt.style.color = '#e50000';
+                    branchSelect.appendChild(hoOpt);
+
+                    // Set default selection to My Branch (or saved preference)
+                    const userKey = 'myBranch_' + email;
+                    const userSaved = localStorage.getItem(userKey);
+                    if (userSaved === 'HEAD OFFICE') {
+                        branchSelect.value = 'HEAD OFFICE';
+                    } else {
+                        branchSelect.value = myOwnBranchName;
+                    }
+                }
+
+                loadMyStock();
+            } catch (e) {
+                console.error("Error loading branch options:", e);
+                loadMyStock();
+            }
+        }
+
+        let myStockUnsubscribe = null;
+        window.loadMyStock = function(isExplicitClick = false) {
+            const tbody = document.getElementById('myStockBody');
+            const stockBadge = document.getElementById('stockBadgeCount');
+            const branchSelect = document.getElementById('myBranchName');
+            let selectedBranch = (branchSelect?.value || '').trim();
+
+            if (selectedBranch && currentUser) {
+                localStorage.setItem('myBranch_' + currentUser.email.toLowerCase(), selectedBranch);
+            }
+
+            if (myStockUnsubscribe) myStockUnsubscribe();
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Loading stock...</td></tr>';
+
+            // Query all available inventory
+            const q = query(collection(db, "inventory"), where("status", "==", "Available"));
+
+            myStockUnsubscribe = onSnapshot(q, (snapshot) => {
+                tbody.innerHTML = '';
+
+                const selBranchLow = selectedBranch.toLowerCase();
+                const myEmail = (currentUser?.email || '').toLowerCase().trim();
+                const myPrefix = myEmail.split('@')[0].toLowerCase().trim();
+                const regName = (myRegisteredShopProfile?.name || '').toLowerCase().trim();
+                const regLoc = (myRegisteredShopProfile?.location || '').toLowerCase().trim();
+
+                const isHeadOfficeSelected = selBranchLow === 'head office' || selBranchLow === 'main shop' || selBranchLow.includes('head office') || selBranchLow.includes('main shop');
+
+                const allocatedItems = [];
+
+                snapshot.forEach(docSnap => {
+                    const data = docSnap.data();
+                    const docId = docSnap.id;
+                    const itemShop = (data.shop || '').trim().toLowerCase();
+                    const isItemHeadOffice = itemShop === 'main shop' || itemShop === 'head office' || itemShop === 'main';
+
+                    let isMatch = false;
+
+                    if (isHeadOfficeSelected) {
+                        if (isItemHeadOffice) isMatch = true;
+                    } else {
+                        // When viewing own branch, do not show Head office stock
+                        if (isItemHeadOffice) return;
+
+                        if (selBranchLow) {
+                            isMatch = (itemShop === selBranchLow || itemShop.includes(selBranchLow) || selBranchLow.includes(itemShop));
+                        }
+                        
+                        if (!isMatch) {
+                            if (regName && (itemShop === regName || itemShop.includes(regName) || regName.includes(itemShop))) {
+                                isMatch = true;
+                            } else if (regLoc && (itemShop === regLoc || itemShop.includes(regLoc) || regLoc.includes(itemShop))) {
+                                isMatch = true;
+                            } else if (itemShop === myEmail || (myPrefix && (itemShop.includes(myPrefix) || myPrefix.includes(itemShop)))) {
+                                isMatch = true;
+                            }
+                        }
+                    }
+
+                    if (isMatch) {
+                        allocatedItems.push({ id: docId, isHeadOffice: isItemHeadOffice, ...data });
+                    }
+                });
+
+                if (allocatedItems.length === 0) {
+                    stockBadge.innerText = '0 Stock Items';
+                    stockBadge.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    stockBadge.style.color = 'var(--danger)';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">No available stock allocated for this selection right now.</td></tr>';
+                    return;
+                }
+
+                stockBadge.innerText = `${allocatedItems.length} Stock Available`;
+                stockBadge.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                stockBadge.style.color = 'var(--success)';
+
+                allocatedItems.forEach(data => {
+                    const tr = document.createElement('tr');
+                    const catBadge = data.category === 'Dialog Lesi Pay'
+                        ? '<span style="font-size:0.75rem; color:#3b82f6; font-weight:600;">📱 Dialog Lesi Pay</span>'
+                        : '<span style="font-size:0.75rem; color:#10b981; font-weight:600;">📦 Own Buy</span>';
+                    
+                    const displayBranch = data.isHeadOffice ? '🏢 HEAD OFFICE' : (data.shop || selectedBranch || '-');
+
+                    let actionHTML = '';
+                    if (data.isHeadOffice) {
+                        actionHTML = '<span style="color: var(--text-muted); font-size: 0.78rem; font-weight: 500;">📍 At Head Office</span>';
+                    } else {
+                        actionHTML = `
+                            <button onclick="returnStockToMain('${data.id}', '${data.imei}')" style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); color: var(--danger); padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; font-size: 0.78rem; font-weight: 600; white-space: nowrap;" title="Return unsold stock to Main Shop">
+                                🔄 Return to Main
+                            </button>
+                        `;
+                    }
+
+                    tr.innerHTML = `
+                        <td><strong>${data.imei || '-'}</strong></td>
+                        <td>${data.model || '-'} ${data.storage ? '- ' + data.storage : ''}<br>${catBadge}</td>
+                        <td><span style="color: ${data.isHeadOffice ? 'var(--primary)' : 'var(--accent-purple)'}; font-weight: 600;">${displayBranch}</span></td>
+                        <td><span class="badge badge-confirmed">Available</span></td>
+                        <td>${actionHTML}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }, error => {
+                console.error("Stock fetch error:", error);
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--warning);">Error fetching stock: ' + error.message + '</td></tr>';
+            });
+        };
+
+        window.returnStockToMain = async function(id, imei) {
+            if (!confirm(`Are you sure you want to transfer unsold stock (IMEI: ${imei}) back to Head Office / Main Shop?`)) return;
+            try {
+                await updateDoc(doc(db, "inventory", id), {
+                    shop: 'MAIN SHOP',
+                    status: 'Available',
+                    returnedAt: Date.now()
+                });
+                showToast(`Stock item ${imei} transferred back to Main Shop!`, "success");
+            } catch (e) {
+                console.error("Return stock error:", e);
+                showToast("Failed to return stock: " + e.message, "error");
+            }
+        };
+
+        // Barcode Scanner Logic
+        let html5QrCode = null;
+        let currentScannerInputId = null;
+
+        window.startScanner = async function(inputId) {
+            currentScannerInputId = inputId;
+            document.getElementById('manualScannerInput').value = '';
+            document.getElementById('scannerModal').style.display = 'flex';
+            
+            try {
+                if (!html5QrCode) {
+                    html5QrCode = new Html5Qrcode("reader");
+                } else if (html5QrCode.isScanning) {
+                    await html5QrCode.stop();
+                }
+                
+                const config = { 
+                    fps: 15, 
+                    qrbox: (viewfinderWidth, viewfinderHeight) => {
+                        const w = Math.min(viewfinderWidth * 0.92, 340);
+                        const h = Math.min(viewfinderHeight * 0.28, 75);
+                        return { width: Math.floor(w), height: Math.floor(h) };
+                    },
+                    aspectRatio: 1.333333,
+                    disableFlip: false,
+                    experimentalFeatures: {
+                        useBarCodeDetectorIfSupported: false
+                    }
+                };
+
+                const onScanSuccess = (decodedText) => {
+                    const inputEl = document.getElementById(inputId);
+                    if (inputEl) {
+                        inputEl.value = decodedText;
+                        const event = new Event('input', { bubbles: true });
+                        inputEl.dispatchEvent(event);
+                    }
+                    stopScanner();
+                    showToast("Scanned: " + decodedText, "success");
+                };
+
+                try {
+                    const devices = await Html5Qrcode.getCameras();
+                    const camSelect = document.getElementById('cameraSelect');
+                    if (camSelect && devices && devices.length > 0) {
+                        camSelect.innerHTML = '';
+                        devices.forEach((dev, idx) => {
+                            const opt = document.createElement('option');
+                            opt.value = dev.id;
+                            opt.innerText = dev.label || `Camera ${idx + 1}`;
+                            camSelect.appendChild(opt);
+                        });
+                        camSelect.style.display = devices.length > 1 ? 'inline-block' : 'none';
+
+                        let selectedCam = devices.find(d => {
+                            const lbl = (d.label || '').toLowerCase();
+                            return (lbl.includes('back') || lbl.includes('rear') || lbl.includes('0')) && !lbl.includes('wide') && !lbl.includes('ultra');
+                        }) || devices.find(d => {
+                            const lbl = (d.label || '').toLowerCase();
+                            return lbl.includes('back') || lbl.includes('rear') || lbl.includes('environment');
+                        }) || devices[devices.length - 1];
+
+                        camSelect.value = selectedCam.id;
+                        await startCameraWithId(selectedCam.id, config, onScanSuccess);
+                        return;
+                    }
+                } catch(e) {
+                    console.log("getCameras enumeration fallback", e);
+                }
+
+                await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, () => {});
+            } catch (err) {
+                console.error("Scanner error:", err);
+                showToast("Could not access camera scanner", "error");
+            }
+        };
+
+        window.startCameraWithId = async function(cameraId, config, onScanSuccess) {
+            if (!html5QrCode) return;
+            if (html5QrCode.isScanning) {
+                await html5QrCode.stop();
+            }
+            await html5QrCode.start(cameraId, config, onScanSuccess, () => {});
+            try {
+                const track = html5QrCode.getRunningTrack();
+                if (track && track.getCapabilities) {
+                    const capabilities = track.getCapabilities();
+                    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+                        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+                    }
+                }
+            } catch(e) {}
+        };
+
+        window.switchCamera = async function(cameraId) {
+            if (!cameraId || !html5QrCode) return;
+            const config = { 
+                fps: 15, 
+                qrbox: (viewfinderWidth, viewfinderHeight) => {
+                    const w = Math.min(viewfinderWidth * 0.92, 340);
+                    const h = Math.min(viewfinderHeight * 0.28, 75);
+                    return { width: Math.floor(w), height: Math.floor(h) };
+                },
+                aspectRatio: 1.333333,
+                disableFlip: false,
+                experimentalFeatures: { useBarCodeDetectorIfSupported: false }
+            };
+            const onScanSuccess = (decodedText) => {
+                const inputEl = document.getElementById(currentScannerInputId);
+                if (inputEl) {
+                    inputEl.value = decodedText;
+                    const event = new Event('input', { bubbles: true });
+                    inputEl.dispatchEvent(event);
+                }
+                stopScanner();
+                showToast("Scanned: " + decodedText, "success");
+            };
+            await startCameraWithId(cameraId, config, onScanSuccess);
+        };
+
+        window.submitManualScan = function() {
+            const val = document.getElementById('manualScannerInput').value.trim();
+            if (!val) return;
+            const inputEl = document.getElementById(currentScannerInputId);
+            if (inputEl) {
+                inputEl.value = val;
+                const event = new Event('input', { bubbles: true });
+                inputEl.dispatchEvent(event);
+                showToast("Entered manually: " + val, "success");
+            }
+            stopScanner();
+        };
+
+        window.stopScanner = function() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                }).catch(e => console.error(e));
+            }
+            document.getElementById('scannerModal').style.display = 'none';
+        };
+
+        // Service Worker Registration for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
+            });
+        }
+    </script>
+</body>
+</html>
+
