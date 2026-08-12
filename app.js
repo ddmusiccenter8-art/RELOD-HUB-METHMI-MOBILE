@@ -1170,6 +1170,49 @@ const App = {
   // ================================================================
   setupShopsPage() {
     document.getElementById('addShopBtn').addEventListener('click', () => this.showAddShopModal());
+    document.getElementById('recoverShopBtn').addEventListener('click', () => this.showRecoverShopsModal());
+  },
+
+  showRecoverShopsModal() {
+    const deletedShops = DB.getShops(true).filter(s => s.deleted);
+    
+    if (deletedShops.length === 0) {
+      this.showModal('♻️ Recover Shops', '<div style="padding: 20px; text-align: center;">මකාදැමූ සාප්පු කිසිවක් නොමැත. (No deleted shops found)</div>', [{ text: 'හරි (OK)', class: 'btn-primary', onClick: () => this.closeModal() }]);
+      return;
+    }
+
+    let html = '<div class="shop-list" style="max-height: 60vh; overflow-y: auto;">';
+    deletedShops.forEach(shop => {
+      const deletedDate = shop.deletedAt ? new Date(shop.deletedAt).toLocaleDateString() : 'Unknown';
+      html += `
+        <div class="card" style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; padding: 15px;">
+          <div>
+            <div style="font-weight: 700; font-size: 1.1rem; color: var(--text-primary);">${shop.name}</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">Deleted: ${deletedDate}</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="App.recoverShop('${shop.id}')">♻️ Recover</button>
+        </div>
+      `;
+    });
+    html += '</div>';
+
+    this.showModal('♻️ Recover Deleted Shops', html, [{ text: 'වහන්න (Close)', class: 'btn-ghost', onClick: () => this.closeModal() }]);
+  },
+
+  recoverShop(shopId) {
+    DB.recoverShop(shopId);
+    this.showToast('♻️ Shop යලි ලබාගත්තා (Recovered)', 'success');
+    this.refreshShopSelector();
+    this.renderShops();
+    this.renderDashboard();
+    
+    // Refresh modal if still open and has more deleted shops
+    const deletedShops = DB.getShops(true).filter(s => s.deleted);
+    if (deletedShops.length > 0) {
+      this.showRecoverShopsModal();
+    } else {
+      this.closeModal();
+    }
   },
 
   showAddShopModal() {
@@ -1294,18 +1337,28 @@ const App = {
 
   confirmDeleteShop(shopId, shopName) {
     this.showModal(
-      '🗑️ සාප්පුව මකන්නද?',
-      `<div class="delete-confirm-text">"<strong>${shopName}</strong>" සහ එහි සියලු updates මකා දැමෙනු ඇත. ඔබට විශ්වාසද?</div>`,
+      '🗑️ සාප්පුව මකන්නද? (Admin Password Required)',
+      `
+        <div class="delete-confirm-text">"<strong>${shopName}</strong>" මකා දැමීමට Admin මුරපදය ලබා දෙන්න.</div>
+        <div class="form-group" style="margin-top: 15px;">
+          <input type="password" id="adminPasswordInput" class="form-input" placeholder="මුරපදය (Password)" autocomplete="off">
+        </div>
+      `,
       [
         { text: 'අවලංගු', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
           text: '🗑️ මකන්න', class: 'btn-danger', onClick: () => {
+            const pwd = document.getElementById('adminPasswordInput').value;
+            if (pwd !== '1234') {
+              this.showToast('❌ මුරපදය වැරදියි!', 'error');
+              return;
+            }
             DB.deleteShop(shopId);
             this.closeModal();
             this.refreshShopSelector();
             this.renderShops();
             this.renderDashboard();
-            this.showToast('🗑️ Shop මකා දැමුවා', 'success');
+            this.showToast('🗑️ Shop ආරක්ෂිතව මකා දැමුවා (Soft Deleted)', 'success');
           }
         }
       ]

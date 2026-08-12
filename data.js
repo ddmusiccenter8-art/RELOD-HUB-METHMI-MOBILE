@@ -245,8 +245,10 @@ const DB = {
   },
 
   // ---- Shop CRUD ----
-  getShops() {
-    return JSON.parse(localStorage.getItem(this.SHOPS_KEY) || '[]');
+  getShops(includeDeleted = false) {
+    const shops = JSON.parse(localStorage.getItem(this.SHOPS_KEY) || '[]');
+    if (includeDeleted) return shops;
+    return shops.filter(s => !s.deleted);
   },
 
   saveShops(shops) {
@@ -283,24 +285,31 @@ const DB = {
   },
 
   deleteShop(id) {
-    let shops = this.getShops();
-    shops = shops.filter(s => s.id !== id);
-    this.saveShops(shops);
-    this._deleteFromFirebase('payment_tracker_shops', id);
-
-    // Remove updates for this shop
-    let updates = this.getUpdates();
-    const updatesToDelete = updates.filter(u => u.shopId === id);
-    updates = updates.filter(u => u.shopId !== id);
-    this.saveUpdates(updates);
-    
-    updatesToDelete.forEach(u => {
-      this._deleteFromFirebase('payment_tracker_updates', u.id);
-    });
+    let shops = this.getShops(true);
+    let idx = shops.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      shops[idx].deleted = true;
+      shops[idx].deletedAt = Date.now();
+      this.saveShops(shops);
+      this._syncToFirebase('payment_tracker_shops', id, shops[idx]);
+    }
 
     // Reset active if deleted
+    // Reset active if deleted
     if (this.getActiveShopId() === id) {
-      this.setActiveShop(shops.length > 0 ? shops[0].id : null);
+      const activeShops = this.getShops(false);
+      this.setActiveShop(activeShops.length > 0 ? activeShops[0].id : null);
+    }
+  },
+
+  recoverShop(id) {
+    let shops = this.getShops(true);
+    let idx = shops.findIndex(s => s.id === id);
+    if (idx !== -1) {
+      shops[idx].deleted = false;
+      delete shops[idx].deletedAt;
+      this.saveShops(shops);
+      this._syncToFirebase('payment_tracker_shops', id, shops[idx]);
     }
   },
 
@@ -325,8 +334,13 @@ const DB = {
   },
 
   // ---- Updates CRUD ----
-  getUpdates() {
-    return JSON.parse(localStorage.getItem(this.UPDATES_KEY) || '[]');
+  getUpdates(includeDeleted = false) {
+    const allUpdates = JSON.parse(localStorage.getItem(this.UPDATES_KEY) || '[]');
+    if (includeDeleted) return allUpdates;
+    
+    // Filter out updates from deleted shops
+    const activeShopIds = new Set(this.getShops(false).map(s => s.id));
+    return allUpdates.filter(u => activeShopIds.has(u.shopId));
   },
 
   saveUpdates(updates) {
