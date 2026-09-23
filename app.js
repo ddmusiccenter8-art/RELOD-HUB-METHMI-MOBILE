@@ -224,6 +224,30 @@ const App = {
     });
   },
 
+  // ---- Period Summary (Today, Yesterday, Week, Month, Year, All) ----
+  updatePeriodSummary(shopId) {
+    const sel = document.getElementById('dashPeriodSelector');
+    if (!sel) return;
+    const period = sel.value || 'month';
+    const stats = DB.getStatsForPeriod(shopId, period);
+    const valEl = document.getElementById('dashPeriodValue');
+    const typeEl = document.getElementById('dashPeriodType');
+    if (!valEl || !typeEl) return;
+
+    if (!stats || (stats.net === 0 && stats.totalProfit === 0 && stats.totalLoss === 0)) {
+      valEl.textContent = 'Rs.0.00';
+      valEl.className = 'overall-value neutral';
+      typeEl.textContent = 'NO DATA IN PERIOD';
+      typeEl.style.color = 'var(--text-muted)';
+    } else {
+      const type = stats.type;
+      valEl.textContent = `${stats.net >= 0 ? '+' : ''}${DB.formatCurrency(stats.net)}`;
+      valEl.className = `overall-value ${type}`;
+      typeEl.textContent = type === 'profit' ? '✅ PROFIT (ලාභ)' : type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE';
+      typeEl.style.color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+    }
+  },
+
   // ================================================================
   // DASHBOARD
   // ================================================================
@@ -283,15 +307,15 @@ const App = {
     const vals = DB.extractValues(lastUpdate);
     document.getElementById('overallTotalCapital').textContent = DB.formatCurrency(vals.totalCapital);
 
-    // 1. SIMs Card
-    document.getElementById('dashSimTotal').textContent = DB.formatCurrency(vals.simTotal);
+    // 1. Reload Total Card
+    document.getElementById('dashReloadTotal').textContent = DB.formatCurrency(vals.reloadTotal);
     if (comp && !comp.isFirst) {
-      const sd = comp.sim;
-      document.getElementById('dashSimDiff').textContent = `${sd.type === 'profit' ? '▲' : sd.type === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(sd.diff))}`;
-      document.getElementById('dashSimDiff').className = `card-diff ${sd.type}`;
+      const rd = comp.reload;
+      document.getElementById('dashReloadDiff').textContent = `${rd.type === 'profit' ? '▲' : rd.type === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(rd.diff))}`;
+      document.getElementById('dashReloadDiff').className = `card-diff ${rd.type}`;
     } else {
-      document.getElementById('dashSimDiff').textContent = '➖ First Update';
-      document.getElementById('dashSimDiff').className = 'card-diff neutral';
+      document.getElementById('dashReloadDiff').textContent = '➖ First Update';
+      document.getElementById('dashReloadDiff').className = 'card-diff neutral';
     }
 
     // 2. Bank Card
@@ -306,7 +330,7 @@ const App = {
     }
 
     // 3. Cash Card
-    document.getElementById('dashCashTotal').textContent = DB.formatCurrency(vals.cashInDrawer);
+    document.getElementById('dashCashTotal').textContent = DB.formatCurrency(vals.totalCash);
     if (comp && !comp.isFirst) {
       const cd = comp.cash;
       document.getElementById('dashCashDiff').textContent = `${cd.type === 'profit' ? '▲' : cd.type === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(cd.diff))}`;
@@ -316,9 +340,16 @@ const App = {
       document.getElementById('dashCashDiff').className = 'card-diff neutral';
     }
 
-    // 4. Update count
-    document.getElementById('dashUpdateCount').textContent = todayUpdates.length;
-    document.getElementById('dashLastUpdateTime').textContent = 'Last: ' + DB.formatTime(lastUpdate.timestamp);
+    // 4. Grand Total Capital Card
+    document.getElementById('dashCapitalTotal').textContent = DB.formatCurrency(vals.totalCapital);
+    if (comp && !comp.isFirst) {
+      const od = comp.overall;
+      document.getElementById('dashCapitalDiff').textContent = `${od.type === 'profit' ? '▲' : od.type === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(od.diff))}`;
+      document.getElementById('dashCapitalDiff').className = `card-diff ${od.type}`;
+    } else {
+      document.getElementById('dashCapitalDiff').textContent = '➖ First Update';
+      document.getElementById('dashCapitalDiff').className = 'card-diff neutral';
+    }
 
     // Comparison Table
     this.renderComparisonTable(lastUpdate);
@@ -334,14 +365,14 @@ const App = {
     document.getElementById('overallType').style.color = 'var(--text-muted)';
     document.getElementById('overallCard').className = 'card overall-card neutral-card';
     document.getElementById('overallTotalCapital').textContent = 'Rs.0.00';
-    document.getElementById('dashSimTotal').textContent = 'Rs.0.00';
-    document.getElementById('dashSimDiff').textContent = '➖ Rs.0.00';
+    document.getElementById('dashReloadTotal').textContent = 'Rs.0.00';
+    document.getElementById('dashReloadDiff').textContent = '➖ Rs.0.00';
     document.getElementById('dashBankTotal').textContent = 'Rs.0.00';
     document.getElementById('dashBankDiff').textContent = '➖ Rs.0.00';
     document.getElementById('dashCashTotal').textContent = 'Rs.0.00';
     document.getElementById('dashCashDiff').textContent = '➖ Rs.0.00';
-    document.getElementById('dashUpdateCount').textContent = '0';
-    document.getElementById('dashLastUpdateTime').textContent = 'Last: --';
+    document.getElementById('dashCapitalTotal').textContent = 'Rs.0.00';
+    document.getElementById('dashCapitalDiff').textContent = '➖ Rs.0.00';
 
     const compTable = document.getElementById('dashComparisonTable');
     if (compTable) {
@@ -361,32 +392,24 @@ const App = {
 
     const rows = [
       {
-        icon: '📶',
-        name: 'Network SIMs Balance (සිම් මුදල)',
-        curr: curr.simTotal,
-        prev: prevUpdate ? prev.simTotal : 0,
-        diff: comp && !comp.isFirst ? comp.sim.diff : 0,
-        type: comp && !comp.isFirst ? comp.sim.type : 'neutral'
+        icon: '🔄',
+        name: I18N.t('comp_track_reload') || 'Reload Track (SIMs + Reload Cash)',
+        curr: curr.reloadTotal,
+        prev: prevUpdate ? prev.reloadTotal : 0,
+        diff: comp && !comp.isFirst ? comp.reload.diff : 0,
+        type: comp && !comp.isFirst ? comp.reload.type : 'neutral'
       },
       {
         icon: '🏦',
-        name: 'Bank Balance (බැංකු මුදල)',
+        name: I18N.t('comp_track_bank') || 'Bank Track (Accounts + Bank Cash)',
         curr: curr.bankTotal,
         prev: prevUpdate ? prev.bankTotal : 0,
         diff: comp && !comp.isFirst ? comp.bank.diff : 0,
         type: comp && !comp.isFirst ? comp.bank.type : 'neutral'
       },
       {
-        icon: '💵',
-        name: 'Cash in Drawer (ලාච්චුවේ මුදල)',
-        curr: curr.cashInDrawer,
-        prev: prevUpdate ? prev.cashInDrawer : 0,
-        diff: comp && !comp.isFirst ? comp.cash.diff : 0,
-        type: comp && !comp.isFirst ? comp.cash.type : 'neutral'
-      },
-      {
-        icon: '📊',
-        name: 'Total Capital (මුළු එකතුව)',
+        icon: '💰',
+        name: I18N.t('comp_track_total') || 'Grand Total Capital (Reload + Bank)',
         curr: curr.totalCapital,
         prev: prevUpdate ? prev.totalCapital : 0,
         diff: comp && !comp.isFirst ? comp.overall.diff : 0,
@@ -400,11 +423,11 @@ const App = {
         <table class="data-table" style="width:100%; border-collapse:collapse; margin-top:8px;">
           <thead>
             <tr style="background:var(--bg-glass); border-bottom:1px solid var(--border-glass);">
-              <th style="padding:10px 14px; text-align:left; font-size:0.85rem;">අංශය (Category)</th>
-              <th style="padding:10px 14px; text-align:right; font-size:0.85rem;">පෙර අගය (Previous)</th>
-              <th style="padding:10px 14px; text-align:right; font-size:0.85rem;">වර්තමාන (Current)</th>
-              <th style="padding:10px 14px; text-align:right; font-size:0.85rem;">වෙනස (Difference)</th>
-              <th style="padding:10px 14px; text-align:center; font-size:0.85rem;">තත්වය (Status)</th>
+              <th style="padding:10px 14px; text-align:left; font-size:0.85rem;">${I18N.t('hist_table_action') || 'Category'}</th>
+              <th style="padding:10px 14px; text-align:right; font-size:0.85rem;">${I18N.t('comp_prev_total') || 'Previous Total'}</th>
+              <th style="padding:10px 14px; text-align:right; font-size:0.85rem;">${I18N.t('comp_curr_total') || 'Today Total'}</th>
+              <th style="padding:10px 14px; text-align:right; font-size:0.85rem;">${I18N.t('comp_diff') || 'Difference (P/L)'}</th>
+              <th style="padding:10px 14px; text-align:center; font-size:0.85rem;">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -413,15 +436,15 @@ const App = {
     rows.forEach(r => {
       const isTotalStyle = r.isTotal ? 'font-weight:800; font-size:1.05rem; background:rgba(59,130,246,0.06);' : '';
       const icon = r.type === 'profit' ? '▲' : r.type === 'loss' ? '▼' : '➖';
-      const typeLabel = r.type === 'profit' ? 'PROFIT' : r.type === 'loss' ? 'LOSS' : 'NO CHANGE';
+      const typeLabel = r.type === 'profit' ? I18N.t('profit') : r.type === 'loss' ? I18N.t('loss') : I18N.t('neutral');
       const color = r.type === 'profit' ? 'var(--accent-green)' : r.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
 
       html += `
         <tr style="border-bottom:1px solid var(--border-glass); ${isTotalStyle}">
-          <td style="padding:12px 14px;">${r.icon} ${r.name}</td>
+          <td style="padding:12px 14px; font-weight:700;">${r.icon} ${r.name}</td>
           <td style="padding:12px 14px; text-align:right; color:var(--text-muted);">${prevUpdate ? DB.formatCurrency(r.prev) : '--'}</td>
           <td style="padding:12px 14px; text-align:right; font-weight:700;">${DB.formatCurrency(r.curr)}</td>
-          <td style="padding:12px 14px; text-align:right; font-weight:700; color:${color};">
+          <td style="padding:12px 14px; text-align:right; font-weight:800; color:${color};">
             ${comp && !comp.isFirst ? `${r.diff >= 0 ? '+' : ''}${DB.formatCurrency(r.diff)}` : '--'}
           </td>
           <td style="padding:12px 14px; text-align:center;">
@@ -465,12 +488,12 @@ const App = {
       document.getElementById('overallCard').className = `card overall-card ${overallType === 'profit' ? 'profit-card' : overallType === 'loss' ? 'loss-card' : 'neutral-card'}`;
       document.getElementById('overallTotalCapital').textContent = DB.formatCurrency(stats.totalCapital);
 
-      // SIMs
-      document.getElementById('dashSimTotal').textContent = DB.formatCurrency(stats.simTotal);
-      const sd = stats.diffs.sim;
-      const sdType = sd > 0 ? 'profit' : sd < 0 ? 'loss' : 'neutral';
-      document.getElementById('dashSimDiff').textContent = `${sdType === 'profit' ? '▲' : sdType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(sd))}`;
-      document.getElementById('dashSimDiff').className = `card-diff ${sdType}`;
+      // Reload
+      document.getElementById('dashReloadTotal').textContent = DB.formatCurrency(stats.reloadTotal);
+      const rd = stats.diffs.reload;
+      const rdType = rd > 0 ? 'profit' : rd < 0 ? 'loss' : 'neutral';
+      document.getElementById('dashReloadDiff').textContent = `${rdType === 'profit' ? '▲' : rdType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(rd))}`;
+      document.getElementById('dashReloadDiff').className = `card-diff ${rdType}`;
 
       // Bank
       document.getElementById('dashBankTotal').textContent = DB.formatCurrency(stats.bankTotal);
@@ -486,8 +509,10 @@ const App = {
       document.getElementById('dashCashDiff').textContent = `${cdType === 'profit' ? '▲' : cdType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(cd))}`;
       document.getElementById('dashCashDiff').className = `card-diff ${cdType}`;
 
-      document.getElementById('dashUpdateCount').textContent = stats.todayUpdatesCount;
-      document.getElementById('dashLastUpdateTime').textContent = 'All Shops Summary';
+      // Capital
+      document.getElementById('dashCapitalTotal').textContent = DB.formatCurrency(stats.totalCapital);
+      document.getElementById('dashCapitalDiff').textContent = `${overallType === 'profit' ? '▲' : overallType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(overallDiff))}`;
+      document.getElementById('dashCapitalDiff').className = `card-diff ${overallType}`;
 
       // Render All Shops Cards
       this.renderAllShopsGrid(stats.shopSummaries);
@@ -501,14 +526,14 @@ const App = {
       document.getElementById('overallType').style.color = 'var(--text-muted)';
       document.getElementById('overallCard').className = 'card overall-card neutral-card';
       document.getElementById('overallTotalCapital').textContent = 'Rs.0.00';
-      document.getElementById('dashSimTotal').textContent = 'Rs.0.00';
-      document.getElementById('dashSimDiff').textContent = '➖ Rs.0.00';
+      document.getElementById('dashReloadTotal').textContent = 'Rs.0.00';
+      document.getElementById('dashReloadDiff').textContent = '➖ Rs.0.00';
       document.getElementById('dashBankTotal').textContent = 'Rs.0.00';
       document.getElementById('dashBankDiff').textContent = '➖ Rs.0.00';
       document.getElementById('dashCashTotal').textContent = 'Rs.0.00';
       document.getElementById('dashCashDiff').textContent = '➖ Rs.0.00';
-      document.getElementById('dashUpdateCount').textContent = '0';
-      document.getElementById('dashLastUpdateTime').textContent = 'Last: --';
+      document.getElementById('dashCapitalTotal').textContent = 'Rs.0.00';
+      document.getElementById('dashCapitalDiff').textContent = '➖ Rs.0.00';
 
       const grid = document.getElementById('dashAllShopsGrid');
       if (grid) {
@@ -553,8 +578,8 @@ const App = {
             <!-- 3 Balances Mini Grid -->
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:14px 0; background:rgba(0,0,0,0.03); padding:10px; border-radius:var(--radius-sm);">
               <div style="text-align:center;">
-                <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">📶 SIMs</div>
-                <div style="font-weight:700; font-size:0.95rem; color:var(--accent-blue);">${DB.formatCurrency(s.simTotal)}</div>
+                <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">🔄 Reload</div>
+                <div style="font-weight:700; font-size:0.95rem; color:var(--accent-blue);">${DB.formatCurrency(s.reloadTotal)}</div>
               </div>
               <div style="text-align:center; border-left:1px solid var(--border-glass); border-right:1px solid var(--border-glass);">
                 <div style="font-size:0.75rem; color:var(--text-secondary); font-weight:600;">🏦 Bank</div>
@@ -607,7 +632,7 @@ const App = {
 
       let diffBadges = '';
       if (comp && !comp.isFirst) {
-        const sDiff = comp.sim?.diff ?? comp.reload?.diff ?? 0;
+        const rDiff = comp.reload?.diff ?? comp.sim?.diff ?? 0;
         const bDiff = comp.bank?.diff ?? comp.mobileRental?.diff ?? 0;
         const cDiff = comp.cash?.diff ?? 0;
         const oDiff = comp.overall?.diff ?? 0;
@@ -615,13 +640,13 @@ const App = {
 
         diffBadges = `
           <div class="update-diff" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
-            <span class="update-diff-badge ${sDiff >= 0 ? 'profit' : 'loss'}">📶 SIM: ${sDiff >= 0 ? '+' : ''}${DB.formatCurrency(sDiff)}</span>
+            <span class="update-diff-badge ${rDiff >= 0 ? 'profit' : 'loss'}">🔄 Reload: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}</span>
             <span class="update-diff-badge ${bDiff >= 0 ? 'profit' : 'loss'}">🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}</span>
             <span class="update-diff-badge ${cDiff >= 0 ? 'profit' : 'loss'}">💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}</span>
-            <span class="update-diff-badge ${oType}" style="font-weight:800;">📊 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
+            <span class="update-diff-badge ${oType}" style="font-weight:800;">💰 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
           </div>`;
       } else {
-        diffBadges = '<div class="update-diff" style="margin-top:6px;"><span class="update-diff-badge neutral">📌 පළමු Update</span></div>';
+        diffBadges = '<div class="update-diff" style="margin-top:6px;"><span class="update-diff-badge neutral">📌 First Update (පළමු Update)</span></div>';
       }
 
       html += `
@@ -638,16 +663,16 @@ const App = {
           </div>
           <div class="update-totals">
             <div class="update-total-item">
-              <span class="update-total-label">📶 SIMs</span>
-              <span class="update-total-value">${DB.formatCurrency(vals.simTotal)}</span>
+              <span class="update-total-label">🔄 Reload Total</span>
+              <span class="update-total-value">${DB.formatCurrency(vals.reloadTotal)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">🏦 Bank</span>
+              <span class="update-total-label">🏦 Bank Total</span>
               <span class="update-total-value">${DB.formatCurrency(vals.bankTotal)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">💵 Cash</span>
-              <span class="update-total-value">${DB.formatCurrency(vals.cashInDrawer)}</span>
+              <span class="update-total-label">💵 Cash Drawer</span>
+              <span class="update-total-value">${DB.formatCurrency(vals.totalCash)}</span>
             </div>
           </div>
           ${diffBadges}
@@ -658,25 +683,142 @@ const App = {
   },
 
   // ================================================================
-  // UPDATE FORM
+  // UPDATE FORM (2-TRACK SYSTEM)
   // ================================================================
   setupUpdateForm() {
-    // Real-time calculation on all 3 balance inputs
-    document.querySelectorAll('.balance-input').forEach(input => {
-      input.addEventListener('input', () => this.calculateLiveBalances());
+    // Inputs in Section 1 (Individual SIMs + Reload Cash)
+    const simInputs = ['simDialog', 'simMobitel', 'simAirtel', 'simHutch', 'simEzcash', 'reloadCashInput'];
+    simInputs.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => this.calculateLiveBalances());
+      }
     });
+
+    // Add Bank Row Button
+    const addBankBtn = document.getElementById('addBankRowBtn');
+    if (addBankBtn) {
+      addBankBtn.addEventListener('click', () => {
+        this.addBankRow();
+      });
+    }
 
     // Form submit
-    document.getElementById('updateForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      this.submitUpdate();
-    });
+    const updateForm = document.getElementById('updateForm');
+    if (updateForm) {
+      updateForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        this.submitUpdate();
+      });
+    }
 
     // Clear button
-    document.getElementById('clearFormBtn').addEventListener('click', () => {
-      document.getElementById('updateForm').reset();
-      this.calculateLiveBalances();
+    const clearBtn = document.getElementById('clearFormBtn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        updateForm.reset();
+        this.editingUpdateId = null;
+        const btn = updateForm.querySelector('button[type="submit"]');
+        if (btn) btn.innerHTML = '💾 Save Update';
+        const bankContainer = document.getElementById('bankRowsContainer');
+        if (bankContainer) bankContainer.innerHTML = '';
+        this.addBankRow();
+        this.calculateLiveBalances();
+      });
+    }
+  },
+
+  addBankRow(data = {}) {
+    const container = document.getElementById('bankRowsContainer');
+    if (!container) return;
+
+    this.bankCounter++;
+    const rowId = 'bankRow_' + this.bankCounter;
+    const row = document.createElement('div');
+    row.className = 'bank-row';
+    row.id = rowId;
+
+    const banksList = [
+      'BOC',
+      'Commercial Bank',
+      "People's Bank",
+      'HNB',
+      'Sampath Bank',
+      'NTB',
+      'Seylan Bank',
+      'Pan Asia Bank',
+      'NDB',
+      'DFCC Bank',
+      'Other Bank'
+    ];
+
+    const currentBank = data.bank || 'Commercial Bank';
+    let optionsHtml = '';
+    banksList.forEach(b => {
+      optionsHtml += `<option value="${b}" ${b.toLowerCase() === currentBank.toLowerCase() ? 'selected' : ''}>${b}</option>`;
     });
+    if (data.bank && !banksList.some(b => b.toLowerCase() === data.bank.toLowerCase())) {
+      optionsHtml += `<option value="${data.bank}" selected>${data.bank}</option>`;
+    }
+
+    const acctVal = (data.accountAmount !== undefined && data.accountAmount !== null && data.accountAmount !== '') ? data.accountAmount : '';
+    const cashVal = (data.cashInDrawer !== undefined && data.cashInDrawer !== null && data.cashInDrawer !== '') ? data.cashInDrawer : '';
+    const initialTotal = (parseFloat(acctVal) || 0) + (parseFloat(cashVal) || 0);
+
+    row.innerHTML = `
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">🏛️ ${I18N.t('upd_bank_acct_lbl') || 'Bank Name'}</label>
+        <select class="form-select bank-select">
+          ${optionsHtml}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">💳 ${I18N.t('upd_bank_acct_lbl') || 'Account Amount'}</label>
+        <input type="number" class="form-input balance-input bank-acct-input" placeholder="0.00" step="0.01" min="0" value="${acctVal}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold);">💵 ${I18N.t('upd_bank_cash_lbl') || 'Bank Cash in Drawer'}</label>
+        <input type="number" class="form-input balance-input bank-cash-input" placeholder="0.00" step="0.01" min="0" value="${cashVal}">
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:flex-end;">
+        <label class="form-label" style="font-size:0.72rem; color:var(--text-muted);">Row Total</label>
+        <div class="bank-row-total">${DB.formatCurrency(initialTotal)}</div>
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button type="button" class="bank-row-remove" title="Remove Bank Account" onclick="App.removeBankRow('${rowId}')">🗑️</button>
+      </div>
+    `;
+
+    container.appendChild(row);
+
+    const acctInput = row.querySelector('.bank-acct-input');
+    const cashInput = row.querySelector('.bank-cash-input');
+    const select = row.querySelector('.bank-select');
+
+    const updateRow = () => {
+      const a = parseFloat(acctInput.value) || 0;
+      const c = parseFloat(cashInput.value) || 0;
+      row.querySelector('.bank-row-total').textContent = DB.formatCurrency(a + c);
+      this.calculateLiveBalances();
+    };
+
+    acctInput.addEventListener('input', updateRow);
+    cashInput.addEventListener('input', updateRow);
+    select.addEventListener('change', () => this.calculateLiveBalances());
+
+    this.calculateLiveBalances();
+  },
+
+  removeBankRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+      row.remove();
+    }
+    const container = document.getElementById('bankRowsContainer');
+    if (container && container.children.length === 0) {
+      this.addBankRow();
+    }
+    this.calculateLiveBalances();
   },
 
   renderUpdateForm() {
@@ -685,93 +827,148 @@ const App = {
 
     const prevUpdate = DB.getLastUpdate(shopId);
 
-    // Show previous update info
+    // Show previous update info & hints
     if (prevUpdate) {
       const prevVals = DB.extractValues(prevUpdate);
-      document.getElementById('prevUpdateInfo').style.display = 'block';
-      document.getElementById('prevUpdateTime').textContent = DB.formatDateTime(prevUpdate.timestamp);
+      const prevInfo = document.getElementById('prevUpdateInfo');
+      if (prevInfo) prevInfo.style.display = 'block';
+      const prevTime = document.getElementById('prevUpdateTime');
+      if (prevTime) prevTime.textContent = DB.formatDateTime(prevUpdate.timestamp);
 
-      document.getElementById('prevUpdateSummary').innerHTML = `
-        <div class="result-item"><div class="result-label">📶 SIMs Total</div><div class="result-value" style="color:var(--accent-blue);">${DB.formatCurrency(prevVals.simTotal)}</div></div>
-        <div class="result-item"><div class="result-label">🏦 Bank Total</div><div class="result-value" style="color:var(--accent-purple);">${DB.formatCurrency(prevVals.bankTotal)}</div></div>
-        <div class="result-item"><div class="result-label">💵 Cash in Drawer</div><div class="result-value" style="color:var(--accent-gold);">${DB.formatCurrency(prevVals.cashInDrawer)}</div></div>
-        <div class="result-item"><div class="result-label">📊 Total Capital</div><div class="result-value" style="font-weight:800;">${DB.formatCurrency(prevVals.totalCapital)}</div></div>
-      `;
+      const prevSummary = document.getElementById('prevUpdateSummary');
+      if (prevSummary) {
+        prevSummary.innerHTML = `
+          <div class="result-item"><div class="result-label">🔄 Reload Total</div><div class="result-value" style="color:var(--accent-blue);">${DB.formatCurrency(prevVals.reloadTotal)}</div></div>
+          <div class="result-item"><div class="result-label">🏦 Bank Total</div><div class="result-value" style="color:var(--accent-purple);">${DB.formatCurrency(prevVals.bankTotal)}</div></div>
+          <div class="result-item"><div class="result-label">💵 Cash Drawer</div><div class="result-value" style="color:var(--accent-gold);">${DB.formatCurrency(prevVals.totalCash)}</div></div>
+          <div class="result-item"><div class="result-label">💰 Grand Total Capital</div><div class="result-value" style="font-weight:800; color:var(--accent-green);">${DB.formatCurrency(prevVals.totalCapital)}</div></div>
+        `;
+      }
 
-      // Show previous values hints
-      document.getElementById('prevSimHint').textContent = `පෙර අගය: ${DB.formatCurrency(prevVals.simTotal)}`;
-      document.getElementById('prevBankHint').textContent = `පෙර අගය: ${DB.formatCurrency(prevVals.bankTotal)}`;
-      document.getElementById('prevCashHint').textContent = `පෙර අගය: ${DB.formatCurrency(prevVals.cashInDrawer)}`;
+      // Hints under Section 1 inputs
+      const setHint = (id, label, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = `${label}: ${DB.formatCurrency(val)}`;
+      };
+      setHint('prevDialogHint', 'Prev', prevVals.dialog);
+      setHint('prevMobitelHint', 'Prev', prevVals.mobitel);
+      setHint('prevAirtelHint', 'Prev', prevVals.airtel);
+      setHint('prevHutchHint', 'Prev', prevVals.hutch);
+      setHint('prevEzcashHint', 'Prev', prevVals.ezcash);
+      setHint('prevReloadCashHint', 'Prev Cash', prevVals.reloadCash);
     } else {
-      document.getElementById('prevUpdateInfo').style.display = 'none';
-      document.getElementById('prevSimHint').textContent = '';
-      document.getElementById('prevBankHint').textContent = '';
-      document.getElementById('prevCashHint').textContent = '';
+      const prevInfo = document.getElementById('prevUpdateInfo');
+      if (prevInfo) prevInfo.style.display = 'none';
+      ['prevDialogHint', 'prevMobitelHint', 'prevAirtelHint', 'prevHutchHint', 'prevEzcashHint', 'prevReloadCashHint'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+      });
+    }
+
+    // If bankRowsContainer is empty and not editing, add 1 initial bank row
+    const container = document.getElementById('bankRowsContainer');
+    if (container && container.children.length === 0 && !this.editingUpdateId) {
+      this.addBankRow();
     }
 
     this.calculateLiveBalances();
   },
 
   calculateLiveBalances() {
-    const sim = parseFloat(document.getElementById('simTotalInput').value) || 0;
-    const bank = parseFloat(document.getElementById('bankTotalInput').value) || 0;
-    const cash = parseFloat(document.getElementById('cashDrawerInput').value) || 0;
-    const total = sim + bank + cash;
+    // 1. Reload Track
+    const dialog = parseFloat(document.getElementById('simDialog')?.value) || 0;
+    const mobitel = parseFloat(document.getElementById('simMobitel')?.value) || 0;
+    const airtel = parseFloat(document.getElementById('simAirtel')?.value) || 0;
+    const hutch = parseFloat(document.getElementById('simHutch')?.value) || 0;
+    const ezcash = parseFloat(document.getElementById('simEzcash')?.value) || 0;
+    const reloadCash = parseFloat(document.getElementById('reloadCashInput')?.value) || 0;
 
-    document.getElementById('updateTotalCapital').textContent = DB.formatCurrency(total);
+    const reloadSimTotal = dialog + mobitel + airtel + hutch + ezcash;
+    const reloadTotal = reloadSimTotal + reloadCash;
 
+    const liveReloadTotalEl = document.getElementById('liveReloadTotal');
+    if (liveReloadTotalEl) liveReloadTotalEl.textContent = DB.formatCurrency(reloadTotal);
+
+    // 2. Bank Track
+    let totalBankAcct = 0;
+    let totalBankCash = 0;
+    let bankGrandTotal = 0;
+
+    const bankRows = document.querySelectorAll('#bankRowsContainer .bank-row');
+    bankRows.forEach(row => {
+      const a = parseFloat(row.querySelector('.bank-acct-input')?.value) || 0;
+      const c = parseFloat(row.querySelector('.bank-cash-input')?.value) || 0;
+      totalBankAcct += a;
+      totalBankCash += c;
+      const rowTotal = a + c;
+      const rowTotalEl = row.querySelector('.bank-row-total');
+      if (rowTotalEl) rowTotalEl.textContent = DB.formatCurrency(rowTotal);
+      bankGrandTotal += rowTotal;
+    });
+
+    const liveBankTotalEl = document.getElementById('liveBankTotal');
+    if (liveBankTotalEl) liveBankTotalEl.textContent = DB.formatCurrency(bankGrandTotal);
+
+    // 3. Grand Total Capital
+    const grandTotal = reloadTotal + bankGrandTotal;
+    const totalCapitalEl = document.getElementById('updateTotalCapital');
+    if (totalCapitalEl) totalCapitalEl.textContent = DB.formatCurrency(grandTotal);
+
+    // Diffs vs Previous Update
     const shopId = DB.getActiveShopId();
     const prevUpdate = shopId ? DB.getLastUpdate(shopId) : null;
+    const reloadDiffBadge = document.getElementById('liveReloadDiffBadge');
+    const bankDiffBadge = document.getElementById('liveBankDiffBadge');
+    const overallDiffBadge = document.getElementById('updateOverallDiffBadge');
     const container = document.getElementById('overallSummaryPreview');
 
     if (!prevUpdate) {
+      if (reloadDiffBadge) reloadDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
+      if (bankDiffBadge) bankDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
+      if (overallDiffBadge) overallDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (container) container.style.display = 'none';
-      document.getElementById('simDiffBadge').innerHTML = '';
-      document.getElementById('bankDiffBadge').innerHTML = '';
-      document.getElementById('cashDiffBadge').innerHTML = '';
       return;
     }
 
     const prevVals = DB.extractValues(prevUpdate);
-    const simDiff = sim - prevVals.simTotal;
-    const bankDiff = bank - prevVals.bankTotal;
-    const cashDiff = cash - prevVals.cashInDrawer;
-    const overallDiff = total - prevVals.totalCapital;
+    const reloadDiff = reloadTotal - prevVals.reloadTotal;
+    const bankDiff = bankGrandTotal - prevVals.bankTotal;
+    const overallDiff = grandTotal - prevVals.totalCapital;
 
-    const makeBadge = (diff) => {
+    const formatBadge = (diff) => {
       const type = diff > 0 ? 'profit' : diff < 0 ? 'loss' : 'neutral';
       const icon = diff > 0 ? '▲' : diff < 0 ? '▼' : '➖';
       const color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
-      return `<span style="font-size:0.8rem; font-weight:700; color:${color};">${icon} ${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}</span>`;
+      return `<span style="font-size:0.82rem; font-weight:700; color:${color};">${icon} ${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}</span>`;
     };
 
-    document.getElementById('simDiffBadge').innerHTML = makeBadge(simDiff);
-    document.getElementById('bankDiffBadge').innerHTML = makeBadge(bankDiff);
-    document.getElementById('cashDiffBadge').innerHTML = makeBadge(cashDiff);
+    if (reloadDiffBadge) reloadDiffBadge.innerHTML = formatBadge(reloadDiff);
+    if (bankDiffBadge) bankDiffBadge.innerHTML = formatBadge(bankDiff);
+    if (overallDiffBadge) overallDiffBadge.innerHTML = formatBadge(overallDiff);
 
-    const type = overallDiff > 0 ? 'profit' : overallDiff < 0 ? 'loss' : 'neutral';
+    const overallType = overallDiff > 0 ? 'profit' : overallDiff < 0 ? 'loss' : 'neutral';
+    const overallColor = overallType === 'profit' ? 'var(--accent-green)' : overallType === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
 
     if (container) {
       container.style.display = 'block';
       container.innerHTML = `
-        <div style="padding:20px; background:${type === 'profit' ? 'rgba(16,185,129,0.08)' : type === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${type === 'profit' ? 'rgba(16,185,129,0.2)' : type === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
+        <div style="padding:18px 20px; background:${overallType === 'profit' ? 'rgba(16,185,129,0.08)' : overallType === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${overallType === 'profit' ? 'rgba(16,185,129,0.2)' : overallType === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
           <div style="text-align:center;">
-            <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">පෙර update එකට සාපේක්ෂව වෙනස</div>
-            <div style="font-size:2.2rem;font-weight:900;color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">
+              ${I18N.t('comp_diff') || 'Difference vs Previous Update'}
+            </div>
+            <div style="font-size:2.2rem;font-weight:900;color:${overallColor};">
               ${overallDiff >= 0 ? '+' : ''}${DB.formatCurrency(overallDiff)}
             </div>
-            <div style="font-size:1rem;font-weight:700;color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});margin-top:4px;">
-              ${type === 'profit' ? '✅ PROFIT (ලාභ)' : type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE'}
+            <div style="font-size:1rem;font-weight:700;color:${overallColor};margin-top:2px;">
+              ${overallType === 'profit' ? '✅ PROFIT (ලාභ)' : overallType === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE'}
             </div>
-            <div style="margin-top:14px; display:flex; justify-content:center; gap:16px; flex-wrap:wrap;">
-              <span style="font-size:0.85rem; font-weight:600; color:var(--accent-${simDiff >= 0 ? 'green' : 'red'});">
-                📶 SIMs: ${simDiff >= 0 ? '+' : ''}${DB.formatCurrency(simDiff)}
+            <div style="margin-top:14px; display:flex; justify-content:center; gap:20px; flex-wrap:wrap;">
+              <span style="font-size:0.88rem; font-weight:700; color:${reloadDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                🔄 Reload Track: ${reloadDiff >= 0 ? '+' : ''}${DB.formatCurrency(reloadDiff)}
               </span>
-              <span style="font-size:0.85rem; font-weight:600; color:var(--accent-${bankDiff >= 0 ? 'green' : 'red'});">
-                🏦 Bank: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}
-              </span>
-              <span style="font-size:0.85rem; font-weight:600; color:var(--accent-${cashDiff >= 0 ? 'green' : 'red'});">
-                💵 Cash: ${cashDiff >= 0 ? '+' : ''}${DB.formatCurrency(cashDiff)}
+              <span style="font-size:0.88rem; font-weight:700; color:${bankDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                🏦 Bank Track: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}
               </span>
             </div>
           </div>
@@ -783,7 +980,7 @@ const App = {
   submitUpdate() {
     const shopId = DB.getActiveShopId();
     if (!shopId) {
-      this.showToast('කරුණාකර පළමුව සාප්පුවක් තෝරන්න', 'error');
+      this.showToast('Please select a shop first (කරුණාකර සාප්පුවක් තෝරන්න)', 'error');
       return;
     }
 
@@ -791,75 +988,111 @@ const App = {
     const jobRole = document.getElementById('jobRole').value.trim();
 
     if (!empName) {
-      this.showToast('සේවකයාගේ නම ඇතුළත් කරන්න', 'error');
+      this.showToast('Please enter Employee Name (සේවකයාගේ නම ඇතුළත් කරන්න)', 'error');
       return;
     }
 
-    const simTotal = parseFloat(document.getElementById('simTotalInput').value) || 0;
-    const bankTotal = parseFloat(document.getElementById('bankTotalInput').value) || 0;
-    const cashInDrawer = parseFloat(document.getElementById('cashDrawerInput').value) || 0;
+    // Section 1: Reload inputs
+    const dialog = parseFloat(document.getElementById('simDialog')?.value) || 0;
+    const mobitel = parseFloat(document.getElementById('simMobitel')?.value) || 0;
+    const airtel = parseFloat(document.getElementById('simAirtel')?.value) || 0;
+    const hutch = parseFloat(document.getElementById('simHutch')?.value) || 0;
+    const ezcash = parseFloat(document.getElementById('simEzcash')?.value) || 0;
+    const reloadCash = parseFloat(document.getElementById('reloadCashInput')?.value) || 0;
 
-    if (simTotal === 0 && bankTotal === 0 && cashInDrawer === 0) {
-      this.showToast('කරුණාකර අවම වශයෙන් එක් අගයක් හෝ ඇතුළත් කරන්න', 'error');
+    // Section 2: Bank inputs
+    const bankRows = document.querySelectorAll('#bankRowsContainer .bank-row');
+    const banks = [];
+    bankRows.forEach(row => {
+      const bank = row.querySelector('.bank-select')?.value || 'Commercial Bank';
+      const accountAmount = parseFloat(row.querySelector('.bank-acct-input')?.value) || 0;
+      const cashInDrawer = parseFloat(row.querySelector('.bank-cash-input')?.value) || 0;
+      if (accountAmount > 0 || cashInDrawer > 0 || bankRows.length === 1) {
+        banks.push({ bank, accountAmount, cashInDrawer });
+      }
+    });
+
+    const hasReloadData = (dialog + mobitel + airtel + hutch + ezcash + reloadCash) > 0;
+    const hasBankData = banks.some(b => (b.accountAmount + b.cashInDrawer) > 0);
+
+    if (!hasReloadData && !hasBankData) {
+      this.showToast('Please enter at least one balance amount (අවම වශයෙන් එක් අගයක් හෝ ඇතුළත් කරන්න)', 'error');
       return;
     }
 
-    // Save or Edit
+    const updatePayload = {
+      shopId,
+      empName,
+      jobRole,
+      reload: {
+        dialog,
+        mobitel,
+        airtel,
+        hutch,
+        ezcash,
+        cashInDrawer: reloadCash
+      },
+      mobileRental: {
+        banks
+      }
+    };
+
     let update;
     if (this.editingUpdateId) {
-      update = DB.editUpdate(this.editingUpdateId, { empName, jobRole, simTotal, bankTotal, cashInDrawer });
+      update = DB.editUpdate(this.editingUpdateId, updatePayload);
       this.editingUpdateId = null;
       const btn = document.querySelector('#updateForm button[type="submit"]');
       if (btn) btn.innerHTML = '💾 Save Update';
+      this.showToast('✅ Update successfully saved! (යාවත්කාලීන කරා)', 'success');
     } else {
-      update = DB.addUpdate({ shopId, empName, jobRole, simTotal, bankTotal, cashInDrawer });
+      update = DB.addUpdate(updatePayload);
     }
 
-    // Show result
+    // Modal result
     const comp = update.comparison;
     if (comp && !comp.isFirst) {
       const type = comp.overall.type;
       const diff = comp.overall.diff;
+      const rDiff = comp.reload?.diff ?? 0;
+      const bDiff = comp.bank?.diff ?? 0;
+
       this.showModal(
-        `${type === 'profit' ? '✅' : type === 'loss' ? '❌' : '➖'} Update Result`,
+        `${type === 'profit' ? '✅' : type === 'loss' ? '❌' : '➖'} Update Saved`,
         `
-        <div style="text-align:center; padding:20px 0;">
+        <div style="text-align:center; padding:16px 0;">
           <div style="font-size:2.2rem; font-weight:900; color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
             ${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}
           </div>
-          <div style="font-size:1.15rem; font-weight:700; margin-top:6px; color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
+          <div style="font-size:1.1rem; font-weight:700; margin-top:4px; color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
             ${type === 'profit' ? 'PROFIT (ලාභ) ✅' : type === 'loss' ? 'LOSS (අලාභ) ❌' : 'NO CHANGE ➖'}
           </div>
-          <div style="margin-top:18px; display:flex; justify-content:center; gap:24px;">
+          <div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:14px; background:var(--bg-glass); padding:14px; border-radius:var(--radius-sm);">
             <div>
-              <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;">📶 SIMs</div>
-              <div style="font-weight:700;color:var(--accent-${comp.sim.type === 'profit' ? 'green' : comp.sim.type === 'loss' ? 'red' : 'text-muted'});">
-                ${comp.sim.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.sim.diff)}
+              <div style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">🔄 Reload Track</div>
+              <div style="font-size:1.1rem; font-weight:800; color:var(--accent-${rDiff >= 0 ? 'green' : 'red'});">
+                ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}
               </div>
             </div>
             <div>
-              <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;">🏦 Bank</div>
-              <div style="font-weight:700;color:var(--accent-${comp.bank.type === 'profit' ? 'green' : comp.bank.type === 'loss' ? 'red' : 'text-muted'});">
-                ${comp.bank.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.bank.diff)}
-              </div>
-            </div>
-            <div>
-              <div style="font-size:0.78rem;color:var(--text-muted);text-transform:uppercase;">💵 Cash</div>
-              <div style="font-weight:700;color:var(--accent-${comp.cash.type === 'profit' ? 'green' : comp.cash.type === 'loss' ? 'red' : 'text-muted'});">
-                ${comp.cash.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.cash.diff)}
+              <div style="font-size:0.8rem; color:var(--text-muted); font-weight:600;">🏦 Bank Track</div>
+              <div style="font-size:1.1rem; font-weight:800; color:var(--accent-${bDiff >= 0 ? 'green' : 'red'});">
+                ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}
               </div>
             </div>
           </div>
         </div>
         `,
-        [{ text: 'හරි 👍', class: 'btn-success', onClick: () => this.closeModal() }]
+        [{ text: 'OK (හරි 👍)', class: 'btn-success', onClick: () => this.closeModal() }]
       );
     } else {
-      this.showToast('✅ පළමු Update save කරා!', 'success');
+      this.showToast('✅ First Update recorded! (පළමු Update සටහන් කරා)', 'success');
     }
 
-    // Reset form
+    // Reset Form
     document.getElementById('updateForm').reset();
+    const bankContainer = document.getElementById('bankRowsContainer');
+    if (bankContainer) bankContainer.innerHTML = '';
+    this.addBankRow();
     this.renderUpdateForm();
   },
 
@@ -916,7 +1149,7 @@ const App = {
 
       let diffBadges = '';
       if (comp && !comp.isFirst) {
-        const sDiff = comp.sim?.diff ?? comp.reload?.diff ?? 0;
+        const rDiff = comp.reload?.diff ?? comp.sim?.diff ?? 0;
         const bDiff = comp.bank?.diff ?? comp.mobileRental?.diff ?? 0;
         const cDiff = comp.cash?.diff ?? 0;
         const oDiff = comp.overall?.diff ?? 0;
@@ -924,10 +1157,10 @@ const App = {
 
         diffBadges = `
           <div class="update-diff" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
-            <span class="update-diff-badge ${sDiff >= 0 ? 'profit' : 'loss'}">📶 SIM: ${sDiff >= 0 ? '+' : ''}${DB.formatCurrency(sDiff)}</span>
+            <span class="update-diff-badge ${rDiff >= 0 ? 'profit' : 'loss'}">🔄 Reload: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}</span>
             <span class="update-diff-badge ${bDiff >= 0 ? 'profit' : 'loss'}">🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}</span>
             <span class="update-diff-badge ${cDiff >= 0 ? 'profit' : 'loss'}">💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}</span>
-            <span class="update-diff-badge ${oType}" style="font-weight:800;">📊 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
+            <span class="update-diff-badge ${oType}" style="font-weight:800;">💰 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
           </div>`;
       } else {
         diffBadges = '<div class="update-diff"><span class="update-diff-badge neutral">📌 පළමු Update</span></div>';
@@ -944,8 +1177,8 @@ const App = {
           </div>
           <div class="update-totals">
             <div class="update-total-item">
-              <span class="update-total-label">📶 SIMs</span>
-              <span class="update-total-value">${DB.formatCurrency(vals.simTotal)}</span>
+              <span class="update-total-label">🔄 Reload</span>
+              <span class="update-total-value">${DB.formatCurrency(vals.reloadTotal)}</span>
             </div>
             <div class="update-total-item">
               <span class="update-total-label">🏦 Bank</span>
@@ -953,11 +1186,11 @@ const App = {
             </div>
             <div class="update-total-item">
               <span class="update-total-label">💵 Cash</span>
-              <span class="update-total-value">${DB.formatCurrency(vals.cashInDrawer)}</span>
+              <span class="update-total-value">${DB.formatCurrency(vals.totalCash)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">📊 Total</span>
-              <span class="update-total-value" style="color:var(--accent-blue); font-weight:800;">${DB.formatCurrency(vals.totalCapital)}</span>
+              <span class="update-total-label">💰 Total</span>
+              <span class="update-total-value" style="color:var(--accent-green); font-weight:800;">${DB.formatCurrency(vals.totalCapital)}</span>
             </div>
           </div>
           ${diffBadges}
@@ -979,16 +1212,59 @@ const App = {
     let compSummary = '';
     if (comp && !comp.isFirst) {
       const type = comp.overall.type;
+      const color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
       compSummary = `
         <div style="text-align:center;padding:16px;background:${type === 'profit' ? 'rgba(16,185,129,0.08)' : type === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'};border-radius:var(--radius-md);margin-top:16px;">
           <div style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;">Vs Previous Update</div>
-          <div style="font-size:1.8rem;font-weight:900;color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
+          <div style="font-size:1.8rem;font-weight:900;color:${color};">
             ${comp.overall.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.overall.diff)}
           </div>
-          <div style="font-weight:700;color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
+          <div style="font-weight:700;color:${color};">
             ${type === 'profit' ? '✅ PROFIT (ලාභ)' : type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE'}
           </div>
+          <div style="margin-top:10px; display:flex; justify-content:center; gap:16px; font-size:0.85rem; font-weight:700;">
+            <span style="color:var(--accent-${comp.reload.diff >= 0 ? 'green' : 'red'});">
+              🔄 Reload: ${comp.reload.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.reload.diff)}
+            </span>
+            <span style="color:var(--accent-${comp.bank.diff >= 0 ? 'green' : 'red'});">
+              🏦 Bank: ${comp.bank.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.bank.diff)}
+            </span>
+          </div>
         </div>`;
+    }
+
+    // Section 1 SIMs Breakdown list
+    let simBreakdown = '';
+    const sims = [
+      { name: 'Dialog', val: vals.dialog },
+      { name: 'Mobitel', val: vals.mobitel },
+      { name: 'Airtel', val: vals.airtel },
+      { name: 'Hutch', val: vals.hutch },
+      { name: 'eZ Cash', val: vals.ezcash },
+      { name: 'Reload Cash', val: vals.reloadCash }
+    ].filter(s => s.val > 0);
+
+    if (sims.length > 0) {
+      simBreakdown = `
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; font-size:0.8rem;">
+          ${sims.map(s => `<span class="date-pill" style="font-size:0.75rem;">${s.name}: ${DB.formatCurrency(s.val)}</span>`).join('')}
+        </div>
+      `;
+    }
+
+    // Section 2 Bank Breakdown list
+    let bankBreakdown = '';
+    if (vals.banks && vals.banks.length > 0) {
+      bankBreakdown = `
+        <div style="display:flex; flex-direction:column; gap:4px; margin-top:6px; font-size:0.8rem;">
+          ${vals.banks.map(b => `
+            <div style="display:flex; justify-content:space-between; padding:4px 8px; background:rgba(0,0,0,0.02); border-radius:4px;">
+              <span>🏛️ <strong>${b.bank}</strong> (Acct: ${DB.formatCurrency(b.accountAmount)}, Cash: ${DB.formatCurrency(b.cashInDrawer)})</span>
+              <strong style="color:var(--accent-purple);">${DB.formatCurrency(b.total)}</strong>
+            </div>
+          `).join('')}
+        </div>
+      `;
     }
 
     this.showModal(
@@ -1000,29 +1276,40 @@ const App = {
       </div>
 
       <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm);">
-          <span style="font-weight:700;">📶 Network SIMs Total</span>
-          <span style="font-weight:800; color:var(--accent-blue);">${DB.formatCurrency(vals.simTotal)}</span>
+        <!-- Reload Track -->
+        <div style="padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm); border-left:3px solid var(--accent-blue);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:700;">🔄 Reload Track Total</span>
+            <span style="font-weight:800; color:var(--accent-blue); font-size:1.05rem;">${DB.formatCurrency(vals.reloadTotal)}</span>
+          </div>
+          ${simBreakdown}
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm);">
-          <span style="font-weight:700;">🏦 Bank Balance Total</span>
-          <span style="font-weight:800; color:var(--accent-purple);">${DB.formatCurrency(vals.bankTotal)}</span>
+
+        <!-- Bank Track -->
+        <div style="padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm); border-left:3px solid var(--accent-purple);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:700;">🏦 Bank Track Total</span>
+            <span style="font-weight:800; color:var(--accent-purple); font-size:1.05rem;">${DB.formatCurrency(vals.bankTotal)}</span>
+          </div>
+          ${bankBreakdown}
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm);">
-          <span style="font-weight:700;">💵 Cash in Drawer</span>
-          <span style="font-weight:800; color:var(--accent-gold);">${DB.formatCurrency(vals.cashInDrawer)}</span>
+
+        <!-- Drawer Cash Total -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm); border-left:3px solid var(--accent-gold);">
+          <span style="font-weight:700;">💵 Total Cash in Drawer</span>
+          <span style="font-weight:800; color:var(--accent-gold); font-size:1.05rem;">${DB.formatCurrency(vals.totalCash)}</span>
         </div>
       </div>
 
       <div style="font-weight:800;font-size:1.15rem;padding-top:12px;border-top:1px solid var(--border-glass);display:flex;justify-content:space-between;">
-        <span>📊 Total Capital:</span>
-        <span style="color:var(--accent-blue);">${DB.formatCurrency(vals.totalCapital)}</span>
+        <span>💰 Grand Total Capital:</span>
+        <span style="color:var(--accent-green); font-size:1.25rem;">${DB.formatCurrency(vals.totalCapital)}</span>
       </div>
 
       ${compSummary}
       `,
       [
-        { text: 'වසන්න', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: 'Close (වසන්න)', class: 'btn-ghost', onClick: () => this.closeModal() },
         { text: '✏️ Edit', class: 'btn-primary', onClick: () => { this.closeModal(); this.promptEditUpdate(u.id); } }
       ]
     );
@@ -1063,11 +1350,30 @@ const App = {
 
     document.getElementById('empName').value = update.empName || '';
     document.getElementById('jobRole').value = update.jobRole || '';
-    document.getElementById('simTotalInput').value = vals.simTotal || '';
-    document.getElementById('bankTotalInput').value = vals.bankTotal || '';
-    document.getElementById('cashDrawerInput').value = vals.cashInDrawer || '';
 
-    // Change submit button text
+    // Section 1: SIMs
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = (val > 0) ? val : '';
+    };
+    setVal('simDialog', vals.dialog);
+    setVal('simMobitel', vals.mobitel);
+    setVal('simAirtel', vals.airtel);
+    setVal('simHutch', vals.hutch);
+    setVal('simEzcash', vals.ezcash);
+    setVal('reloadCashInput', vals.reloadCash);
+
+    // Section 2: Bank rows
+    const container = document.getElementById('bankRowsContainer');
+    if (container) container.innerHTML = '';
+
+    if (vals.banks && vals.banks.length > 0) {
+      vals.banks.forEach(b => this.addBankRow(b));
+    } else {
+      this.addBankRow({ bank: 'Commercial Bank', accountAmount: vals.bankTotal, cashInDrawer: 0 });
+    }
+
+    // Button label
     const btn = document.querySelector('#updateForm button[type="submit"]');
     if (btn) btn.innerHTML = '✏️ Update Data (වෙනස් කරන්න)';
 
@@ -1366,11 +1672,11 @@ const App = {
       return;
     }
 
-    // Calculate totals across 3 pillars and overall
+    // Calculate totals across 2-track system + cash and overall
     let totalProfit = 0;
     let totalLoss = 0;
-    let simProfit = 0;
-    let simLoss = 0;
+    let reloadProfit = 0;
+    let reloadLoss = 0;
     let bankProfit = 0;
     let bankLoss = 0;
     let cashProfit = 0;
@@ -1382,9 +1688,9 @@ const App = {
         if (c.overall.diff > 0) totalProfit += c.overall.diff;
         else totalLoss += Math.abs(c.overall.diff);
 
-        const sDiff = c.sim ? c.sim.diff : (c.reload ? c.reload.diff : 0);
-        if (sDiff > 0) simProfit += sDiff;
-        else simLoss += Math.abs(sDiff);
+        const rDiff = c.reload ? c.reload.diff : (c.sim ? c.sim.diff : 0);
+        if (rDiff > 0) reloadProfit += rDiff;
+        else reloadLoss += Math.abs(rDiff);
 
         const bDiff = c.bank ? c.bank.diff : (c.mobileRental ? c.mobileRental.diff : 0);
         if (bDiff > 0) bankProfit += bDiff;
@@ -1398,7 +1704,7 @@ const App = {
 
     const netProfitLoss = totalProfit - totalLoss;
     const netType = netProfitLoss > 0 ? 'profit' : netProfitLoss < 0 ? 'loss' : 'neutral';
-    const simNet = simProfit - simLoss;
+    const reloadNet = reloadProfit - reloadLoss;
     const bankNet = bankProfit - bankLoss;
     const cashNet = cashProfit - cashLoss;
 
@@ -1415,25 +1721,25 @@ const App = {
         </div>
       </div>
 
-      <!-- 3-Pillar Category Breakdown -->
+      <!-- 2-Track + Cash Category Breakdown -->
       <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
         <div class="card accent-blue">
           <div class="card-header">
-            <span class="card-title">📶 ${I18N.t('dash_sim_total') || 'Network SIMs'}</span>
+            <span class="card-title">🔄 ${I18N.t('dash_reload_total') || 'Reload Track'}</span>
           </div>
           <div style="display:flex;gap:12px;">
             <div>
               <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('profit') || 'Profit'}</div>
-              <div style="font-weight:700;color:var(--accent-green);font-size:0.95rem;">+${DB.formatCurrency(simProfit)}</div>
+              <div style="font-weight:700;color:var(--accent-green);font-size:0.95rem;">+${DB.formatCurrency(reloadProfit)}</div>
             </div>
             <div>
               <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('loss') || 'Loss'}</div>
-              <div style="font-weight:700;color:var(--accent-red);font-size:0.95rem;">-${DB.formatCurrency(simLoss)}</div>
+              <div style="font-weight:700;color:var(--accent-red);font-size:0.95rem;">-${DB.formatCurrency(reloadLoss)}</div>
             </div>
             <div>
               <div style="font-size:0.75rem;color:var(--text-muted);">Net</div>
-              <div style="font-weight:800;font-size:0.95rem;color:var(--accent-${simNet >= 0 ? 'green' : 'red'});">
-                ${simNet >= 0 ? '+' : ''}${DB.formatCurrency(simNet)}
+              <div style="font-weight:800;font-size:0.95rem;color:var(--accent-${reloadNet >= 0 ? 'green' : 'red'});">
+                ${reloadNet >= 0 ? '+' : ''}${DB.formatCurrency(reloadNet)}
               </div>
             </div>
           </div>
@@ -1441,7 +1747,7 @@ const App = {
 
         <div class="card accent-purple">
           <div class="card-header">
-            <span class="card-title">🏦 ${I18N.t('dash_bank_total') || 'Bank Balance'}</span>
+            <span class="card-title">🏦 ${I18N.t('dash_bank_total') || 'Bank Track'}</span>
           </div>
           <div style="display:flex;gap:12px;">
             <div>
@@ -1521,10 +1827,10 @@ const App = {
               <tr style="border-bottom:1px solid var(--border-glass);">
                 <th style="text-align:left;padding:10px;color:var(--text-muted);font-weight:600;">Date</th>
                 <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">Updates</th>
-                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">SIMs Total</th>
-                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">Bank Total</th>
-                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">Cash Drawer</th>
-                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">Total Capital</th>
+                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">🔄 Reload Total</th>
+                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">🏦 Bank Total</th>
+                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">💵 Cash Drawer</th>
+                <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">💰 Total Capital</th>
                 <th style="text-align:right;padding:10px;color:var(--text-muted);font-weight:600;">P/L</th>
               </tr>
             </thead>
@@ -1545,10 +1851,10 @@ const App = {
                   <tr style="border-bottom:1px solid var(--border-glass);">
                     <td style="padding:10px;">${DB.formatDate(date)}</td>
                     <td style="padding:10px;text-align:right;">${dayUpdates.length}</td>
-                    <td style="padding:10px;text-align:right;font-weight:600;">${DB.formatCurrency(vals.simTotal)}</td>
+                    <td style="padding:10px;text-align:right;font-weight:600;">${DB.formatCurrency(vals.reloadTotal)}</td>
                     <td style="padding:10px;text-align:right;font-weight:600;">${DB.formatCurrency(vals.bankTotal)}</td>
-                    <td style="padding:10px;text-align:right;font-weight:600;">${DB.formatCurrency(vals.cashInDrawer)}</td>
-                    <td style="padding:10px;text-align:right;font-weight:700;color:var(--accent-primary);">${DB.formatCurrency(vals.totalCapital)}</td>
+                    <td style="padding:10px;text-align:right;font-weight:600;">${DB.formatCurrency(vals.totalCash)}</td>
+                    <td style="padding:10px;text-align:right;font-weight:700;color:var(--accent-green);">${DB.formatCurrency(vals.totalCapital)}</td>
                     <td style="padding:10px;text-align:right;font-weight:800;color:var(--accent-${dayType === 'profit' ? 'green' : dayType === 'loss' ? 'red' : 'text-muted'});">
                       ${dayPL >= 0 ? '+' : ''}${DB.formatCurrency(dayPL)}
                     </td>
@@ -1582,36 +1888,39 @@ const App = {
     if (window.reportChartInstance) {
       window.reportChartInstance.destroy();
     }
-    const ctx = document.getElementById('reportChart').getContext('2d');
-    window.reportChartInstance = new window.Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: chartLabels,
-        datasets: [
-          {
-            label: 'Profit (ලාභ)',
-            data: chartDataProfit,
-            backgroundColor: 'rgba(22, 163, 74, 0.7)',
-            borderColor: 'rgba(22, 163, 74, 1)',
-            borderWidth: 1
-          },
-          {
-            label: 'Loss (අලාභ)',
-            data: chartDataLoss,
-            backgroundColor: 'rgba(228, 0, 43, 0.7)',
-            borderColor: 'rgba(228, 0, 43, 1)',
-            borderWidth: 1
+    const chartCanvas = document.getElementById('reportChart');
+    if (chartCanvas && window.Chart) {
+      const ctx = chartCanvas.getContext('2d');
+      window.reportChartInstance = new window.Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              label: 'Profit (ලාභ)',
+              data: chartDataProfit,
+              backgroundColor: 'rgba(22, 163, 74, 0.7)',
+              borderColor: 'rgba(22, 163, 74, 1)',
+              borderWidth: 1
+            },
+            {
+              label: 'Loss (අලාභ)',
+              data: chartDataLoss,
+              backgroundColor: 'rgba(228, 0, 43, 0.7)',
+              borderColor: 'rgba(228, 0, 43, 1)',
+              borderWidth: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: { beginAtZero: true }
           }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { beginAtZero: true }
         }
-      }
-    });
+      });
+    }
   },
 
   // ================================================================

@@ -374,31 +374,75 @@ const DB = {
     return updates.length > 0 ? updates[0] : null;
   },
 
-  // Extract canonical 3 values from any update (legacy or new format)
+  // Extract values from any update (legacy or 2-track format)
   extractValues(u) {
-    if (!u) return { simTotal: 0, bankTotal: 0, cashInDrawer: 0, totalCapital: 0 };
-    let sim = (u.simTotal !== undefined) ? (parseFloat(u.simTotal) || 0) : 0;
-    let bank = (u.bankTotal !== undefined) ? (parseFloat(u.bankTotal) || 0) : 0;
-    let cash = (u.cashInDrawer !== undefined) ? (parseFloat(u.cashInDrawer) || 0) : 0;
-
-    // Handle legacy format fallback if not yet set
-    if (u.simTotal === undefined && u.reload) {
-      sim = (parseFloat(u.reload.dialog) || 0) +
-            (parseFloat(u.reload.airtel) || 0) +
-            (parseFloat(u.reload.mobitel) || 0) +
-            (parseFloat(u.reload.hutch) || 0) +
-            (parseFloat(u.reload.ezcash) || 0);
-      cash += (parseFloat(u.reload.cashInDrawer) || 0);
-    }
-    if (u.bankTotal === undefined && u.mobileRental?.banks) {
-      u.mobileRental.banks.forEach(b => {
-        bank += (parseFloat(b.accountAmount) || 0);
-        cash += (parseFloat(b.cashInDrawer) || 0);
-      });
+    if (!u) {
+      return {
+        dialog: 0, mobitel: 0, airtel: 0, hutch: 0, ezcash: 0,
+        simTotal: 0, reloadCash: 0, reloadTotal: 0,
+        banks: [], totalBankAcct: 0, totalBankCash: 0, bankTotal: 0,
+        totalCash: 0, cashInDrawer: 0, totalCapital: 0
+      };
     }
 
-    const totalCapital = (u.totalCapital !== undefined) ? (parseFloat(u.totalCapital) || 0) : (sim + bank + cash);
-    return { simTotal: sim, bankTotal: bank, cashInDrawer: cash, totalCapital };
+    // Reload extraction
+    let dialog = 0, mobitel = 0, airtel = 0, hutch = 0, ezcash = 0;
+    let reloadCash = 0, simTotal = 0, reloadTotal = 0;
+
+    if (u.reload && typeof u.reload === 'object') {
+      dialog = parseFloat(u.reload.dialog) || 0;
+      mobitel = parseFloat(u.reload.mobitel) || 0;
+      airtel = parseFloat(u.reload.airtel) || 0;
+      hutch = parseFloat(u.reload.hutch) || 0;
+      ezcash = parseFloat(u.reload.ezcash) || 0;
+      reloadCash = parseFloat(u.reload.cashInDrawer) || 0;
+      simTotal = dialog + mobitel + airtel + hutch + ezcash;
+      if (simTotal === 0 && u.reload.simTotal !== undefined) {
+        simTotal = parseFloat(u.reload.simTotal) || 0;
+      }
+      reloadTotal = (u.reload.total !== undefined) ? (parseFloat(u.reload.total) || 0) : (simTotal + reloadCash);
+    } else if (u.simTotal !== undefined) {
+      simTotal = parseFloat(u.simTotal) || 0;
+      reloadCash = parseFloat(u.cashInDrawer) || 0;
+      reloadTotal = simTotal + reloadCash;
+    }
+
+    // Bank / Mobile Rental extraction
+    let banks = [];
+    let totalBankAcct = 0;
+    let totalBankCash = 0;
+    let bankTotal = 0;
+
+    if (u.mobileRental && typeof u.mobileRental === 'object') {
+      if (Array.isArray(u.mobileRental.banks)) {
+        banks = u.mobileRental.banks.map(b => ({
+          bank: b.bank || '',
+          accountAmount: parseFloat(b.accountAmount) || 0,
+          cashInDrawer: parseFloat(b.cashInDrawer) || 0,
+          total: (parseFloat(b.accountAmount) || 0) + (parseFloat(b.cashInDrawer) || 0)
+        }));
+        banks.forEach(b => {
+          totalBankAcct += b.accountAmount;
+          totalBankCash += b.cashInDrawer;
+          bankTotal += b.total;
+        });
+      }
+      if (bankTotal === 0 && u.mobileRental.grandTotal !== undefined) {
+        bankTotal = parseFloat(u.mobileRental.grandTotal) || 0;
+      }
+    } else if (u.bankTotal !== undefined) {
+      bankTotal = parseFloat(u.bankTotal) || 0;
+    }
+
+    const totalCash = reloadCash + totalBankCash;
+    const totalCapital = (u.totalCapital !== undefined && u.reload && u.reload.total !== undefined) ? (parseFloat(u.totalCapital) || 0) : (reloadTotal + bankTotal);
+
+    return {
+      dialog, mobitel, airtel, hutch, ezcash,
+      simTotal, reloadCash, reloadTotal,
+      banks, totalBankAcct, totalBankCash, bankTotal,
+      totalCash, cashInDrawer: totalCash, totalCapital
+    };
   },
 
   _migrateLegacyUpdates() {
@@ -416,22 +460,46 @@ const DB = {
         for (let i = 0; i < shopUpdates.length; i++) {
           const u = shopUpdates[i];
           const vals = this.extractValues(u);
-          if (u.simTotal === undefined || u.bankTotal === undefined || u.cashInDrawer === undefined || !u.comparison?.sim) {
-            u.simTotal = vals.simTotal;
-            u.bankTotal = vals.bankTotal;
-            u.cashInDrawer = vals.cashInDrawer;
-            u.totalCapital = vals.simTotal + vals.bankTotal + vals.cashInDrawer;
 
-            const prev = i > 0 ? shopUpdates[i - 1] : null;
-            u.comparison = this.calculateComparison(u, prev);
+          if (!u.reload || typeof u.reload !== 'object' || u.reload.total === undefined) {
+            u.reload = {
+              dialog: vals.dialog,
+              mobitel: vals.mobitel,
+              airtel: vals.airtel,
+              hutch: vals.hutch,
+              ezcash: vals.ezcash,
+              simTotal: vals.simTotal,
+              cashInDrawer: vals.reloadCash,
+              total: vals.reloadTotal
+            };
             modified = true;
           }
+
+          if (!u.mobileRental || typeof u.mobileRental !== 'object' || u.mobileRental.grandTotal === undefined) {
+            u.mobileRental = {
+              banks: vals.banks,
+              totalAccountAmount: vals.totalBankAcct,
+              totalCashInDrawer: vals.totalBankCash,
+              grandTotal: vals.bankTotal
+            };
+            modified = true;
+          }
+
+          u.totalCapital = vals.totalCapital;
+          u.simTotal = vals.simTotal;
+          u.bankTotal = vals.bankTotal;
+          u.cashInDrawer = vals.totalCash;
+          u.reloadTotal = vals.reloadTotal;
+
+          const prev = i > 0 ? shopUpdates[i - 1] : null;
+          u.comparison = this.calculateComparison(u, prev);
+          modified = true;
         }
       });
 
       if (modified) {
         this.saveUpdates(raw);
-        console.log('✅ Migrated legacy updates to 3-pillar format');
+        console.log('✅ Migrated legacy updates to 2-track Reload & Bank format');
       }
     } catch (e) {
       console.error('Migration error:', e);
@@ -442,10 +510,46 @@ const DB = {
     const updates = this.getUpdates(true);
     const now = new Date();
 
-    const simTotal = parseFloat(updateData.simTotal) || 0;
-    const bankTotal = parseFloat(updateData.bankTotal) || 0;
-    const cashInDrawer = parseFloat(updateData.cashInDrawer) || 0;
-    const totalCapital = simTotal + bankTotal + cashInDrawer;
+    const reloadDialog = parseFloat(updateData.reload?.dialog) || 0;
+    const reloadMobitel = parseFloat(updateData.reload?.mobitel) || 0;
+    const reloadAirtel = parseFloat(updateData.reload?.airtel) || 0;
+    const reloadHutch = parseFloat(updateData.reload?.hutch) || 0;
+    const reloadEzcash = parseFloat(updateData.reload?.ezcash) || 0;
+    const reloadCash = parseFloat(updateData.reload?.cashInDrawer) || 0;
+    const reloadSimTotal = reloadDialog + reloadMobitel + reloadAirtel + reloadHutch + reloadEzcash;
+    let reloadTotal = reloadSimTotal + reloadCash;
+    if (reloadTotal === 0 && updateData.simTotal !== undefined) {
+      reloadTotal = parseFloat(updateData.simTotal) || 0;
+    }
+
+    // Process banks
+    const banks = Array.isArray(updateData.mobileRental?.banks) ? updateData.mobileRental.banks.map(b => {
+      const acct = parseFloat(b.accountAmount) || 0;
+      const cash = parseFloat(b.cashInDrawer) || 0;
+      return {
+        bank: b.bank || '',
+        accountAmount: acct,
+        cashInDrawer: cash,
+        total: acct + cash
+      };
+    }) : [];
+
+    let totalBankAcct = 0;
+    let totalBankCash = 0;
+    let bankGrandTotal = 0;
+
+    if (banks.length > 0) {
+      banks.forEach(b => {
+        totalBankAcct += b.accountAmount;
+        totalBankCash += b.cashInDrawer;
+        bankGrandTotal += b.total;
+      });
+    } else if (updateData.bankTotal !== undefined) {
+      bankGrandTotal = parseFloat(updateData.bankTotal) || 0;
+    }
+
+    const totalCapital = reloadTotal + bankGrandTotal;
+    const totalCash = reloadCash + totalBankCash;
 
     const update = {
       id: 'upd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
@@ -454,25 +558,37 @@ const DB = {
       jobRole: updateData.jobRole || '',
       date: now.toISOString().split('T')[0],
       timestamp: now.toISOString(),
-      simTotal,
-      bankTotal,
-      cashInDrawer,
+      reload: {
+        dialog: reloadDialog,
+        mobitel: reloadMobitel,
+        airtel: reloadAirtel,
+        hutch: reloadHutch,
+        ezcash: reloadEzcash,
+        simTotal: reloadSimTotal,
+        cashInDrawer: reloadCash,
+        total: reloadTotal
+      },
+      mobileRental: {
+        banks,
+        totalAccountAmount: totalBankAcct,
+        totalCashInDrawer: totalBankCash,
+        grandTotal: bankGrandTotal
+      },
       totalCapital,
-      // For legacy viewers/backups:
-      reload: { total: simTotal, cashInDrawer },
-      mobileRental: { grandTotal: bankTotal },
+      // Canonical helpers for backwards compatibility:
+      simTotal: reloadSimTotal,
+      bankTotal: bankGrandTotal,
+      cashInDrawer: totalCash,
+      reloadTotal,
       comparison: null
     };
 
-    // Calculate comparison with previous update of this shop
     const prevUpdate = this.getLastUpdate(update.shopId);
     update.comparison = this.calculateComparison(update, prevUpdate);
 
     updates.push(update);
     this.saveUpdates(updates);
     this._syncToFirebase('payment_tracker_updates', update.id, update);
-
-    // Auto-backup after update
     this.autoBackup();
 
     return update;
@@ -487,14 +603,69 @@ const DB = {
 
     existingUpdate.empName = updateData.empName || existingUpdate.empName;
     existingUpdate.jobRole = updateData.jobRole || existingUpdate.jobRole;
-    existingUpdate.simTotal = parseFloat(updateData.simTotal) || 0;
-    existingUpdate.bankTotal = parseFloat(updateData.bankTotal) || 0;
-    existingUpdate.cashInDrawer = parseFloat(updateData.cashInDrawer) || 0;
-    existingUpdate.totalCapital = existingUpdate.simTotal + existingUpdate.bankTotal + existingUpdate.cashInDrawer;
-    existingUpdate.reload = { total: existingUpdate.simTotal, cashInDrawer: existingUpdate.cashInDrawer };
-    existingUpdate.mobileRental = { grandTotal: existingUpdate.bankTotal };
 
-    // Recalculate comparison with the update immediately preceding it
+    const reloadDialog = parseFloat(updateData.reload?.dialog) || 0;
+    const reloadMobitel = parseFloat(updateData.reload?.mobitel) || 0;
+    const reloadAirtel = parseFloat(updateData.reload?.airtel) || 0;
+    const reloadHutch = parseFloat(updateData.reload?.hutch) || 0;
+    const reloadEzcash = parseFloat(updateData.reload?.ezcash) || 0;
+    const reloadCash = parseFloat(updateData.reload?.cashInDrawer) || 0;
+    const reloadSimTotal = reloadDialog + reloadMobitel + reloadAirtel + reloadHutch + reloadEzcash;
+    let reloadTotal = reloadSimTotal + reloadCash;
+    if (reloadTotal === 0 && updateData.simTotal !== undefined) {
+      reloadTotal = parseFloat(updateData.simTotal) || 0;
+    }
+
+    const banks = Array.isArray(updateData.mobileRental?.banks) ? updateData.mobileRental.banks.map(b => {
+      const acct = parseFloat(b.accountAmount) || 0;
+      const cash = parseFloat(b.cashInDrawer) || 0;
+      return {
+        bank: b.bank || '',
+        accountAmount: acct,
+        cashInDrawer: cash,
+        total: acct + cash
+      };
+    }) : [];
+
+    let totalBankAcct = 0;
+    let totalBankCash = 0;
+    let bankGrandTotal = 0;
+
+    if (banks.length > 0) {
+      banks.forEach(b => {
+        totalBankAcct += b.accountAmount;
+        totalBankCash += b.cashInDrawer;
+        bankGrandTotal += b.total;
+      });
+    } else if (updateData.bankTotal !== undefined) {
+      bankGrandTotal = parseFloat(updateData.bankTotal) || 0;
+    }
+
+    const totalCapital = reloadTotal + bankGrandTotal;
+    const totalCash = reloadCash + totalBankCash;
+
+    existingUpdate.reload = {
+      dialog: reloadDialog,
+      mobitel: reloadMobitel,
+      airtel: reloadAirtel,
+      hutch: reloadHutch,
+      ezcash: reloadEzcash,
+      simTotal: reloadSimTotal,
+      cashInDrawer: reloadCash,
+      total: reloadTotal
+    };
+    existingUpdate.mobileRental = {
+      banks,
+      totalAccountAmount: totalBankAcct,
+      totalCashInDrawer: totalBankCash,
+      grandTotal: bankGrandTotal
+    };
+    existingUpdate.totalCapital = totalCapital;
+    existingUpdate.simTotal = reloadSimTotal;
+    existingUpdate.bankTotal = bankGrandTotal;
+    existingUpdate.cashInDrawer = totalCash;
+    existingUpdate.reloadTotal = reloadTotal;
+
     const prevUpdate = this.getLastUpdateBefore(existingUpdate.shopId, existingUpdate.timestamp);
     existingUpdate.comparison = this.calculateComparison(existingUpdate, prevUpdate);
 
@@ -517,13 +688,13 @@ const DB = {
   calculateReloadTotal(u) {
     if (!u) return 0;
     if (typeof u === 'object') {
-      if (u.simTotal !== undefined) return parseFloat(u.simTotal) || 0;
+      if (u.total !== undefined) return parseFloat(u.total) || 0;
       if (u.dialog !== undefined) {
         return (parseFloat(u.dialog) || 0) + (parseFloat(u.airtel) || 0) +
                (parseFloat(u.mobitel) || 0) + (parseFloat(u.hutch) || 0) +
                (parseFloat(u.ezcash) || 0) + (parseFloat(u.cashInDrawer) || 0);
       }
-      if (u.total !== undefined) return parseFloat(u.total) || 0;
+      if (u.simTotal !== undefined) return parseFloat(u.simTotal) || 0;
     }
     return parseFloat(u) || 0;
   },
@@ -545,38 +716,72 @@ const DB = {
 
   calculateComparison(currentUpdate, previousUpdate) {
     const curr = this.extractValues(currentUpdate);
-
     const getType = (diff) => diff > 0 ? 'profit' : diff < 0 ? 'loss' : 'neutral';
 
     if (!previousUpdate) {
       return {
         isFirst: true,
-        sim: { current: curr.simTotal, previous: 0, diff: 0, type: 'neutral' },
-        bank: { current: curr.bankTotal, previous: 0, diff: 0, type: 'neutral' },
-        cash: { current: curr.cashInDrawer, previous: 0, diff: 0, type: 'neutral' },
-        overall: { current: curr.totalCapital, previous: 0, diff: 0, type: 'neutral' },
-        // Backwards compatibility mappings:
-        reload: { current: curr.simTotal, previous: 0, diff: 0, type: 'neutral' },
-        mobileRental: { current: curr.bankTotal, previous: 0, diff: 0, type: 'neutral' },
-        mobileRentalByBank: {}
+        reload: {
+          current: curr.reloadTotal,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
+        mobileRental: {
+          current: curr.bankTotal,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
+        bank: {
+          current: curr.bankTotal,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
+        sim: {
+          current: curr.simTotal,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
+        cash: {
+          current: curr.totalCash,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
+        overall: {
+          current: curr.totalCapital,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        }
       };
     }
 
     const prev = this.extractValues(previousUpdate);
 
-    const simDiff = curr.simTotal - prev.simTotal;
+    const reloadDiff = curr.reloadTotal - prev.reloadTotal;
     const bankDiff = curr.bankTotal - prev.bankTotal;
-    const cashDiff = curr.cashInDrawer - prev.cashInDrawer;
     const overallDiff = curr.totalCapital - prev.totalCapital;
+    const cashDiff = curr.totalCash - prev.totalCash;
+    const simDiff = curr.simTotal - prev.simTotal;
 
     return {
       isFirst: false,
       previousUpdateTime: previousUpdate.timestamp,
-      sim: {
-        current: curr.simTotal,
-        previous: prev.simTotal,
-        diff: simDiff,
-        type: getType(simDiff)
+      reload: {
+        current: curr.reloadTotal,
+        previous: prev.reloadTotal,
+        diff: reloadDiff,
+        type: getType(reloadDiff)
+      },
+      mobileRental: {
+        current: curr.bankTotal,
+        previous: prev.bankTotal,
+        diff: bankDiff,
+        type: getType(bankDiff)
       },
       bank: {
         current: curr.bankTotal,
@@ -584,9 +789,15 @@ const DB = {
         diff: bankDiff,
         type: getType(bankDiff)
       },
+      sim: {
+        current: curr.simTotal,
+        previous: prev.simTotal,
+        diff: simDiff,
+        type: getType(simDiff)
+      },
       cash: {
-        current: curr.cashInDrawer,
-        previous: prev.cashInDrawer,
+        current: curr.totalCash,
+        previous: prev.totalCash,
         diff: cashDiff,
         type: getType(cashDiff)
       },
@@ -595,21 +806,7 @@ const DB = {
         previous: prev.totalCapital,
         diff: overallDiff,
         type: getType(overallDiff)
-      },
-      // Backwards compatibility mappings:
-      reload: {
-        current: curr.simTotal,
-        previous: prev.simTotal,
-        diff: simDiff,
-        type: getType(simDiff)
-      },
-      mobileRental: {
-        current: curr.bankTotal,
-        previous: prev.bankTotal,
-        diff: bankDiff,
-        type: getType(bankDiff)
-      },
-      mobileRentalByBank: {}
+      }
     };
   },
 
@@ -622,12 +819,13 @@ const DB = {
   getGlobalStats() {
     const shops = this.getShops(false); // only active shops
     let totalOverallDiff = 0;
-    let totalSimDiff = 0;
+    let totalReloadDiff = 0;
     let totalBankDiff = 0;
     let totalCashDiff = 0;
-    let totalSim = 0;
+    let totalReload = 0;
     let totalBank = 0;
     let totalCash = 0;
+    let totalSim = 0;
     let hasData = false;
     let updatesCount = 0;
 
@@ -644,13 +842,14 @@ const DB = {
         lastUpdate,
         todayCount,
         hasData: !!lastUpdate,
-        simTotal: 0,
+        reloadTotal: 0,
         bankTotal: 0,
+        simTotal: 0,
         cashInDrawer: 0,
         totalCapital: 0,
         diffs: {
           overall: 0,
-          sim: 0,
+          reload: 0,
           bank: 0,
           cash: 0
         }
@@ -659,29 +858,31 @@ const DB = {
       if (lastUpdate) {
         hasData = true;
         const vals = this.extractValues(lastUpdate);
-        shopData.simTotal = vals.simTotal;
+        shopData.reloadTotal = vals.reloadTotal;
         shopData.bankTotal = vals.bankTotal;
-        shopData.cashInDrawer = vals.cashInDrawer;
+        shopData.simTotal = vals.simTotal;
+        shopData.cashInDrawer = vals.totalCash;
         shopData.totalCapital = vals.totalCapital;
 
-        totalSim += vals.simTotal;
+        totalReload += vals.reloadTotal;
         totalBank += vals.bankTotal;
-        totalCash += vals.cashInDrawer;
+        totalSim += vals.simTotal;
+        totalCash += vals.totalCash;
 
         if (lastUpdate.comparison && !lastUpdate.comparison.isFirst) {
           const c = lastUpdate.comparison;
           const od = c.overall?.diff || 0;
-          const sd = c.sim?.diff ?? c.reload?.diff ?? 0;
-          const bd = c.bank?.diff ?? c.mobileRental?.diff ?? 0;
-          const cd = c.cash?.diff ?? 0;
+          const rd = c.reload?.diff || 0;
+          const bd = c.bank?.diff || c.mobileRental?.diff || 0;
+          const cd = c.cash?.diff || 0;
 
           shopData.diffs.overall = od;
-          shopData.diffs.sim = sd;
+          shopData.diffs.reload = rd;
           shopData.diffs.bank = bd;
           shopData.diffs.cash = cd;
 
           totalOverallDiff += od;
-          totalSimDiff += sd;
+          totalReloadDiff += rd;
           totalBankDiff += bd;
           totalCashDiff += cd;
         }
@@ -689,27 +890,24 @@ const DB = {
       shopSummaries.push(shopData);
     });
 
-    const totalCapital = totalSim + totalBank + totalCash;
+    const totalCapital = totalReload + totalBank;
 
     return {
       hasData,
       totalCapital,
-      simTotal: totalSim,
+      reloadTotal: totalReload,
       bankTotal: totalBank,
+      simTotal: totalSim,
       cashTotal: totalCash,
       todayUpdatesCount: updatesCount,
       diffs: {
         overall: totalOverallDiff,
-        sim: totalSimDiff,
+        reload: totalReloadDiff,
         bank: totalBankDiff,
         cash: totalCashDiff,
-        // legacy mappings:
-        reload: totalSimDiff,
+        sim: totalReloadDiff,
         mobile: totalBankDiff
       },
-      // legacy mappings:
-      reloadTotal: totalSim,
-      mobileTotal: totalBank,
       shopSummaries
     };
   },
@@ -734,7 +932,7 @@ const DB = {
   },
 
   _downloadBackup() {
-    if (typeof document === 'undefined') return;
+    if (typeof document === 'undefined' || typeof Blob === 'undefined' || !document.createElement) return;
     try {
       const data = this.exportData();
       const blob = new Blob([data], { type: 'application/json' });
@@ -795,6 +993,11 @@ const DB = {
     
     if (period === 'today') {
       startDate = now.toISOString().split('T')[0];
+    } else if (period === 'yesterday') {
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
+      const yDate = y.toISOString().split('T')[0];
+      updates = updates.filter(u => u.date === yDate);
     } else if (period === 'week') {
       const d = new Date(now);
       d.setDate(d.getDate() - d.getDay()); // Sunday
@@ -805,7 +1008,7 @@ const DB = {
       startDate = `${now.getFullYear()}-01-01`;
     }
     
-    if (period !== 'all') {
+    if (period !== 'all' && period !== 'yesterday') {
       updates = updates.filter(u => u.date >= startDate);
     }
     
