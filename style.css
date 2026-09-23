@@ -408,6 +408,8 @@ body::after {
 .card.accent-purple .card-icon { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
 .card.accent-gold { border-color: rgba(245, 158, 11, 0.2); }
 .card.accent-gold .card-icon { background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); }
+.card.accent-yellow { border-color: rgba(234, 179, 8, 0.25); }
+.card.accent-yellow .card-icon { background: rgba(234, 179, 8, 0.15); color: #eab308; }
 
 /* Overall Profit/Loss Card */
 .overall-card {

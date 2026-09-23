@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="si">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -25,8 +25,8 @@
       <!-- Language Selector -->
       <div style="padding: 10px; display: flex; justify-content: flex-end;">
         <select id="langSelector" style="background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">
-          <option value="si">සිංහල</option>
           <option value="en">English</option>
+          <option value="si">සිංහල</option>
           <option value="ta">தமிழ்</option>
         </select>
       </div>
@@ -109,28 +109,37 @@
 
         <!-- Summary Cards -->
         <div class="summary-grid" id="summaryCards">
-          <!-- Reload Card -->
+          <!-- SIMs Card -->
           <div class="card accent-blue animate-slide-up">
             <div class="card-header">
-              <span class="card-title" data-i18n="dash_reload">🔄 Reload</span>
-              <div class="card-icon">🔄</div>
+              <span class="card-title" data-i18n="dash_sim_total">📶 SIMs Total</span>
+              <div class="card-icon">📶</div>
             </div>
-            <div class="card-value" id="dashReloadTotal">Rs.0.00</div>
-            <div class="card-diff neutral" id="dashReloadDiff">➖ Rs.0.00</div>
+            <div class="card-value" id="dashSimTotal">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashSimDiff">➖ Rs.0.00</div>
           </div>
-          <!-- Mobile Rental Card -->
+          <!-- Bank Card -->
           <div class="card accent-purple animate-slide-up">
             <div class="card-header">
-              <span class="card-title" data-i18n="dash_mobile">📱 Mobile Rental</span>
-              <div class="card-icon">📱</div>
+              <span class="card-title" data-i18n="dash_bank_total">🏦 Bank Total</span>
+              <div class="card-icon">🏦</div>
             </div>
-            <div class="card-value" id="dashMobileTotal">Rs.0.00</div>
-            <div class="card-diff neutral" id="dashMobileDiff">➖ Rs.0.00</div>
+            <div class="card-value" id="dashBankTotal">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashBankDiff">➖ Rs.0.00</div>
+          </div>
+          <!-- Cash Card -->
+          <div class="card accent-gold animate-slide-up">
+            <div class="card-header">
+              <span class="card-title" data-i18n="dash_cash_total">💵 Cash Drawer</span>
+              <div class="card-icon">💵</div>
+            </div>
+            <div class="card-value" id="dashCashTotal">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashCashDiff">➖ Rs.0.00</div>
           </div>
           <!-- Update Count -->
           <div class="card accent-green animate-slide-up">
             <div class="card-header">
-              <span class="card-title" data-i18n="dash_today_updates">📌 අද Updates</span>
+              <span class="card-title" data-i18n="dash_today_updates">📌 Today Updates</span>
               <div class="card-icon">📌</div>
             </div>
             <div class="card-value" id="dashUpdateCount">0</div>
@@ -138,26 +147,23 @@
           </div>
         </div>
 
-        <!-- Reload Breakdown -->
-        <div class="card" style="margin-bottom: 24px;">
+        <!-- All Shops Live Overview (Shown on Main Dashboard) -->
+        <div class="card" id="dashAllShopsSection" style="margin-bottom: 24px; display: none;">
           <div class="card-header">
-            <span class="card-title">🔄 Reload Breakdown</span>
+            <span class="card-title" data-i18n="dash_all_shops_title">🏪 All Shops Live Overview</span>
           </div>
-          <div id="dashReloadBreakdown" class="result-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;">
-            <div class="empty-state" style="padding:20px;grid-column:1/-1;">
-              <div class="empty-sub" data-i18n="dash_no_data">No reload data yet</div>
-            </div>
+          <div id="dashAllShopsGrid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
           </div>
         </div>
 
-        <!-- Bank Wise Breakdown -->
-        <div class="card" style="margin-bottom: 24px;">
+        <!-- Single Shop Balance Comparison (Shown when a Shop is selected) -->
+        <div class="card" id="dashComparisonSection" style="margin-bottom: 24px;">
           <div class="card-header">
-            <span class="card-title" data-i18n="dash_bank_breakdown">🏦 Bank Wise Breakdown</span>
+            <span class="card-title" data-i18n="dash_comparison_title">📊 Balance Comparison</span>
           </div>
-          <div id="dashBankBreakdown" class="result-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;">
-            <div class="empty-state" style="padding:20px;grid-column:1/-1;">
-              <div class="empty-sub" data-i18n="dash_no_data">No bank data yet</div>
+          <div id="dashComparisonTable">
+            <div class="empty-state" style="padding:20px;">
+              <div class="empty-sub" data-i18n="dash_no_data">No data yet</div>
             </div>
           </div>
         </div>
@@ -165,12 +171,12 @@
         <!-- Recent Updates -->
         <div class="card">
           <div class="card-header">
-            <span class="card-title" data-i18n="dash_recent_updates">📜 මෑත Updates</span>
+            <span class="card-title" data-i18n="dash_recent_updates">📜 Recent Updates</span>
           </div>
           <div id="dashRecentUpdates">
             <div class="empty-state" style="padding:30px;">
               <div class="empty-icon">📭</div>
-              <div class="empty-text" data-i18n="dash_no_data">Updates නැහැ</div>
+              <div class="empty-text" data-i18n="dash_no_data">No updates</div>
             </div>
           </div>
         </div>
@@ -179,13 +185,13 @@
       <!-- ===== UPDATE PAGE ===== -->
       <div class="page" id="page-update">
         <div class="page-header">
-          <h1><span class="header-icon">➕</span> <span data-i18n="upd_title">Update කරන්න</span></h1>
+          <h1><span class="header-icon">➕</span> <span data-i18n="upd_title">Add Update</span></h1>
         </div>
 
         <!-- Previous Update Info -->
         <div class="card" id="prevUpdateInfo" style="margin-bottom:24px; display:none;">
           <div class="card-header">
-            <span class="card-title">📌 පෙර Update එක</span>
+            <span class="card-title">📌 පෙර Update එක (Previous Update)</span>
             <span class="date-pill" id="prevUpdateTime">--</span>
           </div>
           <div class="result-grid" id="prevUpdateSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;"></div>
@@ -210,85 +216,48 @@
             </div>
           </div>
 
-          <!-- RELOAD SECTION -->
+          <!-- BALANCES SECTION -->
           <div class="section-divider blue">
-            <div class="divider-icon">🔄</div>
-            <div class="divider-text" data-i18n="upd_reload_title">Reload (රීලෝඩ්)</div>
+            <div class="divider-icon">💰</div>
+            <div class="divider-text" data-i18n="upd_balances_title">අද දින ශේෂයන් (Current Balances)</div>
             <div class="divider-line"></div>
           </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Dialog</label>
-              <input type="number" class="form-input reload-input" id="reloadDialog" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevDialog"></div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Airtel</label>
-              <input type="number" class="form-input reload-input" id="reloadAirtel" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevAirtel"></div>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">Mobitel</label>
-              <input type="number" class="form-input reload-input" id="reloadMobitel" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevMobitel"></div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">Hutch</label>
-              <input type="number" class="form-input reload-input" id="reloadHutch" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevHutch"></div>
-            </div>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label">eZ Cash</label>
-              <input type="number" class="form-input reload-input" id="reloadEzcash" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevEzcash"></div>
-            </div>
-            <div class="form-group">
-              <label class="form-label" data-i18n="upd_cash_drawer">💵 Cash in Drawer (ලාච්චුවේ සල්ලි)</label>
-              <input type="number" class="form-input reload-input" id="reloadCash" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevReloadCash"></div>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" style="font-weight:700; font-size:1rem;" data-i18n="upd_sim_label">📶 Network SIMs Total (සියලුම SIM වල ශේෂය)</label>
+            <input type="number" class="form-input balance-input" id="simTotalInput" placeholder="0.00" step="0.01" min="0" style="font-size:1.15rem; font-weight:700;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+              <div class="prev-value" id="prevSimHint" style="font-size:0.85rem;"></div>
+              <div id="simDiffBadge"></div>
             </div>
           </div>
 
-          <div class="auto-total">
-            <span class="total-label" data-i18n="upd_reload_total">🔄 Reload Total</span>
-            <span class="total-value" id="reloadTotal">Rs.0.00</span>
-          </div>
-          <div id="reloadDiffDisplay" style="display:none;"></div>
-
-          <!-- MOBILE RENTAL SECTION -->
-          <div class="section-divider purple" style="margin-top:36px;">
-            <div class="divider-icon">📱</div>
-            <div class="divider-text" data-i18n="upd_mobile_title">Mobile Rental (මොබයිල් රෙන්ටල්)</div>
-            <div class="divider-line"></div>
+          <div class="form-group" style="margin-bottom: 20px;">
+            <label class="form-label" style="font-weight:700; font-size:1rem;" data-i18n="upd_bank_label">🏦 Bank Balance Total (බැංකුවේ ඇති මුළු මුදල)</label>
+            <input type="number" class="form-input balance-input" id="bankTotalInput" placeholder="0.00" step="0.01" min="0" style="font-size:1.15rem; font-weight:700;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+              <div class="prev-value" id="prevBankHint" style="font-size:0.85rem;"></div>
+              <div id="bankDiffBadge"></div>
+            </div>
           </div>
 
-          <div class="bank-entries" id="bankEntries">
-            <!-- Bank entries will be added dynamically -->
+          <div class="form-group" style="margin-bottom: 24px;">
+            <label class="form-label" style="font-weight:700; font-size:1rem;" data-i18n="upd_cash_drawer">💵 Cash in Drawer (ලාච්චුවේ ඇති මුදල)</label>
+            <input type="number" class="form-input balance-input" id="cashDrawerInput" placeholder="0.00" step="0.01" min="0" style="font-size:1.15rem; font-weight:700;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+              <div class="prev-value" id="prevCashHint" style="font-size:0.85rem;"></div>
+              <div id="cashDiffBadge"></div>
+            </div>
           </div>
 
-          <button type="button" class="btn btn-ghost" id="addBankBtn" style="margin-top:14px;" data-i18n="upd_add_bank">
-            ➕ Bank එකක් එකතු කරන්න
-          </button>
-
-          <div class="auto-total" style="margin-top:14px;">
-            <span class="total-label" data-i18n="upd_mobile_total">📱 Mobile Rental Total</span>
-            <span class="total-value" id="mobileTotal">Rs.0.00</span>
-          </div>
-          <div id="mobileDiffDisplay" style="display:none;"></div>
-
-          <!-- OVERALL SUMMARY -->
-          <div class="section-divider green" style="margin-top:36px;">
-            <div class="divider-icon">📊</div>
-            <div class="divider-text" data-i18n="upd_grand_total">Overall Summary</div>
-            <div class="divider-line"></div>
+          <!-- AUTO TOTAL CAPITAL -->
+          <div class="auto-total" style="padding:16px; border-radius:var(--radius-md); background:var(--bg-glass); border:1px solid var(--border-glass); margin-bottom:20px;">
+            <span class="total-label" style="font-size:1.05rem; font-weight:700;" data-i18n="upd_grand_total">මුළු එකතුව (Total Capital)</span>
+            <span class="total-value" id="updateTotalCapital" style="font-size:1.5rem; color:var(--accent-blue);">Rs.0.00</span>
           </div>
 
-          <div id="overallSummaryPreview" style="display:none;"></div>
+          <!-- OVERALL SUMMARY PREVIEW -->
+          <div id="overallSummaryPreview" style="display:none; margin-bottom:20px;"></div>
 
           <div style="margin-top:24px; display:flex; gap:12px;">
             <button type="submit" class="btn btn-success btn-lg" style="flex:1;" data-i18n="btn_save_update">
