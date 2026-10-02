@@ -49,6 +49,7 @@
         <li><a href="#" data-page="dashboard" class="active" onclick="App.showMainDashboard()"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
         <li><a href="#" data-page="update"><span class="nav-icon">➕</span> <span data-i18n="nav_update">Update කරන්න</span></a></li>
         <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update ඉතිහාසය</span></a></li>
+        <li><a href="#" data-page="credits"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
         <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">සාප්පු</span></a></li>
         <li><a href="#" data-page="reports"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">වාර්තා</span></a></li>
       </ul>
@@ -76,7 +77,10 @@
       <div class="page active" id="page-dashboard">
         <div class="page-header">
           <h1><span class="header-icon">📊</span> <span data-i18n="dash_title">Dashboard</span></h1>
-          <div class="header-actions">
+          <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
+            <button class="btn btn-primary btn-sm" onclick="App.showQuickAddCreditModal()" title="Add Customer Credit" style="font-weight:700;">
+              <span>📒</span> <span data-i18n="quick_add_credit">+ Add Credit</span>
+            </button>
             <span class="date-pill" id="todayDate">📅 Today</span>
           </div>
         </div>
@@ -144,6 +148,15 @@
             </div>
             <div class="card-value" id="dashCapitalTotal">Rs.0.00</div>
             <div class="card-diff neutral" id="dashCapitalDiff">➖ Rs.0.00</div>
+          </div>
+          <!-- Customer Credit Card -->
+          <div class="card accent-gold animate-slide-up" style="cursor:pointer;" onclick="App.navigateTo('credits')" title="View Customer Credits">
+            <div class="card-header">
+              <span class="card-title" data-i18n="dash_pending_credits">📒 Pending Credits</span>
+              <div class="card-icon">📒</div>
+            </div>
+            <div class="card-value" id="dashCreditTotal" style="color:var(--accent-gold);">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashCreditDiff">0 Pending</div>
           </div>
         </div>
 
@@ -288,6 +301,49 @@
             <span class="total-value" id="liveBankTotal" style="font-size:1.35rem; color:var(--accent-purple);">Rs.0.00</span>
           </div>
 
+          <!-- SECTION 2.5: SHIFT ADJUSTMENTS (CREDITS, ROUTERS & TOP-UPS) -->
+          <div class="section-divider amber" style="margin-top:24px;">
+            <div class="divider-icon">⚖️</div>
+            <div class="divider-text" data-i18n="upd_adj_sec_title">Section 2.5: Shift Adjustments (Credits, Routers & Top-ups)</div>
+            <div class="divider-line"></div>
+          </div>
+
+          <!-- A. Customer Credit Reloads -->
+          <div style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);" data-i18n="upd_adj_credit_title">👤 Customer Credit Reloads (ණයට දුන් රීලෝඩ්)</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="addCreditRowBtn" data-i18n="btn_add_credit">+ Add Customer Credit</button>
+            </div>
+            <div id="creditRowsContainer" class="adj-entries"></div>
+          </div>
+
+          <!-- B. Shop Router Reloads -->
+          <div style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);" data-i18n="upd_adj_router_title">📶 Shop Router Reloads (සාප්පුවේ රවුටර් වියදම්)</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="addRouterRowBtn" data-i18n="btn_add_router">+ Add Router Reload</button>
+            </div>
+            <div id="routerRowsContainer" class="adj-entries"></div>
+          </div>
+
+          <!-- C. Distributor Top-ups Received -->
+          <div style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);" data-i18n="upd_adj_topup_title">📥 Distributor Top-ups / Deposits (ලැබුණු ස්ටොක්)</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="addTopupRowBtn" data-i18n="btn_add_topup">+ Add Distributor Top-up</button>
+            </div>
+            <div id="topupRowsContainer" class="adj-entries"></div>
+          </div>
+
+          <!-- Live Shift Adjustments Summary Badge -->
+          <div class="auto-total" style="padding:14px; border-radius:var(--radius-md); background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); margin-bottom:24px;">
+            <div>
+              <span class="total-label" style="font-size:0.95rem; font-weight:700;" data-i18n="upd_adj_summary_badge">⚖️ Shift Adjustments Total</span>
+              <div id="liveAdjBreakdown" style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">Credits: Rs.0.00 | Routers: Rs.0.00 | Top-ups: Rs.0.00</div>
+            </div>
+            <span class="total-value" id="liveAdjTotal" style="font-size:1.35rem; color:var(--accent-gold);">+ Rs.0.00</span>
+          </div>
+
           <!-- SECTION 3: GRAND TOTAL CAPITAL -->
           <div class="section-divider green">
             <div class="divider-icon">💰</div>
@@ -334,6 +390,70 @@
           <div class="empty-state">
             <div class="empty-icon">📭</div>
             <div class="empty-text" data-i18n="dash_no_data">Updates නැහැ</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CREDITS & EXPENSES LEDGER PAGE ===== -->
+      <div class="page" id="page-credits">
+        <div class="page-header">
+          <div>
+            <h1><span class="header-icon">📒</span> <span data-i18n="cred_title">Customer Credit & Router Ledger</span></h1>
+            <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="cred_subtitle">Track customer receivables, router reloads, and settlements</p>
+          </div>
+          <div class="header-actions">
+            <button class="btn btn-primary" id="pageQuickAddCreditBtn">+ ණයට දුන් රීලෝඩ්</button>
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="summary-grid" style="margin-bottom:24px;">
+          <div class="card accent-gold">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_pending_credits">⏳ Unsettled Credits</span>
+              <div class="card-icon">⏳</div>
+            </div>
+            <div class="card-value" id="kpiPendingCredits">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiPendingCreditsCount">0 Customers</div>
+          </div>
+
+          <div class="card accent-purple">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_router_expenses">📶 Router Expenses</span>
+              <div class="card-icon">📶</div>
+            </div>
+            <div class="card-value" id="kpiRouterExpenses">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiRouterExpensesCount">0 Records</div>
+          </div>
+
+          <div class="card accent-green">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_settled_credits">✅ Settled Credits</span>
+              <div class="card-icon">✅</div>
+            </div>
+            <div class="card-value" id="kpiSettledCredits">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiSettledCreditsCount">0 Paid</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="card" style="margin-bottom:20px; padding:16px;">
+          <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
+            <div style="display:flex; gap:8px;" id="ledgerTabButtons">
+              <button class="btn btn-primary btn-sm ledger-tab-btn active" data-tab="credits" data-i18n="tab_credits">👤 Customer Credits</button>
+              <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="routers" data-i18n="tab_routers">📶 Router Expenses</button>
+              <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="topups" data-i18n="tab_topups">📥 Distributor Top-ups</button>
+            </div>
+            <div style="display:flex; gap:8px; flex:1; max-width:360px;">
+              <input type="text" class="form-input" id="ledgerSearchInput" placeholder="Search customer name or phone..." data-i18n="cred_search_ph">
+            </div>
+          </div>
+        </div>
+
+        <!-- Ledger Table Card -->
+        <div class="card">
+          <div id="ledgerTableContainer" style="overflow-x:auto;">
+            <!-- Populated via App.renderCreditsPage() -->
           </div>
         </div>
       </div>

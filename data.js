@@ -89,6 +89,9 @@ const DB = {
   ACTIVE_SHOP_KEY: 'spt_active_shop',
   BACKUP_KEY: 'spt_last_backup',
   AUTO_BACKUP_KEY: 'spt_auto_backup',
+  CREDITS_KEY: 'spt_credits',
+  ROUTER_EXPENSES_KEY: 'spt_router_expenses',
+  DISTRIBUTOR_TOPUPS_KEY: 'spt_distributor_topups',
 
   _initialized: false,
 
@@ -113,6 +116,30 @@ const DB = {
       if (idbUpdates && idbUpdates.length > 0) {
         localStorage.setItem(this.UPDATES_KEY, JSON.stringify(idbUpdates));
         console.log('✅ Updates restored from IndexedDB backup!');
+      }
+    }
+
+    const lsCredits = localStorage.getItem(this.CREDITS_KEY);
+    if (!lsCredits || lsCredits === '[]') {
+      const idbCredits = await IDB.load(this.CREDITS_KEY);
+      if (idbCredits && idbCredits.length > 0) {
+        localStorage.setItem(this.CREDITS_KEY, JSON.stringify(idbCredits));
+      }
+    }
+
+    const lsRouters = localStorage.getItem(this.ROUTER_EXPENSES_KEY);
+    if (!lsRouters || lsRouters === '[]') {
+      const idbRouters = await IDB.load(this.ROUTER_EXPENSES_KEY);
+      if (idbRouters && idbRouters.length > 0) {
+        localStorage.setItem(this.ROUTER_EXPENSES_KEY, JSON.stringify(idbRouters));
+      }
+    }
+
+    const lsTopups = localStorage.getItem(this.DISTRIBUTOR_TOPUPS_KEY);
+    if (!lsTopups || lsTopups === '[]') {
+      const idbTopups = await IDB.load(this.DISTRIBUTOR_TOPUPS_KEY);
+      if (idbTopups && idbTopups.length > 0) {
+        localStorage.setItem(this.DISTRIBUTOR_TOPUPS_KEY, JSON.stringify(idbTopups));
       }
     }
 
@@ -551,8 +578,53 @@ const DB = {
     const totalCapital = reloadTotal + bankGrandTotal;
     const totalCash = reloadCash + totalBankCash;
 
+    // Process adjustments
+    const updateId = 'upd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+
+    const credits = Array.isArray(updateData.adjustments?.credits) ? updateData.adjustments.credits.map(c => ({
+      id: 'cred_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: updateData.shopId,
+      updateId,
+      customerName: (c.customerName || '').trim(),
+      phone: (c.phone || '').trim(),
+      network: c.network || 'Dialog',
+      amount: parseFloat(c.amount) || 0,
+      timestamp: now.toISOString(),
+      date: now.toISOString().split('T')[0],
+      status: 'pending',
+      note: (c.note || '').trim()
+    })).filter(c => c.amount > 0 && c.customerName) : [];
+
+    const routerExpenses = Array.isArray(updateData.adjustments?.routers) ? updateData.adjustments.routers.map(r => ({
+      id: 'rexp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: updateData.shopId,
+      updateId,
+      routerName: (r.routerName || 'Shop Router').trim(),
+      network: r.network || 'Dialog',
+      amount: parseFloat(r.amount) || 0,
+      timestamp: now.toISOString(),
+      date: now.toISOString().split('T')[0],
+      note: (r.note || '').trim()
+    })).filter(r => r.amount > 0) : [];
+
+    const distributorTopups = Array.isArray(updateData.adjustments?.topups) ? updateData.adjustments.topups.map(t => ({
+      id: 'topup_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: updateData.shopId,
+      updateId,
+      distributorName: (t.distributorName || 'Distributor').trim(),
+      networkOrBank: t.networkOrBank || 'Dialog',
+      amount: parseFloat(t.amount) || 0,
+      timestamp: now.toISOString(),
+      date: now.toISOString().split('T')[0],
+      note: (t.note || '').trim()
+    })).filter(t => t.amount > 0) : [];
+
+    const creditsTotal = credits.reduce((sum, c) => sum + c.amount, 0);
+    const routersTotal = routerExpenses.reduce((sum, r) => sum + r.amount, 0);
+    const topupsTotal = distributorTopups.reduce((sum, t) => sum + t.amount, 0);
+
     const update = {
-      id: 'upd_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      id: updateId,
       shopId: updateData.shopId,
       empName: updateData.empName || '',
       jobRole: updateData.jobRole || '',
@@ -574,6 +646,14 @@ const DB = {
         totalCashInDrawer: totalBankCash,
         grandTotal: bankGrandTotal
       },
+      adjustments: {
+        credits,
+        routerExpenses,
+        distributorTopups,
+        creditsTotal,
+        routersTotal,
+        topupsTotal
+      },
       totalCapital,
       // Canonical helpers for backwards compatibility:
       simTotal: reloadSimTotal,
@@ -585,6 +665,20 @@ const DB = {
 
     const prevUpdate = this.getLastUpdate(update.shopId);
     update.comparison = this.calculateComparison(update, prevUpdate);
+
+    // Save linked adjustments to persistence tables
+    if (credits.length > 0) {
+      const existingCredits = this.getCredits(null, true);
+      this.saveCredits([...credits, ...existingCredits]);
+    }
+    if (routerExpenses.length > 0) {
+      const existingRouters = this.getRouterExpenses(null);
+      this.saveRouterExpenses([...routerExpenses, ...existingRouters]);
+    }
+    if (distributorTopups.length > 0) {
+      const existingTopups = this.getDistributorTopups(null);
+      this.saveDistributorTopups([...distributorTopups, ...existingTopups]);
+    }
 
     updates.push(update);
     this.saveUpdates(updates);
@@ -683,6 +777,156 @@ const DB = {
     this._deleteFromFirebase('payment_tracker_updates', updateId);
   },
 
+  // ---- Customer Credits (ණයට දුන් රීලෝඩ්) ----
+  getCredits(shopId = null, includeSettled = true) {
+    let credits = JSON.parse(localStorage.getItem(this.CREDITS_KEY) || '[]');
+    if (shopId) credits = credits.filter(c => c.shopId === shopId);
+    if (!includeSettled) credits = credits.filter(c => c.status === 'pending');
+    return credits.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  saveCredits(credits) {
+    this._dualSave(this.CREDITS_KEY, credits);
+  },
+
+  addCredit(creditData) {
+    const credits = this.getCredits(null, true);
+    const now = new Date();
+    const item = {
+      id: 'cred_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: creditData.shopId,
+      updateId: creditData.updateId || null,
+      customerName: (creditData.customerName || '').trim(),
+      phone: (creditData.phone || '').trim(),
+      network: creditData.network || 'Dialog',
+      amount: parseFloat(creditData.amount) || 0,
+      timestamp: creditData.timestamp || now.toISOString(),
+      date: creditData.date || now.toISOString().split('T')[0],
+      status: 'pending',
+      note: (creditData.note || '').trim()
+    };
+    credits.unshift(item);
+    this.saveCredits(credits);
+    return item;
+  },
+
+  settleCredit(creditId, settledNote = '') {
+    const credits = this.getCredits(null, true);
+    const item = credits.find(c => c.id === creditId);
+    if (!item) return false;
+    item.status = 'paid';
+    item.settledAt = new Date().toISOString();
+    item.settledNote = settledNote;
+    this.saveCredits(credits);
+    return true;
+  },
+
+  deleteCredit(creditId) {
+    let credits = this.getCredits(null, true);
+    credits = credits.filter(c => c.id !== creditId);
+    this.saveCredits(credits);
+    return true;
+  },
+
+  getCreditsStats(shopId = null) {
+    const list = this.getCredits(shopId, true);
+    let totalPending = 0;
+    let countPending = 0;
+    let totalSettled = 0;
+    let countSettled = 0;
+    list.forEach(c => {
+      const amt = parseFloat(c.amount) || 0;
+      if (c.status === 'paid') {
+        totalSettled += amt;
+        countSettled++;
+      } else {
+        totalPending += amt;
+        countPending++;
+      }
+    });
+    return {
+      totalCreditGiven: totalPending + totalSettled,
+      totalPending,
+      countPending,
+      totalSettled,
+      countSettled
+    };
+  },
+
+  // ---- Router Reload Expenses (සාප්පුවේ රවුටර් රීලෝඩ්) ----
+  getRouterExpenses(shopId = null) {
+    let list = JSON.parse(localStorage.getItem(this.ROUTER_EXPENSES_KEY) || '[]');
+    if (shopId) list = list.filter(r => r.shopId === shopId);
+    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  saveRouterExpenses(list) {
+    this._dualSave(this.ROUTER_EXPENSES_KEY, list);
+  },
+
+  addRouterExpense(data) {
+    const list = this.getRouterExpenses(null);
+    const now = new Date();
+    const item = {
+      id: 'rexp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: data.shopId,
+      updateId: data.updateId || null,
+      routerName: (data.routerName || 'Shop Router').trim(),
+      network: data.network || 'Dialog',
+      amount: parseFloat(data.amount) || 0,
+      timestamp: data.timestamp || now.toISOString(),
+      date: data.date || now.toISOString().split('T')[0],
+      note: (data.note || '').trim()
+    };
+    list.unshift(item);
+    this.saveRouterExpenses(list);
+    return item;
+  },
+
+  deleteRouterExpense(id) {
+    let list = this.getRouterExpenses(null);
+    list = list.filter(r => r.id !== id);
+    this.saveRouterExpenses(list);
+    return true;
+  },
+
+  // ---- Distributor Top-ups Received (ලැබුණු රීලෝඩ් / ස්ටොක්) ----
+  getDistributorTopups(shopId = null) {
+    let list = JSON.parse(localStorage.getItem(this.DISTRIBUTOR_TOPUPS_KEY) || '[]');
+    if (shopId) list = list.filter(t => t.shopId === shopId);
+    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  saveDistributorTopups(list) {
+    this._dualSave(this.DISTRIBUTOR_TOPUPS_KEY, list);
+  },
+
+  addDistributorTopup(data) {
+    const list = this.getDistributorTopups(null);
+    const now = new Date();
+    const item = {
+      id: 'topup_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: data.shopId,
+      updateId: data.updateId || null,
+      distributorName: (data.distributorName || 'Distributor').trim(),
+      networkOrBank: data.networkOrBank || 'Dialog',
+      amount: parseFloat(data.amount) || 0,
+      timestamp: data.timestamp || now.toISOString(),
+      date: data.date || now.toISOString().split('T')[0],
+      note: (data.note || '').trim()
+    };
+    list.unshift(item);
+    this.saveDistributorTopups(list);
+    return item;
+  },
+
+  deleteDistributorTopup(id) {
+    let list = this.getDistributorTopups(null);
+    list = list.filter(t => t.id !== id);
+    this.saveDistributorTopups(list);
+    return true;
+  },
+
   // ---- Calculation Engine ----
 
   calculateReloadTotal(u) {
@@ -718,6 +962,10 @@ const DB = {
     const curr = this.extractValues(currentUpdate);
     const getType = (diff) => diff > 0 ? 'profit' : diff < 0 ? 'loss' : 'neutral';
 
+    const creditsGiven = currentUpdate?.adjustments?.creditsTotal || 0;
+    const routerExpenses = currentUpdate?.adjustments?.routersTotal || 0;
+    const topupsReceived = currentUpdate?.adjustments?.topupsTotal || 0;
+
     if (!previousUpdate) {
       return {
         isFirst: true,
@@ -751,8 +999,19 @@ const DB = {
           diff: 0,
           type: 'neutral'
         },
-        overall: {
+        adjustments: {
+          credits: creditsGiven,
+          routers: routerExpenses,
+          topups: topupsReceived
+        },
+        physical: {
           current: curr.totalCapital,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
+        overall: {
+          current: curr.totalCapital + creditsGiven + routerExpenses,
           previous: 0,
           diff: 0,
           type: 'neutral'
@@ -764,9 +1023,15 @@ const DB = {
 
     const reloadDiff = curr.reloadTotal - prev.reloadTotal;
     const bankDiff = curr.bankTotal - prev.bankTotal;
-    const overallDiff = curr.totalCapital - prev.totalCapital;
+    const physicalDiff = curr.totalCapital - prev.totalCapital;
     const cashDiff = curr.totalCash - prev.totalCash;
     const simDiff = curr.simTotal - prev.simTotal;
+
+    // Adjusted Net Operating Profit/Loss:
+    // Credits given = asset receivable
+    // Router reloads = shop operating expense
+    // Topups received = capital injected from distributor
+    const adjustedDiff = (curr.totalCapital + creditsGiven + routerExpenses) - (prev.totalCapital + topupsReceived);
 
     return {
       isFirst: false,
@@ -801,11 +1066,22 @@ const DB = {
         diff: cashDiff,
         type: getType(cashDiff)
       },
-      overall: {
+      adjustments: {
+        credits: creditsGiven,
+        routers: routerExpenses,
+        topups: topupsReceived
+      },
+      physical: {
         current: curr.totalCapital,
         previous: prev.totalCapital,
-        diff: overallDiff,
-        type: getType(overallDiff)
+        diff: physicalDiff,
+        type: getType(physicalDiff)
+      },
+      overall: {
+        current: curr.totalCapital + creditsGiven + routerExpenses,
+        previous: prev.totalCapital + topupsReceived,
+        diff: adjustedDiff,
+        type: getType(adjustedDiff)
       }
     };
   },
@@ -1085,9 +1361,12 @@ const DB = {
     return JSON.stringify({
       shops: this.getShops(),
       updates: this.getUpdates(),
+      credits: this.getCredits(null, true),
+      routerExpenses: this.getRouterExpenses(null),
+      distributorTopups: this.getDistributorTopups(null),
       activeShopId: this.getActiveShopId(),
       exportedAt: new Date().toISOString(),
-      version: '1.0'
+      version: '2.0'
     }, null, 2);
   },
 
@@ -1097,6 +1376,9 @@ const DB = {
       const data = JSON.parse(jsonString);
       if (data.shops) this.saveShops(data.shops);
       if (data.updates) this.saveUpdates(data.updates);
+      if (data.credits) this.saveCredits(data.credits);
+      if (data.routerExpenses) this.saveRouterExpenses(data.routerExpenses);
+      if (data.distributorTopups) this.saveDistributorTopups(data.distributorTopups);
       if (data.activeShopId) this.setActiveShop(data.activeShopId);
       return true;
     } catch (e) {

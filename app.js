@@ -6,6 +6,11 @@
 const App = {
   currentPage: 'dashboard',
   bankCounter: 0,
+  creditCounter: 0,
+  routerCounter: 0,
+  topupCounter: 0,
+  currentLedgerTab: 'credits',
+  ledgerSearchTerm: '',
   editingUpdateId: null,
 
   // ---- Initialize ----
@@ -23,6 +28,7 @@ const App = {
     this.setupNavigation();
     this.setupShopSelector();
     this.setupUpdateForm();
+    this.setupCreditsPage();
     this.setupShopsPage();
     this.setupHistoryPage();
     this.setupReportsPage();
@@ -175,6 +181,7 @@ const App = {
     switch (page) {
       case 'dashboard': this.renderDashboard(); break;
       case 'update': this.renderUpdateForm(); break;
+      case 'credits': this.renderCreditsPage(); break;
       case 'history': this.renderHistory(); break;
       case 'shops': this.renderShops(); break;
       case 'reports': break;
@@ -351,6 +358,19 @@ const App = {
       document.getElementById('dashCapitalDiff').className = 'card-diff neutral';
     }
 
+    // 5. Customer Credit Card
+    const creditStats = DB.getCreditsStats(shopId);
+    const dashCreditEl = document.getElementById('dashCreditTotal');
+    const dashCreditDiffEl = document.getElementById('dashCreditDiff');
+    if (dashCreditEl) {
+      dashCreditEl.textContent = DB.formatCurrency(creditStats.totalPending);
+    }
+    if (dashCreditDiffEl) {
+      const pLabel = I18N.t('cred_status_pending') || 'Pending';
+      dashCreditDiffEl.textContent = `${creditStats.countPending} ${pLabel}`;
+      dashCreditDiffEl.className = creditStats.totalPending > 0 ? 'card-diff loss' : 'card-diff neutral';
+    }
+
     // Comparison Table
     this.renderComparisonTable(lastUpdate);
 
@@ -374,6 +394,14 @@ const App = {
     document.getElementById('dashCapitalTotal').textContent = 'Rs.0.00';
     document.getElementById('dashCapitalDiff').textContent = '➖ Rs.0.00';
 
+    const dashCreditEl = document.getElementById('dashCreditTotal');
+    const dashCreditDiffEl = document.getElementById('dashCreditDiff');
+    if (dashCreditEl) dashCreditEl.textContent = 'Rs.0.00';
+    if (dashCreditDiffEl) {
+      dashCreditDiffEl.textContent = '0 Pending';
+      dashCreditDiffEl.className = 'card-diff neutral';
+    }
+
     const compTable = document.getElementById('dashComparisonTable');
     if (compTable) {
       compTable.innerHTML = `<div class="empty-state" style="padding:24px;"><div class="empty-icon">🏪</div><div class="empty-text">"${shop.name}" සඳහා තවම Updates නැත</div><div class="empty-sub">පළමු update එක ලබාගැනීමට ➕ Add Update ඔබන්න.</div></div>`;
@@ -389,6 +417,9 @@ const App = {
     const comp = lastUpdate.comparison;
     const prevUpdate = DB.getLastUpdateBefore(lastUpdate.shopId, lastUpdate.timestamp);
     const prev = DB.extractValues(prevUpdate);
+
+    const hasAdj = comp && comp.adjustments && (comp.adjustments.credits > 0 || comp.adjustments.routers > 0 || comp.adjustments.topups > 0);
+    const adjNet = hasAdj ? (comp.adjustments.credits + comp.adjustments.routers - comp.adjustments.topups) : 0;
 
     const rows = [
       {
@@ -406,17 +437,43 @@ const App = {
         prev: prevUpdate ? prev.bankTotal : 0,
         diff: comp && !comp.isFirst ? comp.bank.diff : 0,
         type: comp && !comp.isFirst ? comp.bank.type : 'neutral'
-      },
-      {
-        icon: '💰',
-        name: I18N.t('comp_track_total') || 'Grand Total Capital (Reload + Bank)',
-        curr: curr.totalCapital,
-        prev: prevUpdate ? prev.totalCapital : 0,
+      }
+    ];
+
+    if (hasAdj) {
+      rows.push({
+        icon: '⚖️',
+        name: `${I18N.t('comp_track_adj') || 'Shift Adjustments'} (Credits + Routers - Topups)`,
+        curr: adjNet,
+        prev: 0,
+        diff: adjNet,
+        type: adjNet > 0 ? 'profit' : adjNet < 0 ? 'loss' : 'neutral',
+        isAdj: true,
+        breakdown: `Credits: +${DB.formatCurrency(comp.adjustments.credits)} | Routers: +${DB.formatCurrency(comp.adjustments.routers)} | Top-ups: -${DB.formatCurrency(comp.adjustments.topups)}`
+      });
+    }
+
+    rows.push({
+      icon: '💰',
+      name: I18N.t('comp_track_total') || 'Total Physical Capital (Reload + Bank)',
+      curr: curr.totalCapital,
+      prev: prevUpdate ? prev.totalCapital : 0,
+      diff: comp && !comp.isFirst ? (comp.physical ? comp.physical.diff : comp.overall.diff) : 0,
+      type: comp && !comp.isFirst ? (comp.physical ? comp.physical.type : comp.overall.type) : 'neutral',
+      isTotal: !hasAdj
+    });
+
+    if (hasAdj) {
+      rows.push({
+        icon: '📈',
+        name: I18N.t('comp_operating_pl') || 'True Operating Profit / Loss (Adjusted)',
+        curr: curr.totalCapital + comp.adjustments.credits + comp.adjustments.routers,
+        prev: prevUpdate ? (prev.totalCapital + comp.adjustments.topups) : 0,
         diff: comp && !comp.isFirst ? comp.overall.diff : 0,
         type: comp && !comp.isFirst ? comp.overall.type : 'neutral',
         isTotal: true
-      }
-    ];
+      });
+    }
 
     let html = `
       <div style="overflow-x:auto;">
@@ -441,9 +498,12 @@ const App = {
 
       html += `
         <tr style="border-bottom:1px solid var(--border-glass); ${isTotalStyle}">
-          <td style="padding:12px 14px; font-weight:700;">${r.icon} ${r.name}</td>
-          <td style="padding:12px 14px; text-align:right; color:var(--text-muted);">${prevUpdate ? DB.formatCurrency(r.prev) : '--'}</td>
-          <td style="padding:12px 14px; text-align:right; font-weight:700;">${DB.formatCurrency(r.curr)}</td>
+          <td style="padding:12px 14px; font-weight:700;">
+            ${r.icon} ${r.name}
+            ${r.breakdown ? `<div style="font-size:0.75rem; color:var(--text-muted); font-weight:normal; margin-top:2px;">${r.breakdown}</div>` : ''}
+          </td>
+          <td style="padding:12px 14px; text-align:right; color:var(--text-muted);">${prevUpdate && !r.isAdj ? DB.formatCurrency(r.prev) : (r.isAdj ? '--' : '--')}</td>
+          <td style="padding:12px 14px; text-align:right; font-weight:700;">${r.isAdj ? (r.curr >= 0 ? '+' : '') + DB.formatCurrency(r.curr) : DB.formatCurrency(r.curr)}</td>
           <td style="padding:12px 14px; text-align:right; font-weight:800; color:${color};">
             ${comp && !comp.isFirst ? `${r.diff >= 0 ? '+' : ''}${DB.formatCurrency(r.diff)}` : '--'}
           </td>
@@ -514,6 +574,19 @@ const App = {
       document.getElementById('dashCapitalDiff').textContent = `${overallType === 'profit' ? '▲' : overallType === 'loss' ? '▼' : '➖'} ${DB.formatCurrency(Math.abs(overallDiff))}`;
       document.getElementById('dashCapitalDiff').className = `card-diff ${overallType}`;
 
+      // Customer Credits (All Shops)
+      const creditStats = DB.getCreditsStats(null);
+      const dashCreditEl = document.getElementById('dashCreditTotal');
+      const dashCreditDiffEl = document.getElementById('dashCreditDiff');
+      if (dashCreditEl) {
+        dashCreditEl.textContent = DB.formatCurrency(creditStats.totalPending);
+      }
+      if (dashCreditDiffEl) {
+        const pLabel = I18N.t('cred_status_pending') || 'Pending';
+        dashCreditDiffEl.textContent = `${creditStats.countPending} ${pLabel}`;
+        dashCreditDiffEl.className = creditStats.totalPending > 0 ? 'card-diff loss' : 'card-diff neutral';
+      }
+
       // Render All Shops Cards
       this.renderAllShopsGrid(stats.shopSummaries);
 
@@ -534,6 +607,14 @@ const App = {
       document.getElementById('dashCashDiff').textContent = '➖ Rs.0.00';
       document.getElementById('dashCapitalTotal').textContent = 'Rs.0.00';
       document.getElementById('dashCapitalDiff').textContent = '➖ Rs.0.00';
+
+      const emptyCreditEl = document.getElementById('dashCreditTotal');
+      const emptyCreditDiffEl = document.getElementById('dashCreditDiff');
+      if (emptyCreditEl) emptyCreditEl.textContent = 'Rs.0.00';
+      if (emptyCreditDiffEl) {
+        emptyCreditDiffEl.textContent = '0 Pending';
+        emptyCreditDiffEl.className = 'card-diff neutral';
+      }
 
       const grid = document.getElementById('dashAllShopsGrid');
       if (grid) {
@@ -703,6 +784,30 @@ const App = {
       });
     }
 
+    // Add Credit Row Button
+    const addCreditBtn = document.getElementById('addCreditRowBtn');
+    if (addCreditBtn) {
+      addCreditBtn.addEventListener('click', () => {
+        this.addCreditRow();
+      });
+    }
+
+    // Add Router Row Button
+    const addRouterBtn = document.getElementById('addRouterRowBtn');
+    if (addRouterBtn) {
+      addRouterBtn.addEventListener('click', () => {
+        this.addRouterRow();
+      });
+    }
+
+    // Add Topup Row Button
+    const addTopupBtn = document.getElementById('addTopupRowBtn');
+    if (addTopupBtn) {
+      addTopupBtn.addEventListener('click', () => {
+        this.addTopupRow();
+      });
+    }
+
     // Form submit
     const updateForm = document.getElementById('updateForm');
     if (updateForm) {
@@ -722,6 +827,12 @@ const App = {
         if (btn) btn.innerHTML = '💾 Save Update';
         const bankContainer = document.getElementById('bankRowsContainer');
         if (bankContainer) bankContainer.innerHTML = '';
+        const creditContainer = document.getElementById('creditRowsContainer');
+        if (creditContainer) creditContainer.innerHTML = '';
+        const routerContainer = document.getElementById('routerRowsContainer');
+        if (routerContainer) routerContainer.innerHTML = '';
+        const topupContainer = document.getElementById('topupRowsContainer');
+        if (topupContainer) topupContainer.innerHTML = '';
         this.addBankRow();
         this.calculateLiveBalances();
       });
@@ -821,6 +932,173 @@ const App = {
     this.calculateLiveBalances();
   },
 
+  // ---- Dynamic Shift Adjustment Rows ----
+  addCreditRow(data = {}) {
+    const container = document.getElementById('creditRowsContainer');
+    if (!container) return;
+
+    this.creditCounter++;
+    const rowId = 'creditRow_' + this.creditCounter;
+    const row = document.createElement('div');
+    row.className = 'adj-row';
+    row.id = rowId;
+
+    const networks = ['Dialog', 'Mobitel', 'Airtel', 'Hutch'];
+    const curNet = data.network || 'Dialog';
+    let netOpts = networks.map(n => `<option value="${n}" ${n === curNet ? 'selected' : ''}>${n}</option>`).join('');
+
+    const custName = data.customerName || '';
+    const phone = data.phone || '';
+    const amount = (data.amount !== undefined && data.amount !== null && data.amount !== '') ? data.amount : '';
+
+    row.innerHTML = `
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">👤 Customer (පාරිභෝගිකයා)</label>
+        <input type="text" class="form-input credit-cust-name" placeholder="Name" value="${custName}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">📞 Phone / SIM</label>
+        <input type="tel" class="form-input credit-phone" placeholder="07X XXXXXXX" value="${phone}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">📶 Network</label>
+        <select class="form-select credit-network">
+          ${netOpts}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold);">💰 Amount (ණය මුදල)</label>
+        <input type="number" class="form-input balance-input credit-amount" placeholder="0.00" step="0.01" min="0" value="${amount}">
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button type="button" class="adj-row-remove" title="Remove" onclick="App.removeCreditRow('${rowId}')">🗑️</button>
+      </div>
+    `;
+
+    container.appendChild(row);
+
+    const amtInp = row.querySelector('.credit-amount');
+    amtInp.addEventListener('input', () => this.calculateLiveBalances());
+    row.querySelector('.credit-cust-name').addEventListener('input', () => this.calculateLiveBalances());
+    row.querySelector('.credit-network').addEventListener('change', () => this.calculateLiveBalances());
+
+    this.calculateLiveBalances();
+  },
+
+  removeCreditRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+    this.calculateLiveBalances();
+  },
+
+  addRouterRow(data = {}) {
+    const container = document.getElementById('routerRowsContainer');
+    if (!container) return;
+
+    this.routerCounter++;
+    const rowId = 'routerRow_' + this.routerCounter;
+    const row = document.createElement('div');
+    row.className = 'adj-row';
+    row.id = rowId;
+
+    const networks = ['Dialog', 'Mobitel', 'Airtel', 'Hutch', 'SLT'];
+    const curNet = data.network || 'Dialog';
+    let netOpts = networks.map(n => `<option value="${n}" ${n === curNet ? 'selected' : ''}>${n}</option>`).join('');
+
+    const routerName = data.routerName || 'Main Shop Router';
+    const amount = (data.amount !== undefined && data.amount !== null && data.amount !== '') ? data.amount : '';
+    const note = data.note || '';
+
+    row.innerHTML = `
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">📶 Router Name (රවුටරය)</label>
+        <input type="text" class="form-input router-name" placeholder="e.g. CCTV / POS Router" value="${routerName}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">🌐 Network</label>
+        <select class="form-select router-network">
+          ${netOpts}
+        </select>
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-purple);">💰 Amount (වියදම)</label>
+        <input type="number" class="form-input balance-input router-amount" placeholder="0.00" step="0.01" min="0" value="${amount}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">📝 Note (සටහන)</label>
+        <input type="text" class="form-input router-note" placeholder="Optional note" value="${note}">
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button type="button" class="adj-row-remove" title="Remove" onclick="App.removeRouterRow('${rowId}')">🗑️</button>
+      </div>
+    `;
+
+    container.appendChild(row);
+
+    const amtInp = row.querySelector('.router-amount');
+    amtInp.addEventListener('input', () => this.calculateLiveBalances());
+    row.querySelector('.router-network').addEventListener('change', () => this.calculateLiveBalances());
+
+    this.calculateLiveBalances();
+  },
+
+  removeRouterRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+    this.calculateLiveBalances();
+  },
+
+  addTopupRow(data = {}) {
+    const container = document.getElementById('topupRowsContainer');
+    if (!container) return;
+
+    this.topupCounter++;
+    const rowId = 'topupRow_' + this.topupCounter;
+    const row = document.createElement('div');
+    row.className = 'adj-row';
+    row.id = rowId;
+
+    const distName = data.distributorName || '';
+    const target = data.networkOrBank || 'Dialog';
+    const amount = (data.amount !== undefined && data.amount !== null && data.amount !== '') ? data.amount : '';
+    const note = data.note || '';
+
+    row.innerHTML = `
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">📥 Depositor / Distributor (නම)</label>
+        <input type="text" class="form-input topup-name" placeholder="Agent / Owner Name" value="${distName}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">🎯 Target SIM / Bank (ලැබුණු ගිණුම)</label>
+        <input type="text" class="form-input topup-target" placeholder="e.g. Dialog SIM, Commercial Bank" value="${target}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue);">💰 Amount (ලැබුණු මුදල)</label>
+        <input type="number" class="form-input balance-input topup-amount" placeholder="0.00" step="0.01" min="0" value="${amount}">
+      </div>
+      <div>
+        <label class="form-label" style="font-size:0.75rem;">📝 Reference / Note</label>
+        <input type="text" class="form-input topup-note" placeholder="Receipt / Ref No" value="${note}">
+      </div>
+      <div style="display:flex; align-items:flex-end;">
+        <button type="button" class="adj-row-remove" title="Remove" onclick="App.removeTopupRow('${rowId}')">🗑️</button>
+      </div>
+    `;
+
+    container.appendChild(row);
+
+    const amtInp = row.querySelector('.topup-amount');
+    amtInp.addEventListener('input', () => this.calculateLiveBalances());
+
+    this.calculateLiveBalances();
+  },
+
+  removeTopupRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) row.remove();
+    this.calculateLiveBalances();
+  },
+
   renderUpdateForm() {
     const shopId = DB.getActiveShopId();
     if (!shopId) return;
@@ -909,10 +1187,38 @@ const App = {
     const liveBankTotalEl = document.getElementById('liveBankTotal');
     if (liveBankTotalEl) liveBankTotalEl.textContent = DB.formatCurrency(bankGrandTotal);
 
+    // 2.5 Section 2.5: Shift Adjustments
+    let creditsTotal = 0;
+    document.querySelectorAll('#creditRowsContainer .credit-amount').forEach(inp => {
+      creditsTotal += parseFloat(inp.value) || 0;
+    });
+
+    let routersTotal = 0;
+    document.querySelectorAll('#routerRowsContainer .router-amount').forEach(inp => {
+      routersTotal += parseFloat(inp.value) || 0;
+    });
+
+    let topupsTotal = 0;
+    document.querySelectorAll('#topupRowsContainer .topup-amount').forEach(inp => {
+      topupsTotal += parseFloat(inp.value) || 0;
+    });
+
+    const shiftAdjNet = creditsTotal + routersTotal - topupsTotal;
+    const liveAdjTotalEl = document.getElementById('liveAdjTotal');
+    if (liveAdjTotalEl) {
+      const sign = shiftAdjNet >= 0 ? '+' : '';
+      liveAdjTotalEl.textContent = `${sign}${DB.formatCurrency(shiftAdjNet)}`;
+      liveAdjTotalEl.style.color = shiftAdjNet >= 0 ? 'var(--accent-gold)' : 'var(--accent-purple)';
+    }
+    const liveAdjBreakdownEl = document.getElementById('liveAdjBreakdown');
+    if (liveAdjBreakdownEl) {
+      liveAdjBreakdownEl.textContent = `Credits (+): ${DB.formatCurrency(creditsTotal)} | Routers (+): ${DB.formatCurrency(routersTotal)} | Top-ups (-): ${DB.formatCurrency(topupsTotal)}`;
+    }
+
     // 3. Grand Total Capital
-    const grandTotal = reloadTotal + bankGrandTotal;
+    const physicalCapital = reloadTotal + bankGrandTotal;
     const totalCapitalEl = document.getElementById('updateTotalCapital');
-    if (totalCapitalEl) totalCapitalEl.textContent = DB.formatCurrency(grandTotal);
+    if (totalCapitalEl) totalCapitalEl.textContent = DB.formatCurrency(physicalCapital);
 
     // Diffs vs Previous Update
     const shopId = DB.getActiveShopId();
@@ -933,7 +1239,9 @@ const App = {
     const prevVals = DB.extractValues(prevUpdate);
     const reloadDiff = reloadTotal - prevVals.reloadTotal;
     const bankDiff = bankGrandTotal - prevVals.bankTotal;
-    const overallDiff = grandTotal - prevVals.totalCapital;
+    const physicalDiff = physicalCapital - prevVals.totalCapital;
+    // Adjusted true operating difference:
+    const adjustedDiff = (physicalCapital + creditsTotal + routersTotal) - (prevVals.totalCapital + topupsTotal);
 
     const formatBadge = (diff) => {
       const type = diff > 0 ? 'profit' : diff < 0 ? 'loss' : 'neutral';
@@ -944,9 +1252,9 @@ const App = {
 
     if (reloadDiffBadge) reloadDiffBadge.innerHTML = formatBadge(reloadDiff);
     if (bankDiffBadge) bankDiffBadge.innerHTML = formatBadge(bankDiff);
-    if (overallDiffBadge) overallDiffBadge.innerHTML = formatBadge(overallDiff);
+    if (overallDiffBadge) overallDiffBadge.innerHTML = formatBadge(adjustedDiff);
 
-    const overallType = overallDiff > 0 ? 'profit' : overallDiff < 0 ? 'loss' : 'neutral';
+    const overallType = adjustedDiff > 0 ? 'profit' : adjustedDiff < 0 ? 'loss' : 'neutral';
     const overallColor = overallType === 'profit' ? 'var(--accent-green)' : overallType === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
 
     if (container) {
@@ -955,20 +1263,29 @@ const App = {
         <div style="padding:18px 20px; background:${overallType === 'profit' ? 'rgba(16,185,129,0.08)' : overallType === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${overallType === 'profit' ? 'rgba(16,185,129,0.2)' : overallType === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
           <div style="text-align:center;">
             <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">
-              ${I18N.t('comp_diff') || 'Difference vs Previous Update'}
+              ${I18N.t('comp_operating_pl') || 'True Operating Profit / Loss (ගැලපූ සත්‍ය ලාභය/අලාභය)'}
             </div>
             <div style="font-size:2.2rem;font-weight:900;color:${overallColor};">
-              ${overallDiff >= 0 ? '+' : ''}${DB.formatCurrency(overallDiff)}
+              ${adjustedDiff >= 0 ? '+' : ''}${DB.formatCurrency(adjustedDiff)}
             </div>
             <div style="font-size:1rem;font-weight:700;color:${overallColor};margin-top:2px;">
-              ${overallType === 'profit' ? '✅ PROFIT (ලාභ)' : overallType === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE'}
+              ${overallType === 'profit' ? '✅ TRUE PROFIT (සත්‍ය ලාභය)' : overallType === 'loss' ? '❌ TRUE LOSS (සත්‍ය අලාභය)' : '➖ NO CHANGE'}
             </div>
-            <div style="margin-top:14px; display:flex; justify-content:center; gap:20px; flex-wrap:wrap;">
-              <span style="font-size:0.88rem; font-weight:700; color:${reloadDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
-                🔄 Reload Track: ${reloadDiff >= 0 ? '+' : ''}${DB.formatCurrency(reloadDiff)}
+            <div style="margin-top:14px; display:flex; justify-content:center; gap:16px; flex-wrap:wrap; font-size:0.85rem; font-weight:700;">
+              <span style="color:${reloadDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                🔄 Reload: ${reloadDiff >= 0 ? '+' : ''}${DB.formatCurrency(reloadDiff)}
               </span>
-              <span style="font-size:0.88rem; font-weight:700; color:${bankDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
-                🏦 Bank Track: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}
+              <span style="color:${bankDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                🏦 Bank: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}
+              </span>
+              <span style="color:var(--accent-gold);">
+                👤 Credits: +${DB.formatCurrency(creditsTotal)}
+              </span>
+              <span style="color:var(--accent-purple);">
+                📶 Routers: +${DB.formatCurrency(routersTotal)}
+              </span>
+              <span style="color:var(--accent-blue);">
+                📥 Top-ups: -${DB.formatCurrency(topupsTotal)}
               </span>
             </div>
           </div>
@@ -1012,10 +1329,48 @@ const App = {
       }
     });
 
+    // Section 2.5: Shift Adjustments
+    const creditRows = document.querySelectorAll('#creditRowsContainer .adj-row');
+    const credits = [];
+    creditRows.forEach(row => {
+      const customerName = row.querySelector('.credit-cust-name')?.value.trim();
+      const phone = row.querySelector('.credit-phone')?.value.trim() || '';
+      const network = row.querySelector('.credit-network')?.value || 'Dialog';
+      const amount = parseFloat(row.querySelector('.credit-amount')?.value) || 0;
+      if (amount > 0 && customerName) {
+        credits.push({ customerName, phone, network, amount });
+      }
+    });
+
+    const routerRows = document.querySelectorAll('#routerRowsContainer .adj-row');
+    const routers = [];
+    routerRows.forEach(row => {
+      const routerName = row.querySelector('.router-name')?.value.trim() || 'Shop Router';
+      const network = row.querySelector('.router-network')?.value || 'Dialog';
+      const amount = parseFloat(row.querySelector('.router-amount')?.value) || 0;
+      const note = row.querySelector('.router-note')?.value.trim() || '';
+      if (amount > 0) {
+        routers.push({ routerName, network, amount, note });
+      }
+    });
+
+    const topupRows = document.querySelectorAll('#topupRowsContainer .adj-row');
+    const topups = [];
+    topupRows.forEach(row => {
+      const distributorName = row.querySelector('.topup-name')?.value.trim() || 'Distributor';
+      const networkOrBank = row.querySelector('.topup-target')?.value || 'Dialog';
+      const amount = parseFloat(row.querySelector('.topup-amount')?.value) || 0;
+      const note = row.querySelector('.topup-note')?.value.trim() || '';
+      if (amount > 0) {
+        topups.push({ distributorName, networkOrBank, amount, note });
+      }
+    });
+
     const hasReloadData = (dialog + mobitel + airtel + hutch + ezcash + reloadCash) > 0;
     const hasBankData = banks.some(b => (b.accountAmount + b.cashInDrawer) > 0);
+    const hasAdjData = credits.length > 0 || routers.length > 0 || topups.length > 0;
 
-    if (!hasReloadData && !hasBankData) {
+    if (!hasReloadData && !hasBankData && !hasAdjData) {
       this.showToast('Please enter at least one balance amount (අවම වශයෙන් එක් අගයක් හෝ ඇතුළත් කරන්න)', 'error');
       return;
     }
@@ -1034,6 +1389,11 @@ const App = {
       },
       mobileRental: {
         banks
+      },
+      adjustments: {
+        credits,
+        routers,
+        topups
       }
     };
 
@@ -1055,6 +1415,10 @@ const App = {
       const diff = comp.overall.diff;
       const rDiff = comp.reload?.diff ?? 0;
       const bDiff = comp.bank?.diff ?? 0;
+      const adjInfo = comp.adjustments;
+      const adjText = adjInfo && (adjInfo.credits > 0 || adjInfo.routers > 0 || adjInfo.topups > 0)
+        ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:8px;">⚖️ Adjustments: Credits +${DB.formatCurrency(adjInfo.credits)} | Routers +${DB.formatCurrency(adjInfo.routers)} | Top-ups -${DB.formatCurrency(adjInfo.topups)}</div>`
+        : '';
 
       this.showModal(
         `${type === 'profit' ? '✅' : type === 'loss' ? '❌' : '➖'} Update Saved`,
@@ -1064,7 +1428,7 @@ const App = {
             ${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}
           </div>
           <div style="font-size:1.1rem; font-weight:700; margin-top:4px; color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
-            ${type === 'profit' ? 'PROFIT (ලාභ) ✅' : type === 'loss' ? 'LOSS (අලාභ) ❌' : 'NO CHANGE ➖'}
+            ${type === 'profit' ? 'TRUE OPERATING PROFIT (සත්‍ය ලාභය) ✅' : type === 'loss' ? 'TRUE OPERATING LOSS (සත්‍ය අලාභය) ❌' : 'NO CHANGE ➖'}
           </div>
           <div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:14px; background:var(--bg-glass); padding:14px; border-radius:var(--radius-sm);">
             <div>
@@ -1080,6 +1444,7 @@ const App = {
               </div>
             </div>
           </div>
+          ${adjText}
         </div>
         `,
         [{ text: 'OK (හරි 👍)', class: 'btn-success', onClick: () => this.closeModal() }]
@@ -1092,6 +1457,12 @@ const App = {
     document.getElementById('updateForm').reset();
     const bankContainer = document.getElementById('bankRowsContainer');
     if (bankContainer) bankContainer.innerHTML = '';
+    const creditContainer = document.getElementById('creditRowsContainer');
+    if (creditContainer) creditContainer.innerHTML = '';
+    const routerContainer = document.getElementById('routerRowsContainer');
+    if (routerContainer) routerContainer.innerHTML = '';
+    const topupContainer = document.getElementById('topupRowsContainer');
+    if (topupContainer) topupContainer.innerHTML = '';
     this.addBankRow();
     this.renderUpdateForm();
   },
@@ -1299,6 +1670,21 @@ const App = {
           <span style="font-weight:700;">💵 Total Cash in Drawer</span>
           <span style="font-weight:800; color:var(--accent-gold); font-size:1.05rem;">${DB.formatCurrency(vals.totalCash)}</span>
         </div>
+
+        ${u.adjustments && (u.adjustments.creditsTotal > 0 || u.adjustments.routersTotal > 0 || u.adjustments.topupsTotal > 0) ? `
+        <!-- Shift Adjustments -->
+        <div style="padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm); border-left:3px solid var(--accent-gold);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:700;">⚖️ Shift Adjustments (ගැලපීම්)</span>
+            <span style="font-weight:800; color:var(--accent-gold); font-size:1.05rem;">
+              ${(u.adjustments.creditsTotal + u.adjustments.routersTotal - u.adjustments.topupsTotal) >= 0 ? '+' : ''}${DB.formatCurrency(u.adjustments.creditsTotal + u.adjustments.routersTotal - u.adjustments.topupsTotal)}
+            </span>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+            Credits (+): ${DB.formatCurrency(u.adjustments.creditsTotal)} | Routers (+): ${DB.formatCurrency(u.adjustments.routersTotal)} | Top-ups (-): ${DB.formatCurrency(u.adjustments.topupsTotal)}
+          </div>
+        </div>
+        ` : ''}
       </div>
 
       <div style="font-weight:800;font-size:1.15rem;padding-top:12px;border-top:1px solid var(--border-glass);display:flex;justify-content:space-between;">
@@ -1371,6 +1757,25 @@ const App = {
       vals.banks.forEach(b => this.addBankRow(b));
     } else {
       this.addBankRow({ bank: 'Commercial Bank', accountAmount: vals.bankTotal, cashInDrawer: 0 });
+    }
+
+    // Section 2.5: Shift Adjustments
+    const creditContainer = document.getElementById('creditRowsContainer');
+    if (creditContainer) creditContainer.innerHTML = '';
+    if (update.adjustments?.credits?.length > 0) {
+      update.adjustments.credits.forEach(c => this.addCreditRow(c));
+    }
+
+    const routerContainer = document.getElementById('routerRowsContainer');
+    if (routerContainer) routerContainer.innerHTML = '';
+    if (update.adjustments?.routers?.length > 0) {
+      update.adjustments.routers.forEach(r => this.addRouterRow(r));
+    }
+
+    const topupContainer = document.getElementById('topupRowsContainer');
+    if (topupContainer) topupContainer.innerHTML = '';
+    if (update.adjustments?.topups?.length > 0) {
+      update.adjustments.topups.forEach(t => this.addTopupRow(t));
     }
 
     // Button label
@@ -1593,6 +1998,609 @@ const App = {
             this.renderShops();
             this.renderDashboard();
             this.showToast('🗑️ Shop ආරක්ෂිතව මකා දැමුවා (Soft Deleted)', 'success');
+          }
+        }
+      ]
+    );
+  },
+
+  // ================================================================
+  // CREDITS & EXPENSES LEDGER
+  // ================================================================
+  setupCreditsPage() {
+    const tabBtns = document.querySelectorAll('.ledger-tab-btn');
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => {
+          b.classList.remove('btn-primary', 'active');
+          b.classList.add('btn-ghost');
+        });
+        btn.classList.add('btn-primary', 'active');
+        btn.classList.remove('btn-ghost');
+        this.currentLedgerTab = btn.getAttribute('data-tab');
+        this.renderCreditsTable();
+      });
+    });
+
+    const searchInput = document.getElementById('ledgerSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        this.ledgerSearchTerm = e.target.value.toLowerCase().trim();
+        this.renderCreditsTable();
+      });
+    }
+
+    const quickAddBtn = document.getElementById('pageQuickAddCreditBtn');
+    if (quickAddBtn) {
+      quickAddBtn.addEventListener('click', () => {
+        this.showQuickAddCreditModal();
+      });
+    }
+  },
+
+  renderCreditsPage() {
+    const shopId = DB.getActiveShopId();
+    const credits = DB.getCredits(shopId, true);
+    const routers = DB.getRouterExpenses(shopId);
+    const topups = DB.getDistributorTopups(shopId);
+
+    // KPI Counters
+    let pendingCreditsTotal = 0;
+    let pendingCreditsCount = 0;
+    let settledCreditsTotal = 0;
+    let settledCreditsCount = 0;
+
+    credits.forEach(c => {
+      if (c.status === 'paid') {
+        settledCreditsTotal += (parseFloat(c.amount) || 0);
+        settledCreditsCount++;
+      } else {
+        pendingCreditsTotal += (parseFloat(c.amount) || 0);
+        pendingCreditsCount++;
+      }
+    });
+
+    let routerExpensesTotal = 0;
+    routers.forEach(r => {
+      routerExpensesTotal += (parseFloat(r.amount) || 0);
+    });
+
+    const pendingEl = document.getElementById('kpiPendingCredits');
+    if (pendingEl) pendingEl.textContent = DB.formatCurrency(pendingCreditsTotal);
+    const pendingCountEl = document.getElementById('kpiPendingCreditsCount');
+    if (pendingCountEl) pendingCountEl.textContent = `${pendingCreditsCount} Pending (නොලැබුණු)`;
+
+    const routerEl = document.getElementById('kpiRouterExpenses');
+    if (routerEl) routerEl.textContent = DB.formatCurrency(routerExpensesTotal);
+    const routerCountEl = document.getElementById('kpiRouterExpensesCount');
+    if (routerCountEl) routerCountEl.textContent = `${routers.length} Records (වියදම්)`;
+
+    const settledEl = document.getElementById('kpiSettledCredits');
+    if (settledEl) settledEl.textContent = DB.formatCurrency(settledCreditsTotal);
+    const settledCountEl = document.getElementById('kpiSettledCreditsCount');
+    if (settledCountEl) settledCountEl.textContent = `${settledCreditsCount} Paid (පියවූ)`;
+
+    this.renderCreditsTable();
+  },
+
+  renderCreditsTable() {
+    const shopId = DB.getActiveShopId();
+    const container = document.getElementById('ledgerTableContainer');
+    if (!container) return;
+
+    const term = this.ledgerSearchTerm || '';
+
+    if (this.currentLedgerTab === 'credits') {
+      let list = DB.getCredits(shopId, true);
+      if (term) {
+        list = list.filter(c =>
+          (c.customerName && c.customerName.toLowerCase().includes(term)) ||
+          (c.phone && c.phone.toLowerCase().includes(term)) ||
+          (c.network && c.network.toLowerCase().includes(term)) ||
+          (c.note && c.note.toLowerCase().includes(term))
+        );
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding:30px;">
+            <div class="empty-icon">👤</div>
+            <div class="empty-text">${term ? 'සෙවුමට ගැළපෙන ණය වාර්තා නැත' : 'ණයට දුන් රීලෝඩ් කිසිවක් නැත'}</div>
+            <div class="empty-sub">අලුත් ණය මුදලක් සටහන් කිරීමට "+ ණයට දුන් රීලෝඩ්" ඔබන්න.</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>${I18N.t('tbl_date') || 'Date & Time'}</th>
+              <th>${I18N.t('tbl_customer') || 'Customer'}</th>
+              <th>${I18N.t('tbl_phone') || 'Phone'}</th>
+              <th>${I18N.t('tbl_network') || 'Network'}</th>
+              <th style="text-align:right;">${I18N.t('tbl_amount') || 'Amount'}</th>
+              <th style="text-align:center;">${I18N.t('tbl_status') || 'Status'}</th>
+              <th>${I18N.t('tbl_notes') || 'Notes / Settlement'}</th>
+              <th style="text-align:center;">${I18N.t('tbl_action') || 'Action'}</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      list.forEach(c => {
+        const isPaid = c.status === 'paid';
+        const dateStr = DB.formatDateTime(c.timestamp);
+        const statusBadge = isPaid
+          ? `<span class="status-badge paid">✅ ${I18N.t('cred_status_paid') || 'Paid'}</span>`
+          : `<span class="status-badge pending">⏳ ${I18N.t('cred_status_pending') || 'Pending'}</span>`;
+
+        let settleInfo = '';
+        if (isPaid && c.settledAt) {
+          settleInfo = `
+            <div style="font-size:0.8rem; color:var(--accent-green); font-weight:700;">
+              ✅ පියවූයේ: ${DB.formatDateTime(c.settledAt)}
+            </div>
+            ${c.settledNote ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📝 ${c.settledNote}</div>` : ''}
+          `;
+        } else if (c.note) {
+          settleInfo = `<div style="font-size:0.75rem; color:var(--text-muted);">📝 ${c.note}</div>`;
+        } else {
+          settleInfo = `<span style="font-size:0.75rem; color:var(--accent-red); font-weight:600;">නොගෙවූ (Unsettled)</span>`;
+        }
+
+        html += `
+          <tr>
+            <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
+            <td style="font-weight:700;">👤 ${c.customerName}</td>
+            <td style="font-family:monospace; font-size:0.85rem;">${c.phone || '--'}</td>
+            <td><span class="network-badge">${c.network}</span></td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-gold); font-size:0.95rem;">${DB.formatCurrency(c.amount)}</td>
+            <td style="text-align:center;">${statusBadge}</td>
+            <td>${settleInfo}</td>
+            <td style="text-align:center; white-space:nowrap;">
+              ${!isPaid ? `
+                <button class="btn btn-sm" onclick="App.sendCreditWhatsApp('${c.id}')" style="background:#25D366; color:white; font-weight:700; padding:5px 9px; font-size:0.75rem; margin-right:4px; border:none; border-radius:6px; cursor:pointer;" title="Send WhatsApp Reminder">
+                  💬 WhatsApp
+                </button>
+                <button class="btn btn-success btn-sm" onclick="App.promptSettleCredit('${c.id}')" style="padding:5px 9px; font-size:0.75rem; margin-right:4px;" title="Mark as Settled">
+                  ✅ Settle
+                </button>
+              ` : `
+                <button class="btn btn-ghost btn-sm" onclick="App.sendCreditWhatsAppReceipt('${c.id}')" style="padding:4px 8px; font-size:0.75rem; margin-right:4px; color:#25D366; border:1px solid rgba(37,211,102,0.3);" title="Send Paid Receipt on WhatsApp">
+                  💬 Receipt
+                </button>
+              `}
+              <button class="btn btn-danger btn-sm" onclick="App.promptDeleteCredit('${c.id}')" style="padding:5px 8px; font-size:0.75rem;" title="Delete">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+
+    } else if (this.currentLedgerTab === 'routers') {
+      let list = DB.getRouterExpenses(shopId);
+      if (term) {
+        list = list.filter(r =>
+          (r.routerName && r.routerName.toLowerCase().includes(term)) ||
+          (r.network && r.network.toLowerCase().includes(term)) ||
+          (r.note && r.note.toLowerCase().includes(term))
+        );
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding:30px;">
+            <div class="empty-icon">📶</div>
+            <div class="empty-text">සාප්පු රවුටර් වියදම් කිසිවක් නැත</div>
+            <div class="empty-sub">දෛනික Update එකක් සමඟ හෝ මෙහිදී රවුටර් රීලෝඩ් ඇතුළත් කළ හැක.</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>${I18N.t('tbl_date') || 'Date & Time'}</th>
+              <th>${I18N.t('upd_adj_router_title') || 'Router Name'}</th>
+              <th>${I18N.t('tbl_network') || 'Network'}</th>
+              <th style="text-align:right;">${I18N.t('tbl_amount') || 'Amount'}</th>
+              <th>${I18N.t('tbl_notes') || 'Note'}</th>
+              <th style="text-align:center;">${I18N.t('tbl_action') || 'Action'}</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      list.forEach(r => {
+        const dateStr = DB.formatDateTime(r.timestamp);
+        html += `
+          <tr>
+            <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
+            <td style="font-weight:700;">📶 ${r.routerName}</td>
+            <td><span class="network-badge">${r.network}</span></td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-purple); font-size:0.95rem;">${DB.formatCurrency(r.amount)}</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">${r.note || '--'}</td>
+            <td style="text-align:center;">
+              <button class="btn btn-danger btn-sm" onclick="App.promptDeleteRouterExpense('${r.id}')" style="padding:4px 8px; font-size:0.75rem;">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+
+    } else if (this.currentLedgerTab === 'topups') {
+      let list = DB.getDistributorTopups(shopId);
+      if (term) {
+        list = list.filter(t =>
+          (t.distributorName && t.distributorName.toLowerCase().includes(term)) ||
+          (t.networkOrBank && t.networkOrBank.toLowerCase().includes(term)) ||
+          (t.note && t.note.toLowerCase().includes(term))
+        );
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding:30px;">
+            <div class="empty-icon">📥</div>
+            <div class="empty-text">ලැබුණු ස්ටොක් / ඩිස්ට්‍රිබියුටර් තැන්පතු නැත</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>${I18N.t('tbl_date') || 'Date & Time'}</th>
+              <th>${I18N.t('upd_adj_topup_title') || 'Distributor / Depositor'}</th>
+              <th>${I18N.t('tbl_network') || 'Target SIM / Bank'}</th>
+              <th style="text-align:right;">${I18N.t('tbl_amount') || 'Amount'}</th>
+              <th>${I18N.t('tbl_notes') || 'Note / Ref'}</th>
+              <th style="text-align:center;">${I18N.t('tbl_action') || 'Action'}</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      list.forEach(t => {
+        const dateStr = DB.formatDateTime(t.timestamp);
+        html += `
+          <tr>
+            <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
+            <td style="font-weight:700;">📥 ${t.distributorName}</td>
+            <td><span class="network-badge">${t.networkOrBank}</span></td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-blue); font-size:0.95rem;">${DB.formatCurrency(t.amount)}</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">${t.note || '--'}</td>
+            <td style="text-align:center;">
+              <button class="btn btn-danger btn-sm" onclick="App.promptDeleteDistributorTopup('${t.id}')" style="padding:4px 8px; font-size:0.75rem;">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
+    }
+  },
+
+  promptSettleCredit(creditId) {
+    const credit = DB.getCredits(null, true).find(c => c.id === creditId);
+    if (!credit) return;
+
+    const nowFormatted = DB.formatDateTime(new Date().toISOString());
+
+    this.showModal(
+      '✅ ණය මුදල පියවීම (Mark Credit as Settled)',
+      `
+      <div style="margin-bottom:14px; background:rgba(255,255,255,0.04); padding:12px; border-radius:8px; border:1px solid var(--border-glass);">
+        <div style="font-weight:700; font-size:1.1rem; color:var(--text-primary);">👤 ${credit.customerName}</div>
+        <div style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">
+          📞 දුරකථන: <strong>${credit.phone || 'නැත'}</strong> | ජාලය: <strong>${credit.network}</strong>
+        </div>
+        <div style="margin-top:6px; font-size:0.85rem; color:var(--text-secondary);">
+          📅 රීලෝඩ් දැමූ වේලාව (Sent At): <strong>${DB.formatDateTime(credit.timestamp)}</strong>
+        </div>
+        <div style="margin-top:8px; font-size:1.2rem; font-weight:800; color:var(--accent-gold);">
+          මුදල (Amount): ${DB.formatCurrency(credit.amount)}
+        </div>
+      </div>
+      <div style="font-size:0.85rem; color:var(--accent-green); margin-bottom:12px; font-weight:600;">
+        🕒 පියවන දිනය සහ වේලාව (Settling Now): ${nowFormatted}
+      </div>
+      <div class="form-group">
+        <label class="form-label">Payment Settlement Note (ගෙවීම් සටහන)</label>
+        <input type="text" id="settleNoteInput" class="form-input" placeholder="උදා: කඩේට මුදල් ගෙවන ලදී, EZ Cash, Bank Transfer">
+      </div>
+      `,
+      [
+        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        {
+          text: '✅ Confirm Settled (පියවූ බව සටහන් කරන්න)',
+          class: 'btn-success',
+          onClick: () => {
+            const note = document.getElementById('settleNoteInput').value.trim();
+            DB.settleCredit(creditId, note);
+            this.closeModal();
+            this.showToast('✅ Credit marked as settled! (ණය මුදල පියවන ලදී)', 'success');
+            this.renderCreditsPage();
+            if (this.currentPage === 'dashboard') {
+              this.renderDashboard();
+            }
+          }
+        }
+      ]
+    );
+  },
+
+  sendCreditWhatsApp(creditId) {
+    const credit = DB.getCredits(null, true).find(c => c.id === creditId);
+    if (!credit) return;
+
+    let phone = (credit.phone || '').trim();
+    if (!phone) {
+      this.promptWhatsAppPhone(credit);
+      return;
+    }
+
+    this._openWhatsAppReminder(credit, phone);
+  },
+
+  sendCreditWhatsAppReceipt(creditId) {
+    const credit = DB.getCredits(null, true).find(c => c.id === creditId);
+    if (!credit) return;
+
+    let phone = (credit.phone || '').trim();
+    if (!phone) {
+      this.showToast('No phone number recorded for this customer', 'info');
+      return;
+    }
+
+    let cleanPhone = phone.replace(/[\s\-\+\(\)]/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '94' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('7') && cleanPhone.length === 9) {
+      cleanPhone = '94' + cleanPhone;
+    }
+
+    const shop = credit.shopId ? DB.getShop(credit.shopId) : null;
+    const shopName = shop ? shop.name : 'Shop';
+    const amountStr = DB.formatCurrency(credit.amount);
+    const settledTime = credit.settledAt ? DB.formatDateTime(credit.settledAt) : DB.formatDateTime(new Date().toISOString());
+
+    const message = 
+`ආයුබෝවන් ${credit.customerName},
+ඔබගේ ${credit.network} රීලෝඩ් මුදල (${amountStr}) ${settledTime} දින සාර්ථකව පියවා ඇති බව සතුටින් දන්වා සිටිමු.
+ස්තූතියි! - ${shopName}
+
+(Payment Receipt: Your pending reload of ${amountStr} has been successfully settled on ${settledTime}. Thank you for your business! - ${shopName})`;
+
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+  },
+
+  promptWhatsAppPhone(credit) {
+    this.showModal(
+      '💬 WhatsApp අංකය ඇතුළත් කරන්න (Enter WhatsApp Number)',
+      `
+      <div style="margin-bottom:12px; background:rgba(255,255,255,0.04); padding:10px; border-radius:8px;">
+        <div style="font-weight:700; font-size:1.05rem;">👤 ${credit.customerName}</div>
+        <div style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">
+          ${credit.network} | <strong style="color:var(--accent-gold); font-size:1rem;">${DB.formatCurrency(credit.amount)}</strong>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Customer WhatsApp Number (දුරකථන අංකය)</label>
+        <input type="tel" id="waPhoneInput" class="form-input" placeholder="07XXXXXXXX" autofocus>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">උදා: 0771234567 හෝ 94771234567</div>
+      </div>
+      `,
+      [
+        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        {
+          text: '💬 WhatsApp යවන්න (Send)',
+          class: 'btn-primary',
+          onClick: () => {
+            const inputPhone = document.getElementById('waPhoneInput').value.trim();
+            if (!inputPhone) {
+              this.showToast('Please enter a valid phone number', 'error');
+              return;
+            }
+            credit.phone = inputPhone;
+            const allCredits = DB.getCredits(null, true);
+            const idx = allCredits.findIndex(c => c.id === credit.id);
+            if (idx !== -1) {
+              allCredits[idx].phone = inputPhone;
+              DB.saveCredits(allCredits);
+            }
+            this.closeModal();
+            this._openWhatsAppReminder(credit, inputPhone);
+            this.renderCreditsPage();
+          }
+        }
+      ]
+    );
+  },
+
+  _openWhatsAppReminder(credit, rawPhone) {
+    let cleanPhone = rawPhone.replace(/[\s\-\+\(\)]/g, '');
+    if (cleanPhone.startsWith('0')) {
+      cleanPhone = '94' + cleanPhone.substring(1);
+    } else if (cleanPhone.startsWith('7') && cleanPhone.length === 9) {
+      cleanPhone = '94' + cleanPhone;
+    }
+
+    const shop = credit.shopId ? DB.getShop(credit.shopId) : null;
+    const shopName = shop ? shop.name : 'Shop';
+    const dateStr = DB.formatDateTime(credit.timestamp);
+    const amountStr = DB.formatCurrency(credit.amount);
+
+    const message = 
+`ආයුබෝවන් ${credit.customerName},
+ඔබගේ ${credit.phone ? credit.phone + ' අංකයට ' : ''}${dateStr} දින ${credit.network} රීලෝඩ් (${amountStr}) දමා ඇත. 
+එම මුදල තවමත් ගෙවා නොමැති බැවින් කරුණාකර කඩයට මුදල් ගෙවීමට කාරුණික වන්න.
+ස්තූතියි! - ${shopName}
+
+(Friendly reminder from ${shopName} for your pending reload of ${amountStr} sent on ${dateStr}. Kindly settle when possible. Thank you!)`;
+
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+    window.open(waUrl, '_blank');
+  },
+
+  showQuickAddCreditModal() {
+    const shops = DB.getShops();
+    if (shops.length === 0) {
+      this.showToast('Please create a shop first (පළමුව සාප්පුවක් සාදන්න)', 'error');
+      return;
+    }
+
+    let activeShopId = DB.getActiveShopId();
+    let shopSelectHtml = '';
+    if (!activeShopId || shops.length > 1) {
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Shop (සාප්පුව) *</label>
+        <select id="quickCreditShop" class="form-select">
+          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+        </select>
+      </div>
+      `;
+    }
+
+    this.showModal(
+      '👤 ණයට දුන් රීලෝඩ් එකතු කරන්න (Add Customer Credit)',
+      `
+      ${shopSelectHtml}
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Customer Name (පාරිභෝගික නම) *</label>
+        <input type="text" id="quickCreditName" class="form-input" placeholder="උදා: නිමල්, කසුන්, සුරේෂ්" required autofocus>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Phone / WhatsApp Number (දුරකථන අංකය)</label>
+        <input type="tel" id="quickCreditPhone" class="form-input" placeholder="07XXXXXXXX">
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Network (ජාලය)</label>
+        <select id="quickCreditNetwork" class="form-select">
+          <option value="Dialog">Dialog</option>
+          <option value="Mobitel">Mobitel</option>
+          <option value="Airtel">Airtel</option>
+          <option value="Hutch">Hutch</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Amount (ණයට දුන් මුදල) *</label>
+        <input type="number" id="quickCreditAmount" class="form-input balance-input" placeholder="0.00" step="0.01" min="0" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note (විකල්ප සටහන)</label>
+        <input type="text" id="quickCreditNote" class="form-input" placeholder="උදා: හවසට මුදල් දෙනවා කිව්වා">
+      </div>
+      `,
+      [
+        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        {
+          text: '💾 Save Credit (සටහන් කරන්න)',
+          class: 'btn-primary',
+          onClick: () => {
+            const shopSelectEl = document.getElementById('quickCreditShop');
+            const targetShopId = shopSelectEl ? shopSelectEl.value : activeShopId || (shops[0] && shops[0].id);
+            const name = document.getElementById('quickCreditName').value.trim();
+            const phone = document.getElementById('quickCreditPhone').value.trim();
+            const network = document.getElementById('quickCreditNetwork').value;
+            const amount = parseFloat(document.getElementById('quickCreditAmount').value) || 0;
+            const note = document.getElementById('quickCreditNote').value.trim();
+
+            if (!name) {
+              this.showToast('Please enter Customer Name (පාරිභෝගික නම ඇතුළත් කරන්න)', 'error');
+              return;
+            }
+            if (amount <= 0) {
+              this.showToast('Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)', 'error');
+              return;
+            }
+
+            DB.addCredit({
+              shopId: targetShopId,
+              customerName: name,
+              phone,
+              network,
+              amount,
+              note
+            });
+
+            this.closeModal();
+            this.showToast(`✅ Rs.${amount.toFixed(2)} credit saved for ${name}!`, 'success');
+            
+            if (this.currentPage === 'credits') {
+              this.renderCreditsPage();
+            } else if (this.currentPage === 'dashboard') {
+              this.renderDashboard();
+            }
+          }
+        }
+      ]
+    );
+  },
+
+  promptDeleteCredit(creditId) {
+    this.showAdminPasswordModal(() => {
+      DB.deleteCredit(creditId);
+      this.showToast('Credit deleted (මකා දැමුවා)', 'success');
+      this.renderCreditsPage();
+      if (this.currentPage === 'dashboard') {
+        this.renderDashboard();
+      }
+    });
+  },
+
+  promptDeleteRouterExpense(id) {
+    this.showAdminPasswordModal(() => {
+      DB.deleteRouterExpense(id);
+      this.showToast('Router expense deleted (මකා දැමුවා)', 'success');
+      this.renderCreditsPage();
+    });
+  },
+
+  promptDeleteDistributorTopup(id) {
+    this.showAdminPasswordModal(() => {
+      DB.deleteDistributorTopup(id);
+      this.showToast('Distributor top-up deleted (මකා දැමුවා)', 'success');
+      this.renderCreditsPage();
+    });
+  },
+
+  showAdminPasswordModal(onSuccess) {
+    this.showModal(
+      '🔐 Enter Admin Password',
+      `
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">මෙම දත්තය මකා දැමීමට Admin Password ලබා දෙන්න:</div>
+      <div class="form-group">
+        <input type="password" id="adminActionPwdInput" class="form-input" placeholder="Password (1234)" autofocus>
+      </div>
+      `,
+      [
+        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        {
+          text: 'Confirm (තහවුරු කරන්න)',
+          class: 'btn-danger',
+          onClick: () => {
+            const pwd = document.getElementById('adminActionPwdInput').value;
+            const cleaned = pwd ? pwd.trim() : '';
+            if (cleaned === '1234') {
+              this.closeModal();
+              onSuccess();
+            } else {
+              this.showToast('❌ Incorrect Admin Password!', 'error');
+            }
           }
         }
       ]
