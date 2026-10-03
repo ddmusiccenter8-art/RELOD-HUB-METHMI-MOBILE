@@ -22,18 +22,28 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       
-      <!-- Language Selector -->
-      <div style="padding: 10px; display: flex; justify-content: flex-end;">
-        <select id="langSelector" style="background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; cursor: pointer;">
-          <option value="en">English</option>
-          <option value="si">සිංහල</option>
-          <option value="ta">தமிழ்</option>
-        </select>
-      </div>
-
+      <!-- Sidebar Logo + Language Selector -->
       <div class="sidebar-logo">
         <div class="logo-icon">💰</div>
         <div class="logo-text" data-i18n="app_title">Shop Tracker</div>
+        <div style="margin-left:auto;">
+          <select id="langSelector" title="Change Language" style="
+            background: var(--bg-glass);
+            color: var(--text-primary);
+            border: 1px solid var(--border-glass);
+            padding: 4px 6px 4px 6px;
+            border-radius: 6px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            outline: none;
+            min-width: 80px;
+          ">
+            <option value="en">🌐 English</option>
+            <option value="si">🇱🇰 සිංහල</option>
+            <option value="ta">🇱🇰 தமிழ்</option>
+          </select>
+        </div>
       </div>
 
       <!-- Shop Selector & Add Button -->
