@@ -810,19 +810,125 @@ const DB = {
     return item;
   },
 
-  settleCredit(creditId, settledNote = '') {
+  settleCredit(creditId, settledNote = '', destination = { type: 'cash' }) {
     const credits = this.getCredits(null, true);
     const item = credits.find(c => c.id === creditId);
     if (!item) return false;
+
     item.status = 'paid';
     item.settledAt = new Date().toISOString();
     item.settledNote = settledNote;
+    item.settledDestination = destination || { type: 'cash' };
     this.saveCredits(credits);
+
+    // Rebalance into shop's active accounts and total capital!
+    if (destination && destination.type !== 'none' && item.shopId) {
+      const lastUpdate = this.getLastUpdate(item.shopId);
+      if (lastUpdate) {
+        const amt = parseFloat(item.amount) || 0;
+        if (destination.type === 'cash') {
+          if (!lastUpdate.reload) lastUpdate.reload = {};
+          lastUpdate.reload.cashInDrawer = (parseFloat(lastUpdate.reload.cashInDrawer) || 0) + amt;
+          lastUpdate.reload.total = (parseFloat(lastUpdate.reload.total) || 0) + amt;
+          lastUpdate.cashInDrawer = (parseFloat(lastUpdate.cashInDrawer) || 0) + amt;
+          lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+        } else if (destination.type === 'bank') {
+          if (!lastUpdate.mobileRental || typeof lastUpdate.mobileRental !== 'object') {
+            lastUpdate.mobileRental = { banks: [], totalAccountAmount: 0, totalCashInDrawer: 0, grandTotal: 0 };
+          }
+          if (!Array.isArray(lastUpdate.mobileRental.banks)) {
+            lastUpdate.mobileRental.banks = [];
+          }
+          const bankName = destination.bankName || 'Commercial Bank';
+          let b = lastUpdate.mobileRental.banks.find(x => x.bank && x.bank.toLowerCase() === bankName.toLowerCase());
+          if (!b) {
+            b = { bank: bankName, accountAmount: 0, cashInDrawer: 0, total: 0 };
+            lastUpdate.mobileRental.banks.push(b);
+          }
+          b.accountAmount = (parseFloat(b.accountAmount) || 0) + amt;
+          b.total = (parseFloat(b.total) || 0) + amt;
+          lastUpdate.mobileRental.totalAccountAmount = (parseFloat(lastUpdate.mobileRental.totalAccountAmount) || 0) + amt;
+          lastUpdate.mobileRental.grandTotal = (parseFloat(lastUpdate.mobileRental.grandTotal) || 0) + amt;
+          lastUpdate.bankTotal = (parseFloat(lastUpdate.bankTotal) || 0) + amt;
+          lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+        } else if (destination.type === 'sim') {
+          const simKey = (destination.simName || 'dialog').toLowerCase();
+          if (!lastUpdate.reload) lastUpdate.reload = {};
+          lastUpdate.reload[simKey] = (parseFloat(lastUpdate.reload[simKey]) || 0) + amt;
+          lastUpdate.reload.simTotal = (parseFloat(lastUpdate.reload.simTotal) || 0) + amt;
+          lastUpdate.reload.total = (parseFloat(lastUpdate.reload.total) || 0) + amt;
+          lastUpdate.simTotal = (parseFloat(lastUpdate.simTotal) || 0) + amt;
+          lastUpdate.reloadTotal = (parseFloat(lastUpdate.reloadTotal) || 0) + amt;
+          lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+        }
+
+        const prevUpdate = this.getLastUpdateBefore(item.shopId, lastUpdate.timestamp);
+        lastUpdate.comparison = this.calculateComparison(lastUpdate, prevUpdate);
+
+        const allUpdates = this.getUpdates(true);
+        const idx = allUpdates.findIndex(u => u.id === lastUpdate.id);
+        if (idx !== -1) {
+          allUpdates[idx] = lastUpdate;
+          this.saveUpdates(allUpdates);
+          this._syncToFirebase('payment_tracker_updates', lastUpdate.id, lastUpdate);
+        }
+      }
+    }
+
     return true;
   },
 
   deleteCredit(creditId) {
     let credits = this.getCredits(null, true);
+    const item = credits.find(c => c.id === creditId);
+    if (!item) return false;
+
+    // If it was settled and added to balance, safely reverse the balance adjustment
+    if (item.status === 'paid' && item.settledDestination && item.settledDestination.type !== 'none' && item.shopId) {
+      const lastUpdate = this.getLastUpdate(item.shopId);
+      if (lastUpdate) {
+        const amt = parseFloat(item.amount) || 0;
+        const dest = item.settledDestination;
+        if (dest.type === 'cash') {
+          if (lastUpdate.reload) {
+            lastUpdate.reload.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.reload.cashInDrawer) || 0) - amt);
+            lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+          }
+          lastUpdate.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.cashInDrawer) || 0) - amt);
+          lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+        } else if (dest.type === 'bank' && lastUpdate.mobileRental?.banks) {
+          const b = lastUpdate.mobileRental.banks.find(x => x.bank && x.bank.toLowerCase() === (dest.bankName || '').toLowerCase());
+          if (b) {
+            b.accountAmount = Math.max(0, (parseFloat(b.accountAmount) || 0) - amt);
+            b.total = Math.max(0, (parseFloat(b.total) || 0) - amt);
+            lastUpdate.mobileRental.totalAccountAmount = Math.max(0, (parseFloat(lastUpdate.mobileRental.totalAccountAmount) || 0) - amt);
+            lastUpdate.mobileRental.grandTotal = Math.max(0, (parseFloat(lastUpdate.mobileRental.grandTotal) || 0) - amt);
+            lastUpdate.bankTotal = Math.max(0, (parseFloat(lastUpdate.bankTotal) || 0) - amt);
+            lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+          }
+        } else if (dest.type === 'sim' && lastUpdate.reload) {
+          const simKey = (dest.simName || 'dialog').toLowerCase();
+          lastUpdate.reload[simKey] = Math.max(0, (parseFloat(lastUpdate.reload[simKey]) || 0) - amt);
+          lastUpdate.reload.simTotal = Math.max(0, (parseFloat(lastUpdate.reload.simTotal) || 0) - amt);
+          lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+          lastUpdate.simTotal = Math.max(0, (parseFloat(lastUpdate.simTotal) || 0) - amt);
+          lastUpdate.reloadTotal = Math.max(0, (parseFloat(lastUpdate.reloadTotal) || 0) - amt);
+          lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+        }
+
+        const prevUpdate = this.getLastUpdateBefore(item.shopId, lastUpdate.timestamp);
+        lastUpdate.comparison = this.calculateComparison(lastUpdate, prevUpdate);
+
+        const allUpdates = this.getUpdates(true);
+        const idx = allUpdates.findIndex(u => u.id === lastUpdate.id);
+        if (idx !== -1) {
+          allUpdates[idx] = lastUpdate;
+          this.saveUpdates(allUpdates);
+          this._syncToFirebase('payment_tracker_updates', lastUpdate.id, lastUpdate);
+        }
+      }
+    }
+
     credits = credits.filter(c => c.id !== creditId);
     this.saveCredits(credits);
     return true;
@@ -874,12 +980,51 @@ const DB = {
       routerName: (data.routerName || 'Shop Router').trim(),
       network: data.network || 'Dialog',
       amount: parseFloat(data.amount) || 0,
+      deductSource: data.deductSource || 'none',
       timestamp: data.timestamp || now.toISOString(),
       date: data.date || now.toISOString().split('T')[0],
       note: (data.note || '').trim()
     };
     list.unshift(item);
     this.saveRouterExpenses(list);
+
+    // If deductSource is specified, deduct from active balance
+    if (data.deductSource && data.deductSource !== 'none' && data.shopId) {
+      const lastUpdate = this.getLastUpdate(data.shopId);
+      if (lastUpdate) {
+        const amt = parseFloat(data.amount) || 0;
+        if (data.deductSource === 'cash') {
+          if (lastUpdate.reload) {
+            lastUpdate.reload.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.reload.cashInDrawer) || 0) - amt);
+            lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+          }
+          lastUpdate.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.cashInDrawer) || 0) - amt);
+          lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+        } else if (data.deductSource === 'sim') {
+          const simKey = (data.network || 'dialog').toLowerCase();
+          if (lastUpdate.reload && lastUpdate.reload[simKey] !== undefined) {
+            lastUpdate.reload[simKey] = Math.max(0, (parseFloat(lastUpdate.reload[simKey]) || 0) - amt);
+            lastUpdate.reload.simTotal = Math.max(0, (parseFloat(lastUpdate.reload.simTotal) || 0) - amt);
+            lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+            lastUpdate.simTotal = Math.max(0, (parseFloat(lastUpdate.simTotal) || 0) - amt);
+            lastUpdate.reloadTotal = Math.max(0, (parseFloat(lastUpdate.reloadTotal) || 0) - amt);
+            lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+          }
+        }
+
+        const prevUpdate = this.getLastUpdateBefore(data.shopId, lastUpdate.timestamp);
+        lastUpdate.comparison = this.calculateComparison(lastUpdate, prevUpdate);
+
+        const allUpdates = this.getUpdates(true);
+        const idx = allUpdates.findIndex(u => u.id === lastUpdate.id);
+        if (idx !== -1) {
+          allUpdates[idx] = lastUpdate;
+          this.saveUpdates(allUpdates);
+          this._syncToFirebase('payment_tracker_updates', lastUpdate.id, lastUpdate);
+        }
+      }
+    }
+
     return item;
   },
 
@@ -911,12 +1056,69 @@ const DB = {
       distributorName: (data.distributorName || 'Distributor').trim(),
       networkOrBank: data.networkOrBank || 'Dialog',
       amount: parseFloat(data.amount) || 0,
+      addToBalance: !!data.addToBalance,
       timestamp: data.timestamp || now.toISOString(),
       date: data.date || now.toISOString().split('T')[0],
       note: (data.note || '').trim()
     };
     list.unshift(item);
     this.saveDistributorTopups(list);
+
+    // If addToBalance is true, add to active balance
+    if (data.addToBalance && data.shopId) {
+      const lastUpdate = this.getLastUpdate(data.shopId);
+      if (lastUpdate) {
+        const amt = parseFloat(data.amount) || 0;
+        const target = (data.networkOrBank || 'dialog').toLowerCase();
+
+        if (target === 'cash') {
+          if (!lastUpdate.reload) lastUpdate.reload = {};
+          lastUpdate.reload.cashInDrawer = (parseFloat(lastUpdate.reload.cashInDrawer) || 0) + amt;
+          lastUpdate.reload.total = (parseFloat(lastUpdate.reload.total) || 0) + amt;
+          lastUpdate.cashInDrawer = (parseFloat(lastUpdate.cashInDrawer) || 0) + amt;
+          lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+        } else if (target === 'bank') {
+          if (!lastUpdate.mobileRental) lastUpdate.mobileRental = { banks: [], totalAccountAmount: 0, totalCashInDrawer: 0, grandTotal: 0 };
+          if (!Array.isArray(lastUpdate.mobileRental.banks)) lastUpdate.mobileRental.banks = [];
+          if (lastUpdate.mobileRental.banks.length === 0) {
+            lastUpdate.mobileRental.banks.push({ bank: 'Commercial Bank', accountAmount: amt, cashInDrawer: 0, total: amt });
+          } else {
+            lastUpdate.mobileRental.banks[0].accountAmount = (parseFloat(lastUpdate.mobileRental.banks[0].accountAmount) || 0) + amt;
+            lastUpdate.mobileRental.banks[0].total = (parseFloat(lastUpdate.mobileRental.banks[0].total) || 0) + amt;
+          }
+          lastUpdate.mobileRental.totalAccountAmount = (parseFloat(lastUpdate.mobileRental.totalAccountAmount) || 0) + amt;
+          lastUpdate.mobileRental.grandTotal = (parseFloat(lastUpdate.mobileRental.grandTotal) || 0) + amt;
+          lastUpdate.bankTotal = (parseFloat(lastUpdate.bankTotal) || 0) + amt;
+          lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+        } else {
+          // SIM (dialog, mobitel, airtel, hutch, ezcash)
+          if (!lastUpdate.reload) lastUpdate.reload = {};
+          const simKey = (target === 'ez cash' || target === 'ezcash') ? 'ezcash' : target;
+          if (lastUpdate.reload[simKey] !== undefined) {
+            lastUpdate.reload[simKey] = (parseFloat(lastUpdate.reload[simKey]) || 0) + amt;
+          } else {
+            lastUpdate.reload.dialog = (parseFloat(lastUpdate.reload.dialog) || 0) + amt;
+          }
+          lastUpdate.reload.simTotal = (parseFloat(lastUpdate.reload.simTotal) || 0) + amt;
+          lastUpdate.reload.total = (parseFloat(lastUpdate.reload.total) || 0) + amt;
+          lastUpdate.simTotal = (parseFloat(lastUpdate.simTotal) || 0) + amt;
+          lastUpdate.reloadTotal = (parseFloat(lastUpdate.reloadTotal) || 0) + amt;
+          lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+        }
+
+        const prevUpdate = this.getLastUpdateBefore(data.shopId, lastUpdate.timestamp);
+        lastUpdate.comparison = this.calculateComparison(lastUpdate, prevUpdate);
+
+        const allUpdates = this.getUpdates(true);
+        const idx = allUpdates.findIndex(u => u.id === lastUpdate.id);
+        if (idx !== -1) {
+          allUpdates[idx] = lastUpdate;
+          this.saveUpdates(allUpdates);
+          this._syncToFirebase('payment_tracker_updates', lastUpdate.id, lastUpdate);
+        }
+      }
+    }
+
     return item;
   },
 

@@ -49,6 +49,7 @@ const App = {
     this.navigateTo('dashboard');
     this.updateTodayDate();
     this.updateBackupStatus();
+    this.updateTopBarBadges();
 
     // Auto-prompt shop creation if none
     const shops = DB.getShops();
@@ -229,6 +230,7 @@ const App = {
       if (s.id === activeId) opt.selected = true;
       sel.appendChild(opt);
     });
+    this.updateTopBarBadges();
   },
 
   // ---- Period Summary (Today, Yesterday, Week, Month, Year, All) ----
@@ -259,6 +261,7 @@ const App = {
   // DASHBOARD
   // ================================================================
   renderDashboard() {
+    this.updateTopBarBadges();
     const shopId = DB.getActiveShopId();
     if (!shopId) {
       this.renderNoDashboard();
@@ -2036,9 +2039,24 @@ const App = {
         this.showQuickAddCreditModal();
       });
     }
+
+    const routerBtn = document.getElementById('pageQuickAddRouterBtn');
+    if (routerBtn) {
+      routerBtn.addEventListener('click', () => {
+        this.showQuickAddRouterModal();
+      });
+    }
+
+    const topupBtn = document.getElementById('pageQuickAddTopupBtn');
+    if (topupBtn) {
+      topupBtn.addEventListener('click', () => {
+        this.showQuickAddTopupModal();
+      });
+    }
   },
 
   renderCreditsPage() {
+    this.updateTopBarBadges();
     const shopId = DB.getActiveShopId();
     const credits = DB.getCredits(shopId, true);
     const routers = DB.getRouterExpenses(shopId);
@@ -2138,10 +2156,18 @@ const App = {
 
         let settleInfo = '';
         if (isPaid && c.settledAt) {
+          let destLabel = '';
+          if (c.settledDestination) {
+            if (c.settledDestination.type === 'cash') destLabel = '💵 Cash Drawer';
+            else if (c.settledDestination.type === 'bank') destLabel = `🏦 Bank (${c.settledDestination.bankName || 'Bank'})`;
+            else if (c.settledDestination.type === 'sim') destLabel = `📱 SIM (${c.settledDestination.simName || 'SIM'})`;
+            else if (c.settledDestination.type === 'none') destLabel = '📝 Record Only';
+          }
           settleInfo = `
             <div style="font-size:0.8rem; color:var(--accent-green); font-weight:700;">
               ✅ පියවූයේ: ${DB.formatDateTime(c.settledAt)}
             </div>
+            ${destLabel ? `<div style="font-size:0.75rem; color:var(--accent-blue); font-weight:600; margin-top:2px;">📥 ${destLabel} වෙත එකතු විය</div>` : ''}
             ${c.settledNote ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📝 ${c.settledNote}</div>` : ''}
           `;
         } else if (c.note) {
@@ -2219,13 +2245,20 @@ const App = {
 
       list.forEach(r => {
         const dateStr = DB.formatDateTime(r.timestamp);
+        let deductLabel = '';
+        if (r.deductSource === 'sim') deductLabel = '📱 SIM Balance';
+        else if (r.deductSource === 'cash') deductLabel = '💵 Cash Drawer';
+        else deductLabel = '📝 Record Only';
+
         html += `
           <tr>
             <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
             <td style="font-weight:700;">📶 ${r.routerName}</td>
             <td><span class="network-badge">${r.network}</span></td>
             <td style="text-align:right; font-weight:800; color:var(--accent-purple); font-size:0.95rem;">${DB.formatCurrency(r.amount)}</td>
-            <td style="font-size:0.82rem; color:var(--text-muted);">${r.note || '--'}</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">
+              <span style="font-size:0.75rem; color:var(--accent-purple); font-weight:600;">[${deductLabel}]</span> ${r.note || ''}
+            </td>
             <td style="text-align:center;">
               <button class="btn btn-danger btn-sm" onclick="App.promptDeleteRouterExpense('${r.id}')" style="padding:4px 8px; font-size:0.75rem;">🗑️</button>
             </td>
@@ -2279,7 +2312,9 @@ const App = {
             <td style="font-weight:700;">📥 ${t.distributorName}</td>
             <td><span class="network-badge">${t.networkOrBank}</span></td>
             <td style="text-align:right; font-weight:800; color:var(--accent-blue); font-size:0.95rem;">${DB.formatCurrency(t.amount)}</td>
-            <td style="font-size:0.82rem; color:var(--text-muted);">${t.note || '--'}</td>
+            <td style="font-size:0.82rem; color:var(--text-muted);">
+              ${t.addToBalance ? '<span style="font-size:0.75rem; color:var(--accent-green); font-weight:600;">[+ Added to Balance]</span> ' : ''}${t.note || ''}
+            </td>
             <td style="text-align:center;">
               <button class="btn btn-danger btn-sm" onclick="App.promptDeleteDistributorTopup('${t.id}')" style="padding:4px 8px; font-size:0.75rem;">🗑️</button>
             </td>
@@ -2316,6 +2351,52 @@ const App = {
       <div style="font-size:0.85rem; color:var(--accent-green); margin-bottom:12px; font-weight:600;">
         🕒 පියවන දිනය සහ වේලාව (Settling Now): ${nowFormatted}
       </div>
+
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label" style="font-weight:700;">මුදල් ලැබුණු ආකාරය / ගිණුම (Where was payment received?) *</label>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
+            <input type="radio" name="settleDestinationType" value="cash" checked onchange="App.onSettleDestChange()">
+            <span>💵 <strong>ලාච්චුවේ මුදල් (Cash Drawer)</strong> <small style="color:var(--text-muted);">- ලාච්චුවේ මුදල් හා මුළු ශේෂයට එකතු වේ</small></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
+            <input type="radio" name="settleDestinationType" value="bank" onchange="App.onSettleDestChange()">
+            <span>🏦 <strong>බැංකු ගිණුමකට (Bank Account)</strong> <small style="color:var(--text-muted);">- බැංකු ශේෂය හා මුළු මුදලට එකතු වේ</small></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
+            <input type="radio" name="settleDestinationType" value="sim" onchange="App.onSettleDestChange()">
+            <span>📱 <strong>සිම් / eZ Cash (SIM / eZ Cash)</strong> <small style="color:var(--text-muted);">- සිම් ශේෂය හා මුළු මුදලට එකතු වේ</small></span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
+            <input type="radio" name="settleDestinationType" value="none" onchange="App.onSettleDestChange()">
+            <span>📝 <strong>සටහන් කිරීම පමණි (Record Only)</strong> <small style="color:var(--text-muted);">- ශේෂයන් වෙනස් නොවේ</small></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group" id="settleBankSelectGroup" style="display:none; margin-bottom:12px;">
+        <label class="form-label">බැංකුව තෝරන්න (Select Bank)</label>
+        <select id="settleBankSelect" class="form-select">
+          <option value="Commercial Bank">Commercial Bank</option>
+          <option value="HNB">HNB (Hatton National Bank)</option>
+          <option value="Sampath Bank">Sampath Bank</option>
+          <option value="BOC">BOC (Bank of Ceylon)</option>
+          <option value="People's Bank">People's Bank</option>
+          <option value="Other Bank">Other Bank</option>
+        </select>
+      </div>
+
+      <div class="form-group" id="settleSimSelectGroup" style="display:none; margin-bottom:12px;">
+        <label class="form-label">සිම් / ජාලය තෝරන්න (Select SIM)</label>
+        <select id="settleSimSelect" class="form-select">
+          <option value="Dialog">Dialog</option>
+          <option value="Mobitel">Mobitel</option>
+          <option value="Airtel">Airtel</option>
+          <option value="Hutch">Hutch</option>
+          <option value="Ezcash">eZ Cash</option>
+        </select>
+      </div>
+
       <div class="form-group">
         <label class="form-label">Payment Settlement Note (ගෙවීම් සටහන)</label>
         <input type="text" id="settleNoteInput" class="form-input" placeholder="උදා: කඩේට මුදල් ගෙවන ලදී, EZ Cash, Bank Transfer">
@@ -2327,10 +2408,21 @@ const App = {
           text: '✅ Confirm Settled (පියවූ බව සටහන් කරන්න)',
           class: 'btn-success',
           onClick: () => {
+            const selectedDest = document.querySelector('input[name="settleDestinationType"]:checked');
+            const destType = selectedDest ? selectedDest.value : 'cash';
+            let destination = { type: destType };
+            if (destType === 'bank') {
+              const bSel = document.getElementById('settleBankSelect');
+              destination.bankName = bSel ? bSel.value : 'Commercial Bank';
+            } else if (destType === 'sim') {
+              const sSel = document.getElementById('settleSimSelect');
+              destination.simName = sSel ? sSel.value : 'Dialog';
+            }
             const note = document.getElementById('settleNoteInput').value.trim();
-            DB.settleCredit(creditId, note);
+            DB.settleCredit(creditId, note, destination);
             this.closeModal();
-            this.showToast('✅ Credit marked as settled! (ණය මුදල පියවන ලදී)', 'success');
+            this.updateTopBarBadges();
+            this.showToast('✅ Credit settled & added to accounts! (ණය මුදල පියවා ගිණුම්වලට එකතු විය)', 'success');
             this.renderCreditsPage();
             if (this.currentPage === 'dashboard') {
               this.renderDashboard();
@@ -2339,6 +2431,15 @@ const App = {
         }
       ]
     );
+  },
+
+  onSettleDestChange() {
+    const selectedDest = document.querySelector('input[name="settleDestinationType"]:checked');
+    const val = selectedDest ? selectedDest.value : 'cash';
+    const bankGroup = document.getElementById('settleBankSelectGroup');
+    const simGroup = document.getElementById('settleSimSelectGroup');
+    if (bankGroup) bankGroup.style.display = (val === 'bank') ? 'block' : 'none';
+    if (simGroup) simGroup.style.display = (val === 'sim') ? 'block' : 'none';
   },
 
   sendCreditWhatsApp(creditId) {
@@ -2538,6 +2639,7 @@ const App = {
             });
 
             this.closeModal();
+            this.updateTopBarBadges();
             this.showToast(`✅ Rs.${amount.toFixed(2)} credit saved for ${name}!`, 'success');
             
             if (this.currentPage === 'credits') {
@@ -2551,9 +2653,217 @@ const App = {
     );
   },
 
+  showQuickAddRouterModal() {
+    const shops = DB.getShops();
+    if (shops.length === 0) {
+      this.showToast('Please create a shop first (පළමුව සාප්පුවක් සාදන්න)', 'error');
+      return;
+    }
+
+    let activeShopId = DB.getActiveShopId();
+    let shopSelectHtml = '';
+    if (!activeShopId || shops.length > 1) {
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Shop (සාප්පුව) *</label>
+        <select id="quickRouterShop" class="form-select">
+          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+        </select>
+      </div>
+      `;
+    }
+
+    this.showModal(
+      '📶 සාප්පු රවුටර් / වියදම් එකතු කරන්න (Add Router Expense)',
+      `
+      ${shopSelectHtml}
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Router / Device Name (රවුටරයේ නම) *</label>
+        <input type="text" id="quickRouterName" class="form-input" placeholder="උදා: Shop Main Wi-Fi, CCTV Router" value="Shop Wi-Fi" required autofocus>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Network (ජාලය) *</label>
+        <select id="quickRouterNetwork" class="form-select">
+          <option value="Dialog">Dialog</option>
+          <option value="Mobitel">Mobitel</option>
+          <option value="Airtel">Airtel</option>
+          <option value="Hutch">Hutch</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Amount (වියදම් කළ මුදල) *</label>
+        <input type="number" id="quickRouterAmount" class="form-input balance-input" placeholder="0.00" step="0.01" min="0" required>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Deduct From Balance? (ශේෂයෙන් අඩු විය යුතුද?)</label>
+        <select id="quickRouterDeductSource" class="form-select">
+          <option value="sim">📱 අදාළ සිම් එකෙන් අඩු කරන්න (Deduct from SIM)</option>
+          <option value="cash">💵 ලාච්චුවේ මුදලින් අඩු කරන්න (Deduct from Cash Drawer)</option>
+          <option value="none">📝 ශේෂයෙන් අඩු නොකරන්න - සටහනක් පමණි (Record Only)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note (විකල්ප සටහන)</label>
+        <input type="text" id="quickRouterNote" class="form-input" placeholder="උදා: මාසික පැකේජය දමන ලදී">
+      </div>
+      `,
+      [
+        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        {
+          text: '💾 Save Router Expense (සටහන් කරන්න)',
+          class: 'btn-primary',
+          onClick: () => {
+            const shopSelectEl = document.getElementById('quickRouterShop');
+            const targetShopId = shopSelectEl ? shopSelectEl.value : activeShopId || (shops[0] && shops[0].id);
+            const routerName = document.getElementById('quickRouterName').value.trim() || 'Shop Wi-Fi';
+            const network = document.getElementById('quickRouterNetwork').value;
+            const amount = parseFloat(document.getElementById('quickRouterAmount').value) || 0;
+            const deductSource = document.getElementById('quickRouterDeductSource').value;
+            const note = document.getElementById('quickRouterNote').value.trim();
+
+            if (amount <= 0) {
+              this.showToast('Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)', 'error');
+              return;
+            }
+
+            DB.addRouterExpense({
+              shopId: targetShopId,
+              routerName,
+              network,
+              amount,
+              deductSource,
+              note
+            });
+
+            this.closeModal();
+            this.showToast(`✅ Rs.${amount.toFixed(2)} router reload recorded!`, 'success');
+
+            if (this.currentPage === 'credits') {
+              this.renderCreditsPage();
+            } else if (this.currentPage === 'dashboard') {
+              this.renderDashboard();
+            }
+          }
+        }
+      ]
+    );
+  },
+
+  showQuickAddTopupModal() {
+    const shops = DB.getShops();
+    if (shops.length === 0) {
+      this.showToast('Please create a shop first (පළමුව සාප්පුවක් සාදන්න)', 'error');
+      return;
+    }
+
+    let activeShopId = DB.getActiveShopId();
+    let shopSelectHtml = '';
+    if (!activeShopId || shops.length > 1) {
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Shop (සාප්පුව) *</label>
+        <select id="quickTopupShop" class="form-select">
+          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+        </select>
+      </div>
+      `;
+    }
+
+    this.showModal(
+      '📥 ලැබුණු ස්ටොක් / ඩිස්ට්‍රිබියුටර් තැන්පතු (Distributor Stock Top-up)',
+      `
+      ${shopSelectHtml}
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Distributor / Depositor Name (ලබාදුන් පාර්ශ්වය) *</label>
+        <input type="text" id="quickTopupDistributor" class="form-input" placeholder="උදා: Dialog Distributor, Mobitel Agent" value="Distributor" required autofocus>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Target Account / SIM (ලැබුණු ගිණුම / සිම් පත) *</label>
+        <select id="quickTopupTarget" class="form-select">
+          <option value="Dialog">Dialog SIM</option>
+          <option value="Mobitel">Mobitel SIM</option>
+          <option value="Airtel">Airtel SIM</option>
+          <option value="Hutch">Hutch SIM</option>
+          <option value="Ezcash">eZ Cash SIM</option>
+          <option value="bank">🏦 Bank Account</option>
+          <option value="cash">💵 Cash Drawer</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">Amount (ලැබුණු ස්ටොක් මුදල) *</label>
+        <input type="number" id="quickTopupAmount" class="form-input balance-input" placeholder="0.00" step="0.01" min="0" required>
+      </div>
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="quickTopupAddToBalance" checked>
+          <span><strong>මෙම මුදල සාප්පුවේ සක්‍රීය ශේෂයට (Active Balance) එකතු කරන්න</strong></span>
+        </label>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Note / Reference (සටහන / රිසිට්පත් අංකය)</label>
+        <input type="text" id="quickTopupNote" class="form-input" placeholder="උදා: Invoice #12345, Cash paid to sales rep">
+      </div>
+      `,
+      [
+        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        {
+          text: '💾 Save Stock Top-up (සටහන් කරන්න)',
+          class: 'btn-primary',
+          onClick: () => {
+            const shopSelectEl = document.getElementById('quickTopupShop');
+            const targetShopId = shopSelectEl ? shopSelectEl.value : activeShopId || (shops[0] && shops[0].id);
+            const distributorName = document.getElementById('quickTopupDistributor').value.trim() || 'Distributor';
+            const networkOrBank = document.getElementById('quickTopupTarget').value;
+            const amount = parseFloat(document.getElementById('quickTopupAmount').value) || 0;
+            const addToBalance = document.getElementById('quickTopupAddToBalance').checked;
+            const note = document.getElementById('quickTopupNote').value.trim();
+
+            if (amount <= 0) {
+              this.showToast('Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)', 'error');
+              return;
+            }
+
+            DB.addDistributorTopup({
+              shopId: targetShopId,
+              distributorName,
+              networkOrBank,
+              amount,
+              addToBalance,
+              note
+            });
+
+            this.closeModal();
+            this.showToast(`✅ Rs.${amount.toFixed(2)} stock top-up recorded!`, 'success');
+
+            if (this.currentPage === 'credits') {
+              this.renderCreditsPage();
+            } else if (this.currentPage === 'dashboard') {
+              this.renderDashboard();
+            }
+          }
+        }
+      ]
+    );
+  },
+
+  updateTopBarBadges() {
+    const shopId = DB.getActiveShopId();
+    const stats = DB.getCreditsStats(shopId);
+    const badge = document.getElementById('topBarCreditBadge');
+    if (badge) {
+      if (stats.countPending > 0) {
+        badge.textContent = stats.countPending;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+  },
+
   promptDeleteCredit(creditId) {
     this.showAdminPasswordModal(() => {
       DB.deleteCredit(creditId);
+      this.updateTopBarBadges();
       this.showToast('Credit deleted (මකා දැමුවා)', 'success');
       this.renderCreditsPage();
       if (this.currentPage === 'dashboard') {
@@ -2567,6 +2877,9 @@ const App = {
       DB.deleteRouterExpense(id);
       this.showToast('Router expense deleted (මකා දැමුවා)', 'success');
       this.renderCreditsPage();
+      if (this.currentPage === 'dashboard') {
+        this.renderDashboard();
+      }
     });
   },
 
@@ -2575,6 +2888,9 @@ const App = {
       DB.deleteDistributorTopup(id);
       this.showToast('Distributor top-up deleted (මකා දැමුවා)', 'success');
       this.renderCreditsPage();
+      if (this.currentPage === 'dashboard') {
+        this.renderDashboard();
+      }
     });
   },
 

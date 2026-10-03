@@ -73,6 +73,32 @@
     <!-- Main Content -->
     <main class="main-content">
 
+      <!-- Top Quick Action Bar (උඩ Bar එක) -->
+      <div class="top-action-bar" id="topActionBar">
+        <div class="top-bar-left">
+          <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">⚡ Quick Actions:</span>
+          <button type="button" class="top-bar-btn credit-btn" onclick="App.showQuickAddCreditModal()" title="Add Customer Credit Reload">
+            <span class="btn-icon">👤</span>
+            <span class="btn-text">+ ණයට දුන් රීලෝඩ්</span>
+            <span class="top-bar-badge" id="topBarCreditBadge" style="display:none;">0</span>
+          </button>
+          <button type="button" class="top-bar-btn router-btn" onclick="App.showQuickAddRouterModal()" title="Add Shop Router / Expense Reload">
+            <span class="btn-icon">📶</span>
+            <span class="btn-text">+ සාප්පු රවුටර් / වියදම්</span>
+          </button>
+          <button type="button" class="top-bar-btn topup-btn" onclick="App.showQuickAddTopupModal()" title="Add Distributor Stock Top-up">
+            <span class="btn-icon">📥</span>
+            <span class="btn-text">+ ලැබුණු ස්ටොක්</span>
+          </button>
+        </div>
+        <div class="top-bar-right">
+          <button type="button" class="top-bar-btn ledger-btn" onclick="App.navigateTo('credits')" title="Open Credits & Expenses Ledger">
+            <span class="btn-icon">📒</span>
+            <span class="btn-text">ලෙජරය & Settle</span>
+          </button>
+        </div>
+      </div>
+
       <!-- ===== DASHBOARD PAGE ===== -->
       <div class="page active" id="page-dashboard">
         <div class="page-header">
@@ -301,47 +327,14 @@
             <span class="total-value" id="liveBankTotal" style="font-size:1.35rem; color:var(--accent-purple);">Rs.0.00</span>
           </div>
 
-          <!-- SECTION 2.5: SHIFT ADJUSTMENTS (CREDITS, ROUTERS & TOP-UPS) -->
-          <div class="section-divider amber" style="margin-top:24px;">
-            <div class="divider-icon">⚖️</div>
-            <div class="divider-text" data-i18n="upd_adj_sec_title">Section 2.5: Shift Adjustments (Credits, Routers & Top-ups)</div>
-            <div class="divider-line"></div>
-          </div>
-
-          <!-- A. Customer Credit Reloads -->
-          <div style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);" data-i18n="upd_adj_credit_title">👤 Customer Credit Reloads (ණයට දුන් රීලෝඩ්)</span>
-              <button type="button" class="btn btn-secondary btn-sm" id="addCreditRowBtn" data-i18n="btn_add_credit">+ Add Customer Credit</button>
+          <!-- Quick Actions Note -->
+          <div style="margin: 20px 0; padding: 12px 16px; background: rgba(59,130,246,0.06); border: 1px dashed rgba(59,130,246,0.25); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+            <div style="font-size: 0.85rem; color: var(--text-secondary);">
+              💡 <strong>Customer Credits, Router වියදම් සහ Stock ලැබීම්</strong> උඩ ඇති <strong style="color:var(--accent-blue);">Quick Actions Bar</strong> එකෙන් හෝ <strong style="color:var(--accent-gold);">Credits පිටුවෙන්</strong> ඕනෑම වේලාවක සටහන් කළ හැක.
             </div>
-            <div id="creditRowsContainer" class="adj-entries"></div>
-          </div>
-
-          <!-- B. Shop Router Reloads -->
-          <div style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);" data-i18n="upd_adj_router_title">📶 Shop Router Reloads (සාප්පුවේ රවුටර් වියදම්)</span>
-              <button type="button" class="btn btn-secondary btn-sm" id="addRouterRowBtn" data-i18n="btn_add_router">+ Add Router Reload</button>
-            </div>
-            <div id="routerRowsContainer" class="adj-entries"></div>
-          </div>
-
-          <!-- C. Distributor Top-ups Received -->
-          <div style="background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:14px; margin-bottom:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-              <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);" data-i18n="upd_adj_topup_title">📥 Distributor Top-ups / Deposits (ලැබුණු ස්ටොක්)</span>
-              <button type="button" class="btn btn-secondary btn-sm" id="addTopupRowBtn" data-i18n="btn_add_topup">+ Add Distributor Top-up</button>
-            </div>
-            <div id="topupRowsContainer" class="adj-entries"></div>
-          </div>
-
-          <!-- Live Shift Adjustments Summary Badge -->
-          <div class="auto-total" style="padding:14px; border-radius:var(--radius-md); background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); margin-bottom:24px;">
-            <div>
-              <span class="total-label" style="font-size:0.95rem; font-weight:700;" data-i18n="upd_adj_summary_badge">⚖️ Shift Adjustments Total</span>
-              <div id="liveAdjBreakdown" style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">Credits: Rs.0.00 | Routers: Rs.0.00 | Top-ups: Rs.0.00</div>
-            </div>
-            <span class="total-value" id="liveAdjTotal" style="font-size:1.35rem; color:var(--accent-gold);">+ Rs.0.00</span>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="App.navigateTo('credits')" style="font-size: 0.8rem; font-weight: 700;">
+              📒 Open Ledger (ලෙජරය)
+            </button>
           </div>
 
           <!-- SECTION 3: GRAND TOTAL CAPITAL -->
@@ -401,8 +394,10 @@
             <h1><span class="header-icon">📒</span> <span data-i18n="cred_title">Customer Credit & Router Ledger</span></h1>
             <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="cred_subtitle">Track customer receivables, router reloads, and settlements</p>
           </div>
-          <div class="header-actions">
+          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-primary" id="pageQuickAddCreditBtn">+ ණයට දුන් රීලෝඩ්</button>
+            <button class="btn btn-ghost" id="pageQuickAddRouterBtn" style="border:1px solid rgba(255,255,255,0.15);">📶 + සාප්පු රවුටර්</button>
+            <button class="btn btn-ghost" id="pageQuickAddTopupBtn" style="border:1px solid rgba(255,255,255,0.15);">📥 + ලැබුණු ස්ටොක්</button>
           </div>
         </div>
 
