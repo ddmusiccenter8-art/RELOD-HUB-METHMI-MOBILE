@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="description" content="Shop Payment Tracker - Mobile Reload, Bill Payment, Mobile Loan & Bank Payment Management System">
-  <title>Shop Payment Tracker | සාප්පු ගෙවීම් ට්‍රැකර්</title>
+  <title>Shop Payment Tracker</title>
   
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
@@ -49,7 +49,7 @@
       <!-- Shop Selector & Add Button -->
       <div class="shop-selector" style="display: flex; gap: 8px;">
         <select id="shopSelector" class="form-select" title="Select Shop" style="flex: 1;" data-i18n="select_shop">
-          <option value="">-- සාප්පුව තෝරන්න --</option>
+          <option value="" data-i18n="select_shop">-- Select Shop --</option>
         </select>
         <button id="quickAddShopBtn" class="btn btn-primary" style="padding: 0 12px; font-size: 1.2rem; font-weight: bold;" title="Add Shop">+</button>
       </div>
@@ -57,18 +57,18 @@
       <!-- Navigation -->
       <ul class="nav-links">
         <li><a href="#" data-page="dashboard" class="active" onclick="App.showMainDashboard()"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
-        <li><a href="#" data-page="update"><span class="nav-icon">➕</span> <span data-i18n="nav_update">Update කරන්න</span></a></li>
-        <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update ඉතිහාසය</span></a></li>
+        <li><a href="#" data-page="update"><span class="nav-icon">➕</span> <span data-i18n="nav_update">Add Update</span></a></li>
+        <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
         <li><a href="#" data-page="credits"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
-        <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">සාප්පු</span></a></li>
-        <li><a href="#" data-page="reports"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">වාර්තා</span></a></li>
+        <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops</span></a></li>
+        <li><a href="#" data-page="reports"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">Reports</span></a></li>
       </ul>
 
       <!-- Backup Status -->
       <div style="padding:10px 4px;margin-bottom:8px;">
         <div style="font-size:0.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;" data-i18n="backup_status">🛡️ Backup Status</div>
         <div id="backupStatus" style="font-size:0.8rem;font-weight:500;color:var(--text-secondary);">
-          <span style="color:var(--accent-red);">⚠️</span> Backup නැහැ
+          <span style="color:var(--accent-red);">⚠️</span> <span data-i18n="no_backup">No Backup</span>
         </div>
       </div>
 
@@ -83,28 +83,28 @@
     <!-- Main Content -->
     <main class="main-content">
 
-      <!-- Top Quick Action Bar (උඩ Bar එක) -->
+      <!-- Top Quick Action Bar -->
       <div class="top-action-bar" id="topActionBar">
         <div class="top-bar-left">
-          <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">⚡ Quick Actions:</span>
+          <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="top_actions">⚡ Quick Actions:</span>
           <button type="button" class="top-bar-btn credit-btn" onclick="App.showQuickAddCreditModal()" title="Add Customer Credit Reload">
             <span class="btn-icon">👤</span>
-            <span class="btn-text">+ ණයට දුන් රීලෝඩ්</span>
+            <span class="btn-text" data-i18n="top_btn_credit">+ Customer Credit</span>
             <span class="top-bar-badge" id="topBarCreditBadge" style="display:none;">0</span>
           </button>
           <button type="button" class="top-bar-btn router-btn" onclick="App.showQuickAddRouterModal()" title="Add Shop Router / Expense Reload">
             <span class="btn-icon">📶</span>
-            <span class="btn-text">+ සාප්පු රවුටර් / වියදම්</span>
+            <span class="btn-text" data-i18n="top_btn_router">+ Router Reload</span>
           </button>
           <button type="button" class="top-bar-btn topup-btn" onclick="App.showQuickAddTopupModal()" title="Add Distributor Stock Top-up">
             <span class="btn-icon">📥</span>
-            <span class="btn-text">+ ලැබුණු ස්ටොක්</span>
+            <span class="btn-text" data-i18n="top_btn_topup">+ Stock Top-up</span>
           </button>
         </div>
         <div class="top-bar-right">
           <button type="button" class="top-bar-btn ledger-btn" onclick="App.navigateTo('credits')" title="Open Credits & Expenses Ledger">
             <span class="btn-icon">📒</span>
-            <span class="btn-text">ලෙජරය & Settle</span>
+            <span class="btn-text" data-i18n="top_btn_ledger">Ledger & Settle</span>
           </button>
         </div>
       </div>
@@ -123,18 +123,18 @@
 
         <!-- Overall Card -->
         <div id="overallCard" class="card overall-card neutral-card" style="margin-bottom: 24px;">
-          <div class="overall-label" data-i18n="dash_overall">මුළු ලාභය / අලාභය (Overall Profit/Loss)</div>
+          <div class="overall-label" data-i18n="dash_overall">VS PREVIOUS UPDATE</div>
           <div class="overall-value neutral" id="overallValue">Rs.0.00</div>
           <div class="overall-type" id="overallType" data-i18n="dash_no_data">NO DATA</div>
           <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.1);">
-            <div style="font-size:0.95rem; color:var(--text-secondary); font-weight:700;">මුළු මුදල (Total Balance): <span id="overallTotalCapital" style="color:var(--text-primary); font-size:1.1rem;">Rs.0.00</span></div>
+            <div style="font-size:0.95rem; color:var(--text-secondary); font-weight:700;"><span data-i18n="total_balance_lbl">Total Balance</span>: <span id="overallTotalCapital" style="color:var(--text-primary); font-size:1.1rem;">Rs.0.00</span></div>
           </div>
         </div>
 
         <!-- Period Summary Card -->
         <div id="periodSummaryCard" class="card neutral-card" style="margin-bottom: 24px; padding: 15px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-            <div style="font-weight:700; color:var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;" data-i18n="dash_period_summary">PROFIT / LOSS SUMMARY (කාලය අනුව)</div>
+            <div style="font-weight:700; color:var(--text-secondary); font-size: 0.9rem; text-transform: uppercase;" data-i18n="dash_period_summary">PROFIT / LOSS SUMMARY</div>
             <select id="dashPeriodSelector" class="form-input" style="width: auto; padding: 6px 10px; font-size: 0.85rem; height: auto;">
               <option value="today" data-i18n="period_today">Today</option>
               <option value="week" data-i18n="period_week">This Week</option>
@@ -240,7 +240,7 @@
         <!-- Previous Update Info -->
         <div class="card" id="prevUpdateInfo" style="margin-bottom:24px; display:none;">
           <div class="card-header">
-            <span class="card-title">📌 පෙර Update එක (Previous Update)</span>
+            <span class="card-title" data-i18n="upd_prev_title">📌 Previous Update</span>
             <span class="date-pill" id="prevUpdateTime">--</span>
           </div>
           <div class="result-grid" id="prevUpdateSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;"></div>
@@ -251,17 +251,17 @@
           <!-- EMPLOYEE SECTION -->
           <div class="section-divider">
             <div class="divider-icon">🧑‍💼</div>
-            <div class="divider-text" data-i18n="upd_emp_details">සේවක තොරතුරු</div>
+            <div class="divider-text" data-i18n="upd_emp_details">Employee Details</div>
             <div class="divider-line"></div>
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label class="form-label" data-i18n="upd_emp_name">සේවකයාගේ නම</label>
-              <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="සේවකයාගේ නම" required>
+              <label class="form-label" data-i18n="upd_emp_name">Employee Name</label>
+              <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="Employee Name" required>
             </div>
             <div class="form-group">
-              <label class="form-label" data-i18n="upd_job_role">තනතුර</label>
-              <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="තනතුර (උදා: Cashier)">
+              <label class="form-label" data-i18n="upd_job_role">Job Role</label>
+              <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="Job Role (e.g. Cashier)">
             </div>
           </div>
 
@@ -340,10 +340,10 @@
           <!-- Quick Actions Note -->
           <div style="margin: 20px 0; padding: 12px 16px; background: rgba(59,130,246,0.06); border: 1px dashed rgba(59,130,246,0.25); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
             <div style="font-size: 0.85rem; color: var(--text-secondary);">
-              💡 <strong>Customer Credits, Router වියදම් සහ Stock ලැබීම්</strong> උඩ ඇති <strong style="color:var(--accent-blue);">Quick Actions Bar</strong> එකෙන් හෝ <strong style="color:var(--accent-gold);">Credits පිටුවෙන්</strong> ඕනෑම වේලාවක සටහන් කළ හැක.
+              💡 <strong>Customer Credits, Router Expenses & Stock Top-ups</strong> can be recorded anytime from the <strong style="color:var(--accent-blue);">Quick Actions Bar</strong> or <strong style="color:var(--accent-gold);">Credits & Ledger page</strong>.
             </div>
             <button type="button" class="btn btn-ghost btn-sm" onclick="App.navigateTo('credits')" style="font-size: 0.8rem; font-weight: 700;">
-              📒 Open Ledger (ලෙජරය)
+              📒 Open Ledger
             </button>
           </div>
 
@@ -380,19 +380,19 @@
       <!-- ===== HISTORY PAGE ===== -->
       <div class="page" id="page-history">
         <div class="page-header">
-          <h1><span class="header-icon">📜</span> <span data-i18n="hist_title">Update ඉතිහාසය</span></h1>
+          <h1><span class="header-icon">📜</span> <span data-i18n="hist_title">Update History</span></h1>
         </div>
 
         <div class="filter-bar">
           <input type="date" class="form-input" id="historyDateFilter">
-          <button class="btn btn-ghost btn-sm" id="historyTodayBtn" data-i18n="rep_preset_today">අද</button>
-          <button class="btn btn-ghost btn-sm" id="historyAllBtn" data-i18n="hist_btn_all">සියල්ල</button>
+          <button class="btn btn-ghost btn-sm" id="historyTodayBtn" data-i18n="rep_preset_today">Today</button>
+          <button class="btn btn-ghost btn-sm" id="historyAllBtn" data-i18n="hist_btn_all">View All</button>
         </div>
 
         <div id="historyList">
           <div class="empty-state">
             <div class="empty-icon">📭</div>
-            <div class="empty-text" data-i18n="dash_no_data">Updates නැහැ</div>
+            <div class="empty-text" data-i18n="dash_no_data">No updates recorded yet</div>
           </div>
         </div>
       </div>
@@ -405,9 +405,9 @@
             <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="cred_subtitle">Track customer receivables, router reloads, and settlements</p>
           </div>
           <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn btn-primary" id="pageQuickAddCreditBtn">+ ණයට දුන් රීලෝඩ්</button>
-            <button class="btn btn-ghost" id="pageQuickAddRouterBtn" style="border:1px solid rgba(255,255,255,0.15);">📶 + සාප්පු රවුටර්</button>
-            <button class="btn btn-ghost" id="pageQuickAddTopupBtn" style="border:1px solid rgba(255,255,255,0.15);">📥 + ලැබුණු ස්ටොක්</button>
+            <button class="btn btn-primary" id="pageQuickAddCreditBtn"><span data-i18n="cred_btn_add_credit">👤 + Customer Credit</span></button>
+            <button class="btn btn-ghost" id="pageQuickAddRouterBtn" style="border:1px solid rgba(255,255,255,0.15);"><span data-i18n="cred_btn_add_router">📶 + Router Reload</span></button>
+            <button class="btn btn-ghost" id="pageQuickAddTopupBtn" style="border:1px solid rgba(255,255,255,0.15);"><span data-i18n="cred_btn_add_topup">📥 + Stock Top-up</span></button>
           </div>
         </div>
 
@@ -466,17 +466,17 @@
       <!-- ===== SHOPS PAGE ===== -->
       <div class="page" id="page-shops">
         <div class="page-header">
-          <h1><span class="header-icon">🏪</span> <span data-i18n="nav_shops">සාප්පු කළමනාකරණය</span></h1>
+          <h1><span class="header-icon">🏪</span> <span data-i18n="nav_shops">Shop Management</span></h1>
           <div class="header-actions">
             <button class="btn btn-ghost" id="recoverShopBtn">♻️ Recover Shops</button>
-            <button class="btn btn-primary" id="addShopBtn">➕ නව සාප්පුවක්</button>
+            <button class="btn btn-primary" id="addShopBtn" data-i18n="add_shop">+ Add Shop</button>
           </div>
         </div>
 
         <div class="shop-list" id="shopList">
           <div class="empty-state">
             <div class="empty-icon">🏪</div>
-            <div class="empty-text" data-i18n="dash_no_data">සාප්පු නැහැ</div>
+            <div class="empty-text" data-i18n="dash_no_data">No shops yet</div>
           </div>
         </div>
       </div>
@@ -484,7 +484,7 @@
       <!-- ===== REPORTS PAGE ===== -->
       <div class="page" id="page-reports">
         <div class="page-header">
-          <h1><span class="header-icon">📈</span> <span data-i18n="rep_title">වාර්තා</span></h1>
+          <h1><span class="header-icon">📈</span> <span data-i18n="rep_title">Reports</span></h1>
         </div>
 
         <div class="card" style="margin-bottom: 24px;">
@@ -517,7 +517,7 @@
         <div id="reportResults">
           <div class="empty-state">
             <div class="empty-icon">📈</div>
-            <div class="empty-text" data-i18n="dash_no_data">Date range එකක් select කරන්න</div>
+            <div class="empty-text" data-i18n="dash_no_data">Select a date range to generate report</div>
           </div>
         </div>
       </div>
@@ -553,6 +553,7 @@
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js').then(reg => {
+          reg.update();
           console.log('ServiceWorker registration successful');
         }).catch(err => {
           console.log('ServiceWorker registration failed: ', err);

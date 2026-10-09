@@ -777,7 +777,7 @@ const DB = {
     this._deleteFromFirebase('payment_tracker_updates', updateId);
   },
 
-  // ---- Customer Credits (ණයට දුන් රීලෝඩ්) ----
+  // ---- Customer Credits ----
   getCredits(shopId = null, includeSettled = true) {
     let credits = JSON.parse(localStorage.getItem(this.CREDITS_KEY) || '[]');
     if (shopId) credits = credits.filter(c => c.shopId === shopId);
@@ -807,6 +807,40 @@ const DB = {
     };
     credits.unshift(item);
     this.saveCredits(credits);
+
+    // Deduct credit reload amount from the corresponding SIM in active balance (lastUpdate)
+    if (item.shopId && item.amount > 0) {
+      const lastUpdate = this.getLastUpdate(item.shopId);
+      if (lastUpdate) {
+        const amt = parseFloat(item.amount) || 0;
+        const simKey = (item.network || 'dialog').toLowerCase().trim();
+        if (!lastUpdate.reload) lastUpdate.reload = {};
+
+        if (lastUpdate.reload[simKey] !== undefined) {
+          lastUpdate.reload[simKey] = Math.max(0, (parseFloat(lastUpdate.reload[simKey]) || 0) - amt);
+        } else {
+          lastUpdate.reload[simKey] = 0;
+        }
+
+        lastUpdate.reload.simTotal = Math.max(0, (parseFloat(lastUpdate.reload.simTotal) || 0) - amt);
+        lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+        lastUpdate.simTotal = Math.max(0, (parseFloat(lastUpdate.simTotal) || 0) - amt);
+        lastUpdate.reloadTotal = Math.max(0, (parseFloat(lastUpdate.reloadTotal) || 0) - amt);
+        lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+
+        const prevUpdate = this.getLastUpdateBefore(item.shopId, lastUpdate.timestamp);
+        lastUpdate.comparison = this.calculateComparison(lastUpdate, prevUpdate);
+
+        const allUpdates = this.getUpdates(true);
+        const idx = allUpdates.findIndex(u => u.id === lastUpdate.id);
+        if (idx !== -1) {
+          allUpdates[idx] = lastUpdate;
+          this.saveUpdates(allUpdates);
+          this._syncToFirebase('payment_tracker_updates', lastUpdate.id, lastUpdate);
+        }
+      }
+    }
+
     return item;
   },
 
@@ -883,37 +917,51 @@ const DB = {
     const item = credits.find(c => c.id === creditId);
     if (!item) return false;
 
-    // If it was settled and added to balance, safely reverse the balance adjustment
-    if (item.status === 'paid' && item.settledDestination && item.settledDestination.type !== 'none' && item.shopId) {
+    // Restore SIM balance and reverse settlement adjustments
+    if (item.shopId && item.amount > 0) {
       const lastUpdate = this.getLastUpdate(item.shopId);
       if (lastUpdate) {
         const amt = parseFloat(item.amount) || 0;
-        const dest = item.settledDestination;
-        if (dest.type === 'cash') {
-          if (lastUpdate.reload) {
-            lastUpdate.reload.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.reload.cashInDrawer) || 0) - amt);
+        const simKey = (item.network || 'dialog').toLowerCase().trim();
+
+        // 1. Restore the SIM balance that was deducted upon credit creation
+        if (!lastUpdate.reload) lastUpdate.reload = {};
+        lastUpdate.reload[simKey] = (parseFloat(lastUpdate.reload[simKey]) || 0) + amt;
+        lastUpdate.reload.simTotal = (parseFloat(lastUpdate.reload.simTotal) || 0) + amt;
+        lastUpdate.reload.total = (parseFloat(lastUpdate.reload.total) || 0) + amt;
+        lastUpdate.simTotal = (parseFloat(lastUpdate.simTotal) || 0) + amt;
+        lastUpdate.reloadTotal = (parseFloat(lastUpdate.reloadTotal) || 0) + amt;
+        lastUpdate.totalCapital = (parseFloat(lastUpdate.totalCapital) || 0) + amt;
+
+        // 2. If it was already settled and added to balance, safely reverse the settlement addition
+        if (item.status === 'paid' && item.settledDestination && item.settledDestination.type !== 'none') {
+          const dest = item.settledDestination;
+          if (dest.type === 'cash') {
+            if (lastUpdate.reload) {
+              lastUpdate.reload.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.reload.cashInDrawer) || 0) - amt);
+              lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+            }
+            lastUpdate.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.cashInDrawer) || 0) - amt);
+            lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+          } else if (dest.type === 'bank' && lastUpdate.mobileRental?.banks) {
+            const b = lastUpdate.mobileRental.banks.find(x => x.bank && x.bank.toLowerCase() === (dest.bankName || '').toLowerCase());
+            if (b) {
+              b.accountAmount = Math.max(0, (parseFloat(b.accountAmount) || 0) - amt);
+              b.total = Math.max(0, (parseFloat(b.total) || 0) - amt);
+              lastUpdate.mobileRental.totalAccountAmount = Math.max(0, (parseFloat(lastUpdate.mobileRental.totalAccountAmount) || 0) - amt);
+              lastUpdate.mobileRental.grandTotal = Math.max(0, (parseFloat(lastUpdate.mobileRental.grandTotal) || 0) - amt);
+              lastUpdate.bankTotal = Math.max(0, (parseFloat(lastUpdate.bankTotal) || 0) - amt);
+              lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+            }
+          } else if (dest.type === 'sim' && lastUpdate.reload) {
+            const destSimKey = (dest.simName || 'dialog').toLowerCase();
+            lastUpdate.reload[destSimKey] = Math.max(0, (parseFloat(lastUpdate.reload[destSimKey]) || 0) - amt);
+            lastUpdate.reload.simTotal = Math.max(0, (parseFloat(lastUpdate.reload.simTotal) || 0) - amt);
             lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
-          }
-          lastUpdate.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.cashInDrawer) || 0) - amt);
-          lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
-        } else if (dest.type === 'bank' && lastUpdate.mobileRental?.banks) {
-          const b = lastUpdate.mobileRental.banks.find(x => x.bank && x.bank.toLowerCase() === (dest.bankName || '').toLowerCase());
-          if (b) {
-            b.accountAmount = Math.max(0, (parseFloat(b.accountAmount) || 0) - amt);
-            b.total = Math.max(0, (parseFloat(b.total) || 0) - amt);
-            lastUpdate.mobileRental.totalAccountAmount = Math.max(0, (parseFloat(lastUpdate.mobileRental.totalAccountAmount) || 0) - amt);
-            lastUpdate.mobileRental.grandTotal = Math.max(0, (parseFloat(lastUpdate.mobileRental.grandTotal) || 0) - amt);
-            lastUpdate.bankTotal = Math.max(0, (parseFloat(lastUpdate.bankTotal) || 0) - amt);
+            lastUpdate.simTotal = Math.max(0, (parseFloat(lastUpdate.simTotal) || 0) - amt);
+            lastUpdate.reloadTotal = Math.max(0, (parseFloat(lastUpdate.reloadTotal) || 0) - amt);
             lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
           }
-        } else if (dest.type === 'sim' && lastUpdate.reload) {
-          const simKey = (dest.simName || 'dialog').toLowerCase();
-          lastUpdate.reload[simKey] = Math.max(0, (parseFloat(lastUpdate.reload[simKey]) || 0) - amt);
-          lastUpdate.reload.simTotal = Math.max(0, (parseFloat(lastUpdate.reload.simTotal) || 0) - amt);
-          lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
-          lastUpdate.simTotal = Math.max(0, (parseFloat(lastUpdate.simTotal) || 0) - amt);
-          lastUpdate.reloadTotal = Math.max(0, (parseFloat(lastUpdate.reloadTotal) || 0) - amt);
-          lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
         }
 
         const prevUpdate = this.getLastUpdateBefore(item.shopId, lastUpdate.timestamp);
@@ -959,7 +1007,7 @@ const DB = {
     };
   },
 
-  // ---- Router Reload Expenses (සාප්පුවේ රවුටර් රීලෝඩ්) ----
+  // ---- Router Reload Expenses ----
   getRouterExpenses(shopId = null) {
     let list = JSON.parse(localStorage.getItem(this.ROUTER_EXPENSES_KEY) || '[]');
     if (shopId) list = list.filter(r => r.shopId === shopId);
@@ -1035,7 +1083,7 @@ const DB = {
     return true;
   },
 
-  // ---- Distributor Top-ups Received (ලැබුණු රීලෝඩ් / ස්ටොක්) ----
+  // ---- Distributor Top-ups Received ----
   getDistributorTopups(shopId = null) {
     let list = JSON.parse(localStorage.getItem(this.DISTRIBUTOR_TOPUPS_KEY) || '[]');
     if (shopId) list = list.filter(t => t.shopId === shopId);

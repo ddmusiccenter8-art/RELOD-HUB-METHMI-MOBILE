@@ -19,6 +19,7 @@ const I18N = {
       'btn_export': '📤 Data Backup / Export',
       'btn_import': '📥 Data Import / Restore',
       'backup_status': '🛡️ Backup Status',
+      'no_backup': 'No Backup',
       'cloud_sync_active': '☁️ Cloud Sync: Active',
       
       // Dashboard
@@ -31,6 +32,7 @@ const I18N = {
       'period_all': 'All Time',
       'dash_overall': 'VS PREVIOUS UPDATE',
       'dash_no_data': 'NO DATA',
+      'total_balance_lbl': 'Total Balance',
       'dash_reload_total': '🔄 Reload Total',
       'dash_bank_total': '🏦 Bank Total',
       'dash_cash_total': '💵 Cash in Drawer Total',
@@ -46,6 +48,7 @@ const I18N = {
       
       // Update Form
       'upd_title': 'Add New Update',
+      'upd_prev_title': '📌 Previous Update',
       'upd_emp_details': 'Employee Details',
       'upd_emp_name': 'Employee Name',
       'upd_job_role': 'Job Role (e.g. Cashier)',
@@ -72,13 +75,14 @@ const I18N = {
       
       // Section 2.5: Shift Adjustments
       'upd_adj_sec_title': '⚖️ Section 2.5: Shift Adjustments (Credits, Routers & Top-ups)',
-      'upd_adj_credit_title': '👤 Customer Credit Reloads (ණයට දුන් රීලෝඩ්)',
+      'upd_adj_credit_title': '👤 Customer Credit Reloads',
       'btn_add_credit': '+ Add Customer Credit',
-      'upd_adj_router_title': '📶 Shop Router Reloads (සාප්පුවේ රවුටර් වියදම්)',
+      'upd_adj_router_title': '📶 Shop Router Reloads',
       'btn_add_router': '+ Add Router Reload',
-      'upd_adj_topup_title': '📥 Distributor Top-ups / Deposits (ලැබුණු ස්ටොක්)',
+      'upd_adj_topup_title': '📥 Distributor Top-ups / Deposits',
       'btn_add_topup': '+ Add Distributor Top-up',
       'upd_adj_summary_badge': '⚖️ Shift Adjustments Total',
+      'add_shop': '➕ Add Shop',
 
       // Section 3: Grand Total
       'upd_grand_sec_title': '💰 Section 3: Grand Total Capital',
@@ -138,7 +142,17 @@ const I18N = {
       'settle_note_ph': 'Note (e.g. Paid cash at shop, bank transfer, etc.)',
       'dash_pending_credits': 'Pending Credits',
       'btn_send_whatsapp': '💬 WhatsApp',
-      'quick_add_credit': '+ Add Credit',
+      'quick_add_credit': '+ Customer Credit',
+      'top_actions': '⚡ Quick Actions:',
+      'top_btn_credit': '+ Customer Credit',
+      'top_btn_router': '+ Router Reload',
+      'top_btn_topup': '+ Stock Top-up',
+      'top_btn_ledger': 'Ledger & Settle',
+      'cred_btn_add_credit': '👤 + Customer Credit',
+      'cred_btn_add_router': '📶 + Router Reload',
+      'cred_btn_add_topup': '📥 + Stock Top-up',
+      'tbl_reload_sim': 'Reload SIM',
+      'tbl_settlement': 'Settlement & Destination',
       
       // Reports
       'rep_title': 'Reports',
@@ -172,6 +186,7 @@ const I18N = {
       'btn_export': '📤 Data Backup / Export',
       'btn_import': '📥 Data Import / Restore',
       'backup_status': '🛡️ Backup Status',
+      'no_backup': 'Backup නැහැ',
       'cloud_sync_active': '☁️ Cloud Sync: Active',
       
       // Dashboard
@@ -184,6 +199,7 @@ const I18N = {
       'period_all': 'ආරම්භයේ සිට (All Time)',
       'dash_overall': 'පෙර Update එකට සාපේක්ෂව',
       'dash_no_data': 'දත්ත නොමැත',
+      'total_balance_lbl': 'මුළු මුදල',
       'dash_reload_total': '🔄 රීලෝඩ් මුළු එකතුව',
       'dash_bank_total': '🏦 බැංකු මුළු එකතුව',
       'dash_cash_total': '💵 ලාච්චුවේ මුළු මුදල',
@@ -199,6 +215,7 @@ const I18N = {
       
       // Update Form
       'upd_title': 'අලුත් Update එකක් දාන්න',
+      'upd_prev_title': '📌 පෙර දින Update එක',
       'upd_emp_details': 'සේවක තොරතුරු',
       'upd_emp_name': 'සේවකයාගේ නම',
       'upd_job_role': 'තනතුර (උදා: Cashier)',
@@ -232,6 +249,7 @@ const I18N = {
       'upd_adj_topup_title': '📥 ඩිස්ට්‍රිබියුටර්ගෙන් ලැබුණු රීලෝඩ් / තැන්පතු (Top-ups Received)',
       'btn_add_topup': '+ ලැබුණු ස්ටොක් එකතු කරන්න',
       'upd_adj_summary_badge': '⚖️ ගැලපීම් ශුද්ධ අගය',
+      'add_shop': '➕ නව සාප්පුවක්',
 
       // Section 3: Grand Total
       'upd_grand_sec_title': '💰 අංශය 3: සම්පූර්ණ ප්‍රාග්ධනය',
@@ -292,6 +310,16 @@ const I18N = {
       'dash_pending_credits': 'නොලැබුණු ණය',
       'btn_send_whatsapp': '💬 WhatsApp',
       'quick_add_credit': '+ ණයට දුන් රීලෝඩ්',
+      'top_actions': '⚡ Quick Actions:',
+      'top_btn_credit': '+ Customer Credit',
+      'top_btn_router': '+ Router Reload',
+      'top_btn_topup': '+ Stock Top-up',
+      'top_btn_ledger': 'Ledger & Settle',
+      'cred_btn_add_credit': '👤 + Customer Credit',
+      'cred_btn_add_router': '📶 + Router Reload',
+      'cred_btn_add_topup': '📥 + Stock Top-up',
+      'tbl_reload_sim': 'රීලෝඩ් සිම් පත',
+      'tbl_settlement': 'පියවීම / එකතු වූ ගිණුම',
       
       // Reports
       'rep_title': 'වාර්තා (Reports)',
@@ -325,6 +353,7 @@ const I18N = {
       'btn_export': '📤 தரவு ஏற்றுமதி',
       'btn_import': '📥 தரவு இறக்குமதி',
       'backup_status': '🛡️ காப்பு நிலை',
+      'no_backup': 'காப்புப்பிரதி இல்லை',
       'cloud_sync_active': '☁️ கிளவுட் ஒத்திசைவு',
       
       // Dashboard
@@ -337,6 +366,7 @@ const I18N = {
       'period_all': 'அனைத்து நேரமும்',
       'dash_overall': 'முந்தைய தின ஒப்பீடு',
       'dash_no_data': 'தரவு இல்லை',
+      'total_balance_lbl': 'மொத்த இருப்பு',
       'dash_reload_total': '🔄 ரீலோட் மொத்தம்',
       'dash_bank_total': '🏦 வங்கி மொத்தம்',
       'dash_cash_total': '💵 டிராயர் பணம்',
@@ -352,6 +382,7 @@ const I18N = {
       
       // Update Form
       'upd_title': 'புதிய புதுப்பிப்பு',
+      'upd_prev_title': '📌 முந்தைய புதுப்பிப்பு',
       'upd_emp_details': 'பணியாளர் விவரங்கள்',
       'upd_emp_name': 'பணியாளர் பெயர்',
       'upd_job_role': 'பதவி',
@@ -385,6 +416,7 @@ const I18N = {
       'upd_adj_topup_title': '📥 விநியோகஸ்தர் டாப்-அப் / வைப்பு',
       'btn_add_topup': '+ டாப்-அப் சேர்',
       'upd_adj_summary_badge': '⚖️ சரிசெய்தல் நிகர மொத்தம்',
+      'add_shop': '➕ புதிய கடை',
 
       // Section 3: Grand Total
       'upd_grand_sec_title': '💰 பிரிவு 3: மொத்த மூலதனம்',
@@ -445,6 +477,16 @@ const I18N = {
       'dash_pending_credits': 'நிலுவைக் கடன்கள்',
       'btn_send_whatsapp': '💬 WhatsApp',
       'quick_add_credit': '+ கடன் ரீலோட்',
+      'top_actions': '⚡ Quick Actions:',
+      'top_btn_credit': '+ Customer Credit',
+      'top_btn_router': '+ Router Reload',
+      'top_btn_topup': '+ Stock Top-up',
+      'top_btn_ledger': 'Ledger & Settle',
+      'cred_btn_add_credit': '👤 + Customer Credit',
+      'cred_btn_add_router': '📶 + Router Reload',
+      'cred_btn_add_topup': '📥 + Stock Top-up',
+      'tbl_reload_sim': 'ரீலோட் சிம்',
+      'tbl_settlement': 'தீர்வு / வரவு கணக்கு',
       
       // Reports
       'rep_title': 'அறிக்கைகள்',

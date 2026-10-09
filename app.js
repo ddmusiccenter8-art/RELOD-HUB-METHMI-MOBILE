@@ -74,9 +74,9 @@ const App = {
     
     if (lastBackup) {
       const d = new Date(lastBackup);
-      html += `<div><span style="color:var(--accent-green);">✅</span> Local Backup: ${d.toLocaleDateString('si-LK')}</div>`;
+      html += `<div><span style="color:var(--accent-green);">✅</span> Local Backup: ${d.toLocaleDateString(I18N.currentLang === 'si' ? 'si-LK' : 'en-US')}</div>`;
     } else {
-      html += `<div><span style="color:var(--accent-red);">⚠️</span> Local Backup: නැහැ</div>`;
+      html += `<div><span style="color:var(--accent-red);">⚠️</span> Local Backup: ${I18N.currentLang === 'si' ? 'නැහැ' : 'None'}</div>`;
     }
     
     statusEl.innerHTML = html;
@@ -89,7 +89,7 @@ const App = {
 
     if (!lastBackup) {
       setTimeout(() => {
-        this.showToast('⚠️ Data backup නැහැ! Export බොත්තම ඔබන්න', 'error');
+        this.showToast(I18N.currentLang === 'si' ? '⚠️ Data backup නැහැ! Export බොත්තම ඔබන්න' : '⚠️ No data backup! Click Export to backup', 'error');
       }, 2000);
       return;
     }
@@ -97,7 +97,7 @@ const App = {
     const daysSince = (Date.now() - new Date(lastBackup).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSince > 2) {
       setTimeout(() => {
-        this.showToast(`⚠️ අවසන් backup ${Math.floor(daysSince)} දින වලට කලින්! Backup කරන්න`, 'error');
+        this.showToast(I18N.currentLang === 'si' ? `⚠️ අවසන් backup ${Math.floor(daysSince)} දින වලට කලින්! Backup කරන්න` : `⚠️ Last backup was ${Math.floor(daysSince)} days ago! Please backup now`, 'error');
       }, 2000);
     }
   },
@@ -147,7 +147,7 @@ const App = {
         if (page === 'update') {
           this.editingUpdateId = null;
           const btn = document.querySelector('#updateForm button[type="submit"]');
-          if (btn) btn.innerHTML = '💾 Save Update (සටහන් කරන්න)';
+          if (btn) btn.innerHTML = I18N.currentLang === 'si' ? '💾 Save Update (සටහන් කරන්න)' : '💾 Save Update';
         }
         this.navigateTo(page);
         // Close mobile menu
@@ -222,7 +222,7 @@ const App = {
     const sel = document.getElementById('shopSelector');
     const shops = DB.getShops();
     const activeId = DB.getActiveShopId();
-    sel.innerHTML = '<option value="">-- සාප්පුව තෝරන්න --</option>';
+    sel.innerHTML = `<option value="">${I18N.t('select_shop') || '-- Select Shop --'}</option>`;
     shops.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.id;
@@ -252,7 +252,7 @@ const App = {
       const type = stats.type;
       valEl.textContent = `${stats.net >= 0 ? '+' : ''}${DB.formatCurrency(stats.net)}`;
       valEl.className = `overall-value ${type}`;
-      typeEl.textContent = type === 'profit' ? '✅ PROFIT (ලාභ)' : type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE';
+      typeEl.textContent = type === 'profit' ? (I18N.currentLang === 'si' ? '✅ PROFIT (ලාභ)' : '✅ PROFIT') : type === 'loss' ? (I18N.currentLang === 'si' ? '❌ LOSS (අලාභ)' : '❌ LOSS') : '➖ NO CHANGE';
       typeEl.style.color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
     }
   },
@@ -303,13 +303,13 @@ const App = {
       const type = comp.overall.type;
       overallValue.textContent = DB.formatCurrency(Math.abs(diff));
       overallValue.className = `overall-value ${type}`;
-      overallType.textContent = type === 'profit' ? '✅ PROFIT (ලාභ)' : type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE';
+      overallType.textContent = type === 'profit' ? (I18N.currentLang === 'si' ? '✅ PROFIT (ලාභ)' : '✅ PROFIT') : type === 'loss' ? (I18N.currentLang === 'si' ? '❌ LOSS (අලාභ)' : '❌ LOSS') : '➖ NO CHANGE';
       overallType.style.color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
       overallCard.className = `card overall-card ${type === 'profit' ? 'profit-card' : type === 'loss' ? 'loss-card' : 'neutral-card'}`;
     } else {
       overallValue.textContent = DB.formatCurrency(0);
       overallValue.className = 'overall-value neutral';
-      overallType.textContent = 'පළමු UPDATE (FIRST UPDATE)';
+      overallType.textContent = I18N.currentLang === 'si' ? 'පළමු UPDATE (FIRST UPDATE)' : 'FIRST UPDATE';
       overallType.style.color = 'var(--text-muted)';
       overallCard.className = 'card overall-card neutral-card';
     }
@@ -407,9 +407,9 @@ const App = {
 
     const compTable = document.getElementById('dashComparisonTable');
     if (compTable) {
-      compTable.innerHTML = `<div class="empty-state" style="padding:24px;"><div class="empty-icon">🏪</div><div class="empty-text">"${shop.name}" සඳහා තවම Updates නැත</div><div class="empty-sub">පළමු update එක ලබාගැනීමට ➕ Add Update ඔබන්න.</div></div>`;
+      compTable.innerHTML = `<div class="empty-state" style="padding:24px;"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? `"${shop.name}" සඳහා තවම Updates නැත` : `No updates yet for "${shop.name}"`}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමු update එක ලබාගැනීමට ➕ Add Update ඔබන්න.' : 'Click ➕ Add Update to create the first update.'}</div></div>`;
     }
-    document.getElementById('dashRecentUpdates').innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div><div class="empty-sub">පළමු update එක ගන්න ➕ බොත්තම ඔබන්න</div></div>';
+    document.getElementById('dashRecentUpdates').innerHTML = `<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'Updates නැහැ' : 'No updates yet'}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමු update එක ගන්න ➕ බොත්තම ඔබන්න' : 'Click ➕ to record your first update'}</div></div>`;
   },
 
   renderComparisonTable(lastUpdate) {
@@ -546,7 +546,7 @@ const App = {
       const overallType = overallDiff > 0 ? 'profit' : overallDiff < 0 ? 'loss' : 'neutral';
       document.getElementById('overallValue').textContent = DB.formatCurrency(Math.abs(overallDiff));
       document.getElementById('overallValue').className = `overall-value ${overallType}`;
-      document.getElementById('overallType').textContent = 'ALL SHOPS (සියලුම සාප්පු වල එකතුව)';
+      document.getElementById('overallType').textContent = I18N.currentLang === 'si' ? 'ALL SHOPS (සියලුම සාප්පු වල එකතුව)' : 'ALL SHOPS (All Shops Combined)';
       document.getElementById('overallType').style.color = 'var(--accent-blue)';
       document.getElementById('overallCard').className = `card overall-card ${overallType === 'profit' ? 'profit-card' : overallType === 'loss' ? 'loss-card' : 'neutral-card'}`;
       document.getElementById('overallTotalCapital').textContent = DB.formatCurrency(stats.totalCapital);
@@ -621,7 +621,7 @@ const App = {
 
       const grid = document.getElementById('dashAllShopsGrid');
       if (grid) {
-        grid.innerHTML = '<div class="empty-state" style="padding:30px; grid-column:1/-1;"><div class="empty-icon">🏪</div><div class="empty-text">සාප්පු එකතු කර නැත</div><div class="empty-sub">පළමුව සාප්පුවක් එකතු කරන්න</div></div>';
+        grid.innerHTML = `<div class="empty-state" style="padding:30px; grid-column:1/-1;"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'සාප්පු එකතු කර නැත' : 'No shops added yet'}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමුව සාප්පුවක් එකතු කරන්න' : 'Add a shop first to get started'}</div></div>`;
       }
       document.getElementById('dashRecentUpdates').innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div><div class="empty-sub">පළමු update එක ගන්න ➕ බොත්තම ඔබන්න</div></div>';
     }
@@ -632,7 +632,7 @@ const App = {
     if (!container) return;
 
     if (!shopSummaries || shopSummaries.length === 0) {
-      container.innerHTML = '<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">සාප්පු කිසිවක් නැත</div></div>';
+      container.innerHTML = `<div class="empty-state" style="padding:20px;grid-column:1/-1;"><div class="empty-sub">${I18N.currentLang === 'si' ? 'සාප්පු කිසිවක් නැත' : 'No shops found'}</div></div>`;
       return;
     }
 
@@ -651,7 +651,7 @@ const App = {
               <div>
                 <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary);">🏪 ${shop.name}</div>
                 <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">
-                  ${last ? `📅 Last: ${DB.formatDateTime(last.timestamp)}` : 'දත්ත නොමැත'}
+                  ${last ? `📅 Last: ${DB.formatDateTime(last.timestamp)}` : (I18N.currentLang === 'si' ? 'දත්ත නොමැත' : 'No data')}
                 </div>
               </div>
               <span class="badge ${type}" style="padding:4px 10px; font-size:0.8rem; font-weight:700; border-radius:12px; background:rgba(${type === 'profit' ? '16,185,129' : type === 'loss' ? '239,68,68' : '100,116,139'}, 0.15); color:${color};">
@@ -676,13 +676,13 @@ const App = {
             </div>
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding-top:6px; border-top:1px solid var(--border-glass);">
-              <span style="font-size:0.9rem; font-weight:700; color:var(--text-secondary);">මුළු ප්‍රාග්ධනය (Total):</span>
+              <span style="font-size:0.9rem; font-weight:700; color:var(--text-secondary);">${I18N.currentLang === 'si' ? 'මුළු ප්‍රාග්ධනය (Total):' : 'Total Capital:'}</span>
               <span style="font-size:1.15rem; font-weight:900; color:var(--text-primary);">${DB.formatCurrency(s.totalCapital)}</span>
             </div>
           </div>
 
           <button class="btn btn-primary btn-sm" style="width:100%; font-weight:700; margin-top:8px;" onclick="App.selectShopAndOpen('${shop.id}')">
-            👉 ${shop.name} බලන්න (Open Shop)
+            👉 ${I18N.currentLang === 'si' ? `${shop.name} බලන්න (Open Shop)` : `Open ${shop.name}`}
           </button>
         </div>
       `;
@@ -704,7 +704,7 @@ const App = {
     const container = document.getElementById('dashRecentUpdates');
 
     if (updates.length === 0) {
-      container.innerHTML = '<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div></div>';
+      container.innerHTML = `<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'Updates නැහැ' : 'No updates yet'}</div></div>`;
       return;
     }
 
@@ -730,7 +730,7 @@ const App = {
             <span class="update-diff-badge ${oType}" style="font-weight:800;">💰 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
           </div>`;
       } else {
-        diffBadges = '<div class="update-diff" style="margin-top:6px;"><span class="update-diff-badge neutral">📌 First Update (පළමු Update)</span></div>';
+        diffBadges = `<div class="update-diff" style="margin-top:6px;"><span class="update-diff-badge neutral">📌 ${I18N.currentLang === 'si' ? 'First Update (පළමු Update)' : 'First Update'}</span></div>`;
       }
 
       html += `
@@ -956,7 +956,7 @@ const App = {
 
     row.innerHTML = `
       <div>
-        <label class="form-label" style="font-size:0.75rem;">👤 Customer (පාරිභෝගිකයා)</label>
+        <label class="form-label" style="font-size:0.75rem;">👤 ${I18N.currentLang === 'si' ? 'Customer (පාරිභෝගිකයා)' : 'Customer Name'}</label>
         <input type="text" class="form-input credit-cust-name" placeholder="Name" value="${custName}">
       </div>
       <div>
@@ -970,7 +970,7 @@ const App = {
         </select>
       </div>
       <div>
-        <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold);">💰 Amount (ණය මුදල)</label>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold);">💰 ${I18N.currentLang === 'si' ? 'Amount (ණය මුදල)' : 'Credit Amount'}</label>
         <input type="number" class="form-input balance-input credit-amount" placeholder="0.00" step="0.01" min="0" value="${amount}">
       </div>
       <div style="display:flex; align-items:flex-end;">
@@ -1014,7 +1014,7 @@ const App = {
 
     row.innerHTML = `
       <div>
-        <label class="form-label" style="font-size:0.75rem;">📶 Router Name (රවුටරය)</label>
+        <label class="form-label" style="font-size:0.75rem;">📶 ${I18N.currentLang === 'si' ? 'Router Name (රවුටරය)' : 'Router Name'}</label>
         <input type="text" class="form-input router-name" placeholder="e.g. CCTV / POS Router" value="${routerName}">
       </div>
       <div>
@@ -1024,11 +1024,11 @@ const App = {
         </select>
       </div>
       <div>
-        <label class="form-label" style="font-size:0.75rem; color:var(--accent-purple);">💰 Amount (වියදම)</label>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-purple);">💰 ${I18N.currentLang === 'si' ? 'Amount (වියදම)' : 'Amount'}</label>
         <input type="number" class="form-input balance-input router-amount" placeholder="0.00" step="0.01" min="0" value="${amount}">
       </div>
       <div>
-        <label class="form-label" style="font-size:0.75rem;">📝 Note (සටහන)</label>
+        <label class="form-label" style="font-size:0.75rem;">📝 ${I18N.currentLang === 'si' ? 'Note (සටහන)' : 'Note'}</label>
         <input type="text" class="form-input router-note" placeholder="Optional note" value="${note}">
       </div>
       <div style="display:flex; align-items:flex-end;">
@@ -1068,15 +1068,15 @@ const App = {
 
     row.innerHTML = `
       <div>
-        <label class="form-label" style="font-size:0.75rem;">📥 Depositor / Distributor (නම)</label>
+        <label class="form-label" style="font-size:0.75rem;">📥 ${I18N.currentLang === 'si' ? 'Depositor / Distributor (නම)' : 'Depositor / Distributor'}</label>
         <input type="text" class="form-input topup-name" placeholder="Agent / Owner Name" value="${distName}">
       </div>
       <div>
-        <label class="form-label" style="font-size:0.75rem;">🎯 Target SIM / Bank (ලැබුණු ගිණුම)</label>
+        <label class="form-label" style="font-size:0.75rem;">🎯 ${I18N.currentLang === 'si' ? 'Target SIM / Bank (ලැබුණු ගිණුම)' : 'Target SIM / Bank'}</label>
         <input type="text" class="form-input topup-target" placeholder="e.g. Dialog SIM, Commercial Bank" value="${target}">
       </div>
       <div>
-        <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue);">💰 Amount (ලැබුණු මුදල)</label>
+        <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue);">💰 ${I18N.currentLang === 'si' ? 'Amount (ලැබුණු මුදල)' : 'Amount Received'}</label>
         <input type="number" class="form-input balance-input topup-amount" placeholder="0.00" step="0.01" min="0" value="${amount}">
       </div>
       <div>
@@ -1266,13 +1266,13 @@ const App = {
         <div style="padding:18px 20px; background:${overallType === 'profit' ? 'rgba(16,185,129,0.08)' : overallType === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${overallType === 'profit' ? 'rgba(16,185,129,0.2)' : overallType === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
           <div style="text-align:center;">
             <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">
-              ${I18N.t('comp_operating_pl') || 'True Operating Profit / Loss (ගැලපූ සත්‍ය ලාභය/අලාභය)'}
+              ${I18N.t('comp_operating_pl') || 'True Operating Profit / Loss'}
             </div>
             <div style="font-size:2.2rem;font-weight:900;color:${overallColor};">
               ${adjustedDiff >= 0 ? '+' : ''}${DB.formatCurrency(adjustedDiff)}
             </div>
             <div style="font-size:1rem;font-weight:700;color:${overallColor};margin-top:2px;">
-              ${overallType === 'profit' ? '✅ TRUE PROFIT (සත්‍ය ලාභය)' : overallType === 'loss' ? '❌ TRUE LOSS (සත්‍ය අලාභය)' : '➖ NO CHANGE'}
+              ${overallType === 'profit' ? (I18N.currentLang === 'si' ? '✅ TRUE PROFIT (සත්‍ය ලාභය)' : '✅ TRUE PROFIT') : overallType === 'loss' ? (I18N.currentLang === 'si' ? '❌ TRUE LOSS (සත්‍ය අලාභය)' : '❌ TRUE LOSS') : '➖ NO CHANGE'}
             </div>
             <div style="margin-top:14px; display:flex; justify-content:center; gap:16px; flex-wrap:wrap; font-size:0.85rem; font-weight:700;">
               <span style="color:${reloadDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
@@ -1300,7 +1300,7 @@ const App = {
   submitUpdate() {
     const shopId = DB.getActiveShopId();
     if (!shopId) {
-      this.showToast('Please select a shop first (කරුණාකර සාප්පුවක් තෝරන්න)', 'error');
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න (Please select a shop)' : 'Please select a shop first', 'error');
       return;
     }
 
@@ -1308,7 +1308,7 @@ const App = {
     const jobRole = document.getElementById('jobRole').value.trim();
 
     if (!empName) {
-      this.showToast('Please enter Employee Name (සේවකයාගේ නම ඇතුළත් කරන්න)', 'error');
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න' : 'Please enter Employee Name', 'error');
       return;
     }
 
@@ -1374,7 +1374,7 @@ const App = {
     const hasAdjData = credits.length > 0 || routers.length > 0 || topups.length > 0;
 
     if (!hasReloadData && !hasBankData && !hasAdjData) {
-      this.showToast('Please enter at least one balance amount (අවම වශයෙන් එක් අගයක් හෝ ඇතුළත් කරන්න)', 'error');
+      this.showToast(I18N.currentLang === 'si' ? 'අවම වශයෙන් එක් අගයක් හෝ ඇතුළත් කරන්න' : 'Please enter at least one balance amount', 'error');
       return;
     }
 
@@ -1406,7 +1406,7 @@ const App = {
       this.editingUpdateId = null;
       const btn = document.querySelector('#updateForm button[type="submit"]');
       if (btn) btn.innerHTML = '💾 Save Update';
-      this.showToast('✅ Update successfully saved! (යාවත්කාලීන කරා)', 'success');
+      this.showToast(I18N.currentLang === 'si' ? '✅ Update එක සාර්ථකව සටහන් විය!' : '✅ Update successfully saved!', 'success');
     } else {
       update = DB.addUpdate(updatePayload);
     }
@@ -1431,7 +1431,7 @@ const App = {
             ${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}
           </div>
           <div style="font-size:1.1rem; font-weight:700; margin-top:4px; color:var(--accent-${type === 'profit' ? 'green' : type === 'loss' ? 'red' : 'text-muted'});">
-            ${type === 'profit' ? 'TRUE OPERATING PROFIT (සත්‍ය ලාභය) ✅' : type === 'loss' ? 'TRUE OPERATING LOSS (සත්‍ය අලාභය) ❌' : 'NO CHANGE ➖'}
+            ${type === 'profit' ? (I18N.currentLang === 'si' ? 'TRUE OPERATING PROFIT (සත්‍ය ලාභය) ✅' : 'TRUE OPERATING PROFIT ✅') : type === 'loss' ? (I18N.currentLang === 'si' ? 'TRUE OPERATING LOSS (සත්‍ය අලාභය) ❌' : 'TRUE OPERATING LOSS ❌') : 'NO CHANGE ➖'}
           </div>
           <div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:14px; background:var(--bg-glass); padding:14px; border-radius:var(--radius-sm);">
             <div>
@@ -1450,10 +1450,10 @@ const App = {
           ${adjText}
         </div>
         `,
-        [{ text: 'OK (හරි 👍)', class: 'btn-success', onClick: () => this.closeModal() }]
+        [{ text: I18N.currentLang === 'si' ? 'හරි (OK)' : 'OK', class: 'btn-success', onClick: () => this.closeModal() }]
       );
     } else {
-      this.showToast('✅ First Update recorded! (පළමු Update සටහන් කරා)', 'success');
+      this.showToast(I18N.currentLang === 'si' ? '✅ පළමු Update එක සටහන් විය!' : '✅ First Update recorded!', 'success');
     }
 
     // Reset Form
@@ -1492,7 +1492,7 @@ const App = {
     const container = document.getElementById('historyList');
 
     if (!shopId) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">කරුණාකර සාප්පුවක් තෝරන්න</div></div>';
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න' : 'Please select a shop'}</div></div>`;
       return;
     }
 
@@ -1505,7 +1505,7 @@ const App = {
     }
 
     if (updates.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Updates නැහැ</div></div>';
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'Updates නැහැ' : 'No updates found'}</div></div>`;
       return;
     }
 
@@ -1537,7 +1537,7 @@ const App = {
             <span class="update-diff-badge ${oType}" style="font-weight:800;">💰 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
           </div>`;
       } else {
-        diffBadges = '<div class="update-diff"><span class="update-diff-badge neutral">📌 පළමු Update</span></div>';
+        diffBadges = `<div class="update-diff"><span class="update-diff-badge neutral">📌 ${I18N.currentLang === 'si' ? 'පළමු Update' : 'First Update'}</span></div>`;
       }
 
       html += `
@@ -1594,7 +1594,7 @@ const App = {
             ${comp.overall.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.overall.diff)}
           </div>
           <div style="font-weight:700;color:${color};">
-            ${type === 'profit' ? '✅ PROFIT (ලාභ)' : type === 'loss' ? '❌ LOSS (අලාභ)' : '➖ NO CHANGE'}
+            ${type === 'profit' ? (I18N.currentLang === 'si' ? '✅ PROFIT (ලාභ)' : '✅ PROFIT') : type === 'loss' ? (I18N.currentLang === 'si' ? '❌ LOSS (අලාභ)' : '❌ LOSS') : '➖ NO CHANGE'}
           </div>
           <div style="margin-top:10px; display:flex; justify-content:center; gap:16px; font-size:0.85rem; font-weight:700;">
             <span style="color:var(--accent-${comp.reload.diff >= 0 ? 'green' : 'red'});">
@@ -1678,7 +1678,7 @@ const App = {
         <!-- Shift Adjustments -->
         <div style="padding:10px 14px; background:var(--bg-glass); border-radius:var(--radius-sm); border-left:3px solid var(--accent-gold);">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <span style="font-weight:700;">⚖️ Shift Adjustments (ගැලපීම්)</span>
+            <span style="font-weight:700;">⚖️ ${I18N.currentLang === 'si' ? 'Shift Adjustments (ගැලපීම්)' : 'Shift Adjustments'}</span>
             <span style="font-weight:800; color:var(--accent-gold); font-size:1.05rem;">
               ${(u.adjustments.creditsTotal + u.adjustments.routersTotal - u.adjustments.topupsTotal) >= 0 ? '+' : ''}${DB.formatCurrency(u.adjustments.creditsTotal + u.adjustments.routersTotal - u.adjustments.topupsTotal)}
             </span>
@@ -1698,7 +1698,7 @@ const App = {
       ${compSummary}
       `,
       [
-        { text: 'Close (වසන්න)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.currentLang === 'si' ? 'වසන්න (Close)' : 'Close', class: 'btn-ghost', onClick: () => this.closeModal() },
         { text: '✏️ Edit', class: 'btn-primary', onClick: () => { this.closeModal(); this.promptEditUpdate(u.id); } }
       ]
     );
@@ -1708,7 +1708,7 @@ const App = {
     this.showModal(
       '🔐 Enter Admin Password',
       `<div class="form-group" style="margin-top:10px;">
-        <input type="password" id="adminPwdInput" class="form-input" placeholder="Password (මුරපදය)" autofocus>
+        <input type="password" id="adminPwdInput" class="form-input" placeholder="${I18N.currentLang === 'si' ? 'මුරපදය (Password)' : 'Password'}" autofocus>
       </div>`,
       [
         { text: 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
@@ -1719,7 +1719,7 @@ const App = {
               this.closeModal();
               this.startEditingUpdate(updateId);
             } else {
-              this.showToast('Incorrect Password (මුරපදය වැරදියි)', 'error');
+              this.showToast(I18N.currentLang === 'si' ? 'මුරපදය වැරදියි (Incorrect Password)' : 'Incorrect Password', 'error');
             }
           }
         }
@@ -1783,22 +1783,22 @@ const App = {
 
     // Button label
     const btn = document.querySelector('#updateForm button[type="submit"]');
-    if (btn) btn.innerHTML = '✏️ Update Data (වෙනස් කරන්න)';
+    if (btn) btn.innerHTML = I18N.currentLang === 'si' ? '✏️ Data වෙනස් කරන්න' : '✏️ Update Data';
 
     this.calculateLiveBalances();
   },
 
   confirmDeleteUpdate(updateId) {
     this.showModal(
-      '🗑️ Update මකන්නද?',
-      '<div class="delete-confirm-text">මෙම update එක ස්ථිරවම මකා දැමෙනු ඇත. ඔබට විශ්වාසද?</div>',
+      I18N.currentLang === 'si' ? '🗑️ Update මකන්නද?' : '🗑️ Delete Update?',
+      `<div class="delete-confirm-text">${I18N.currentLang === 'si' ? 'මෙම update එක ස්ථිරවම මකා දැමෙනු ඇත. ඔබට විශ්වාසද?' : 'This update will be permanently deleted. Are you sure?'}</div>`,
       [
-        { text: 'අවලංගු', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.currentLang === 'si' ? 'අවලංගු' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '🗑️ මකන්න', class: 'btn-danger', onClick: () => {
+          text: I18N.currentLang === 'si' ? '🗑️ මකන්න' : '🗑️ Delete', class: 'btn-danger', onClick: () => {
             DB.deleteUpdate(updateId);
             this.closeModal();
-            this.showToast('Update මකා දැමුවා', 'success');
+            this.showToast(I18N.currentLang === 'si' ? 'Update මකා දැමුවා' : 'Update deleted', 'success');
             this.renderHistory();
             if (this.currentPage === 'dashboard') this.renderDashboard();
           }
@@ -1819,7 +1819,7 @@ const App = {
     const deletedShops = DB.getShops(true).filter(s => s.deleted);
     
     if (deletedShops.length === 0) {
-      this.showModal('♻️ Recover Shops', '<div style="padding: 20px; text-align: center;">මකාදැමූ සාප්පු කිසිවක් නොමැත. (No deleted shops found)</div>', [{ text: 'හරි (OK)', class: 'btn-primary', onClick: () => this.closeModal() }]);
+      this.showModal('♻️ Recover Shops', `<div style="padding: 20px; text-align: center;">${I18N.currentLang === 'si' ? 'මකාදැමූ සාප්පු කිසිවක් නොමැත.' : 'No deleted shops found.'}</div>`, [{ text: I18N.currentLang === 'si' ? 'හරි (OK)' : 'OK', class: 'btn-primary', onClick: () => this.closeModal() }]);
       return;
     }
 
@@ -1838,12 +1838,12 @@ const App = {
     });
     html += '</div>';
 
-    this.showModal('♻️ Recover Deleted Shops', html, [{ text: 'වහන්න (Close)', class: 'btn-ghost', onClick: () => this.closeModal() }]);
+    this.showModal('♻️ Recover Deleted Shops', html, [{ text: I18N.currentLang === 'si' ? 'වහන්න (Close)' : 'Close', class: 'btn-ghost', onClick: () => this.closeModal() }]);
   },
 
   recoverShop(shopId) {
     DB.recoverShop(shopId);
-    this.showToast('♻️ Shop යලි ලබාගත්තා (Recovered)', 'success');
+    this.showToast(I18N.currentLang === 'si' ? '♻️ Shop යලි ලබාගත්තා' : '♻️ Shop recovered', 'success');
     this.refreshShopSelector();
     this.renderShops();
     this.renderDashboard();
@@ -1859,27 +1859,27 @@ const App = {
 
   showAddShopModal() {
     this.showModal(
-      '🏪 නව සාප්පුවක් එකතු කරන්න',
+      I18N.currentLang === 'si' ? '🏪 නව සාප්පුවක් එකතු කරන්න' : '🏪 Add New Shop',
       `
       <div class="form-group">
-        <label class="form-label">සාප්පුවේ නම</label>
-        <input type="text" class="form-input" id="newShopName" placeholder="උදා: My Mobile Shop" autofocus>
+        <label class="form-label">${I18N.currentLang === 'si' ? 'සාප්පුවේ නම' : 'Shop Name'}</label>
+        <input type="text" class="form-input" id="newShopName" placeholder="${I18N.currentLang === 'si' ? 'උදා: My Mobile Shop' : 'e.g. My Mobile Shop'}" autofocus>
       </div>
       `,
       [
-        { text: 'අවලංගු', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.currentLang === 'si' ? 'අවලංගු' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '➕ එකතු කරන්න', class: 'btn-primary', onClick: () => {
+          text: I18N.currentLang === 'si' ? '➕ එකතු කරන්න' : '➕ Add Shop', class: 'btn-primary', onClick: () => {
             const name = document.getElementById('newShopName').value.trim();
             if (!name) {
-              this.showToast('කරුණාකර නමක් ඇතුළත් කරන්න', 'error');
+              this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නමක් ඇතුළත් කරන්න' : 'Please enter a shop name', 'error');
               return;
             }
             DB.addShop(name);
             this.closeModal();
             this.refreshShopSelector();
             this.renderShops();
-            this.showToast(`🏪 "${name}" එකතු කරා!`, 'success');
+            this.showToast(I18N.currentLang === 'si' ? `🏪 "${name}" එකතු කරා!` : `🏪 "${name}" added!`, 'success');
           }
         }
       ]
@@ -1897,7 +1897,7 @@ const App = {
     const container = document.getElementById('shopList');
 
     if (shops.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">සාප්පු නැහැ</div><div class="empty-sub">පළමු සාප්පුව එකතු කරන්න</div></div>';
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'සාප්පු නැහැ' : 'No shops yet'}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමු සාප්පුව එකතු කරන්න' : 'Add your first shop'}</div></div>`;
       return;
     }
 
@@ -1942,7 +1942,7 @@ const App = {
     DB.setActiveShop(shopId);
     this.refreshShopSelector();
     this.navigateTo('dashboard');
-    this.showToast('🏪 Shop switch කරා!', 'success');
+    this.showToast(I18N.currentLang === 'si' ? '🏪 Shop switch කරා!' : '🏪 Shop switched!', 'success');
   },
 
   editShop(shopId) {
@@ -1950,27 +1950,27 @@ const App = {
     if (!shop) return;
 
     this.showModal(
-      '✏️ සාප්පුව edit කරන්න',
+      I18N.currentLang === 'si' ? '✏️ සාප්පුව edit කරන්න' : '✏️ Edit Shop',
       `
       <div class="form-group">
-        <label class="form-label">සාප්පුවේ නම</label>
+        <label class="form-label">${I18N.currentLang === 'si' ? 'සාප්පුවේ නම' : 'Shop Name'}</label>
         <input type="text" class="form-input" id="editShopName" value="${shop.name}">
       </div>
       `,
       [
-        { text: 'අවලංගු', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.currentLang === 'si' ? 'අවලංගු' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
           text: '💾 Save', class: 'btn-primary', onClick: () => {
             const name = document.getElementById('editShopName').value.trim();
             if (!name) {
-              this.showToast('කරුණාකර නමක් ඇතුළත් කරන්න', 'error');
+              this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නමක් ඇතුළත් කරන්න' : 'Please enter a shop name', 'error');
               return;
             }
             DB.updateShop(shopId, name);
             this.closeModal();
             this.refreshShopSelector();
             this.renderShops();
-            this.showToast('✏️ Shop update කරා!', 'success');
+            this.showToast(I18N.currentLang === 'si' ? '✏️ Shop update කරා!' : '✏️ Shop updated!', 'success');
           }
         }
       ]
@@ -1979,20 +1979,20 @@ const App = {
 
   confirmDeleteShop(shopId, shopName) {
     this.showModal(
-      '🗑️ සාප්පුව මකන්නද? (Admin Password Required)',
+      I18N.currentLang === 'si' ? '🗑️ සාප්පුව මකන්නද? (Admin Password Required)' : '🗑️ Delete Shop? (Admin Password Required)',
       `
-        <div class="delete-confirm-text">"<strong>${shopName}</strong>" මකා දැමීමට Admin මුරපදය ලබා දෙන්න.</div>
+        <div class="delete-confirm-text">${I18N.currentLang === 'si' ? `"${shopName}" මකා දැමීමට Admin මුරපදය ලබා දෙන්න.` : `Please enter Admin password to delete "<strong>${shopName}</strong>".`}</div>
         <div class="form-group" style="margin-top: 15px;">
-          <input type="password" id="adminPasswordInput" class="form-input" placeholder="මුරපදය (Password)" autocomplete="off">
+          <input type="password" id="adminPasswordInput" class="form-input" placeholder="${I18N.currentLang === 'si' ? 'මුරපදය (Password)' : 'Admin Password'}" autocomplete="off">
         </div>
       `,
       [
-        { text: 'අවලංගු', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.currentLang === 'si' ? 'අවලංගු' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '🗑️ මකන්න', class: 'btn-danger', onClick: () => {
+          text: I18N.currentLang === 'si' ? '🗑️ මකන්න' : '🗑️ Delete', class: 'btn-danger', onClick: () => {
             const pwd = document.getElementById('adminPasswordInput').value;
             if (pwd !== '1234') {
-              this.showToast('❌ මුරපදය වැරදියි!', 'error');
+              this.showToast(I18N.currentLang === 'si' ? '❌ මුරපදය වැරදියි!' : '❌ Incorrect password!', 'error');
               return;
             }
             DB.deleteShop(shopId);
@@ -2000,7 +2000,7 @@ const App = {
             this.refreshShopSelector();
             this.renderShops();
             this.renderDashboard();
-            this.showToast('🗑️ Shop ආරක්ෂිතව මකා දැමුවා (Soft Deleted)', 'success');
+            this.showToast(I18N.currentLang === 'si' ? '🗑️ Shop ආරක්ෂිතව මකා දැමුවා (Soft Deleted)' : '🗑️ Shop deleted', 'success');
           }
         }
       ]
@@ -2086,17 +2086,17 @@ const App = {
     const pendingEl = document.getElementById('kpiPendingCredits');
     if (pendingEl) pendingEl.textContent = DB.formatCurrency(pendingCreditsTotal);
     const pendingCountEl = document.getElementById('kpiPendingCreditsCount');
-    if (pendingCountEl) pendingCountEl.textContent = `${pendingCreditsCount} Pending (නොලැබුණු)`;
+    if (pendingCountEl) pendingCountEl.textContent = `${pendingCreditsCount} ${I18N.currentLang === 'si' ? 'නොලැබූ ණය' : 'Pending'}`;
 
     const routerEl = document.getElementById('kpiRouterExpenses');
     if (routerEl) routerEl.textContent = DB.formatCurrency(routerExpensesTotal);
     const routerCountEl = document.getElementById('kpiRouterExpensesCount');
-    if (routerCountEl) routerCountEl.textContent = `${routers.length} Records (වියදම්)`;
+    if (routerCountEl) routerCountEl.textContent = `${routers.length} ${I18N.currentLang === 'si' ? 'වියදම්' : 'Records'}`;
 
     const settledEl = document.getElementById('kpiSettledCredits');
     if (settledEl) settledEl.textContent = DB.formatCurrency(settledCreditsTotal);
     const settledCountEl = document.getElementById('kpiSettledCreditsCount');
-    if (settledCountEl) settledCountEl.textContent = `${settledCreditsCount} Paid (පියවූ)`;
+    if (settledCountEl) settledCountEl.textContent = `${settledCreditsCount} ${I18N.currentLang === 'si' ? 'පියවූ' : 'Paid'}`;
 
     this.renderCreditsTable();
   },
@@ -2107,6 +2107,7 @@ const App = {
     if (!container) return;
 
     const term = this.ledgerSearchTerm || '';
+    const isSi = I18N.currentLang === 'si';
 
     if (this.currentLedgerTab === 'credits') {
       let list = DB.getCredits(shopId, true);
@@ -2123,8 +2124,8 @@ const App = {
         container.innerHTML = `
           <div class="empty-state" style="padding:30px;">
             <div class="empty-icon">👤</div>
-            <div class="empty-text">${term ? 'සෙවුමට ගැළපෙන ණය වාර්තා නැත' : 'ණයට දුන් රීලෝඩ් කිසිවක් නැත'}</div>
-            <div class="empty-sub">අලුත් ණය මුදලක් සටහන් කිරීමට "+ ණයට දුන් රීලෝඩ්" ඔබන්න.</div>
+            <div class="empty-text">${term ? (isSi ? 'සෙවුමට ගැළපෙන ණය වාර්තා නැත' : 'No matching credit records found') : (isSi ? 'ණයට දුන් රීලෝඩ් කිසිවක් නැත' : 'No customer credit records yet')}</div>
+            <div class="empty-sub">${isSi ? 'අලුත් ණය මුදලක් සටහන් කිරීමට "+ ණයට දුන් රීලෝඩ්" ඔබන්න.' : 'Click "+ Customer Credit" to add a new credit record.'}</div>
           </div>
         `;
         return;
@@ -2136,11 +2137,10 @@ const App = {
             <tr>
               <th>${I18N.t('tbl_date') || 'Date & Time'}</th>
               <th>${I18N.t('tbl_customer') || 'Customer'}</th>
-              <th>${I18N.t('tbl_phone') || 'Phone'}</th>
-              <th>${I18N.t('tbl_network') || 'Network'}</th>
+              <th>${I18N.t('tbl_reload_sim') || 'Reload SIM'}</th>
               <th style="text-align:right;">${I18N.t('tbl_amount') || 'Amount'}</th>
               <th style="text-align:center;">${I18N.t('tbl_status') || 'Status'}</th>
-              <th>${I18N.t('tbl_notes') || 'Notes / Settlement'}</th>
+              <th>${I18N.t('tbl_settlement') || 'Settlement & Destination'}</th>
               <th style="text-align:center;">${I18N.t('tbl_action') || 'Action'}</th>
             </tr>
           </thead>
@@ -2151,7 +2151,7 @@ const App = {
         const isPaid = c.status === 'paid';
         const dateStr = DB.formatDateTime(c.timestamp);
         const statusBadge = isPaid
-          ? `<span class="status-badge paid">✅ ${I18N.t('cred_status_paid') || 'Paid'}</span>`
+          ? `<span class="status-badge paid">✅ ${I18N.t('cred_status_paid') || 'Settled'}</span>`
           : `<span class="status-badge pending">⏳ ${I18N.t('cred_status_pending') || 'Pending'}</span>`;
 
         let settleInfo = '';
@@ -2165,24 +2165,36 @@ const App = {
           }
           settleInfo = `
             <div style="font-size:0.8rem; color:var(--accent-green); font-weight:700;">
-              ✅ පියවූයේ: ${DB.formatDateTime(c.settledAt)}
+              ✅ ${isSi ? 'පියවූයේ' : 'Settled'}: ${DB.formatDateTime(c.settledAt)}
             </div>
-            ${destLabel ? `<div style="font-size:0.75rem; color:var(--accent-blue); font-weight:600; margin-top:2px;">📥 ${destLabel} වෙත එකතු විය</div>` : ''}
+            ${destLabel ? `<div style="font-size:0.75rem; color:var(--accent-blue); font-weight:600; margin-top:2px;">📥 ${destLabel}</div>` : ''}
             ${c.settledNote ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📝 ${c.settledNote}</div>` : ''}
           `;
         } else if (c.note) {
-          settleInfo = `<div style="font-size:0.75rem; color:var(--text-muted);">📝 ${c.note}</div>`;
+          settleInfo = `
+            <div style="font-size:0.75rem; color:var(--accent-gold); font-weight:600;">⏳ ${isSi ? 'නොගෙවූ (හිඟ මුදල)' : 'Payment Pending'}</div>
+            <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">📝 ${c.note}</div>
+          `;
         } else {
-          settleInfo = `<span style="font-size:0.75rem; color:var(--accent-red); font-weight:600;">නොගෙවූ (Unsettled)</span>`;
+          settleInfo = `<span style="font-size:0.75rem; color:var(--accent-red); font-weight:600;">⏳ ${isSi ? 'නොගෙවූ (හිඟ මුදල)' : 'Payment Pending'}</span>`;
         }
+
+        const netClass = (c.network || 'dialog').toLowerCase().replace(/\s+/g, '');
 
         html += `
           <tr>
             <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
-            <td style="font-weight:700;">👤 ${c.customerName}</td>
-            <td style="font-family:monospace; font-size:0.85rem;">${c.phone || '--'}</td>
-            <td><span class="network-badge">${c.network}</span></td>
-            <td style="text-align:right; font-weight:800; color:var(--accent-gold); font-size:0.95rem;">${DB.formatCurrency(c.amount)}</td>
+            <td>
+              <div style="font-weight:700; color:var(--text-primary); font-size:0.95rem;">👤 ${c.customerName}</div>
+              ${c.phone ? `<div style="font-family:monospace; font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">📞 ${c.phone}</div>` : '<div style="font-size:0.75rem; color:var(--text-muted);">No phone</div>'}
+            </td>
+            <td>
+              <span class="network-badge ${netClass}">📱 ${c.network} SIM</span>
+              <div style="font-size:0.72rem; color:var(--text-muted); margin-top:3px;">Deducted from ${c.network}</div>
+            </td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-gold); font-size:1.05rem; white-space:nowrap;">
+              ${DB.formatCurrency(c.amount)}
+            </td>
             <td style="text-align:center;">${statusBadge}</td>
             <td>${settleInfo}</td>
             <td style="text-align:center; white-space:nowrap;">
@@ -2190,7 +2202,7 @@ const App = {
                 <button class="btn btn-sm" onclick="App.sendCreditWhatsApp('${c.id}')" style="background:#25D366; color:white; font-weight:700; padding:5px 9px; font-size:0.75rem; margin-right:4px; border:none; border-radius:6px; cursor:pointer;" title="Send WhatsApp Reminder">
                   💬 WhatsApp
                 </button>
-                <button class="btn btn-success btn-sm" onclick="App.promptSettleCredit('${c.id}')" style="padding:5px 9px; font-size:0.75rem; margin-right:4px;" title="Mark as Settled">
+                <button class="btn btn-success btn-sm" onclick="App.promptSettleCredit('${c.id}')" style="padding:5px 9px; font-size:0.75rem; margin-right:4px; font-weight:700;" title="Mark as Settled">
                   ✅ Settle
                 </button>
               ` : `
@@ -2221,8 +2233,8 @@ const App = {
         container.innerHTML = `
           <div class="empty-state" style="padding:30px;">
             <div class="empty-icon">📶</div>
-            <div class="empty-text">සාප්පු රවුටර් වියදම් කිසිවක් නැත</div>
-            <div class="empty-sub">දෛනික Update එකක් සමඟ හෝ මෙහිදී රවුටර් රීලෝඩ් ඇතුළත් කළ හැක.</div>
+            <div class="empty-text">${isSi ? 'සාප්පු රවුටර් වියදම් කිසිවක් නැත' : 'No router reload expenses recorded'}</div>
+            <div class="empty-sub">${isSi ? 'රවුටර් රීලෝඩ් වියදමක් සටහන් කිරීමට "+ සාප්පු රවුටර්" ඔබන්න.' : 'Click "+ Router Reload" to record shop router reloads.'}</div>
           </div>
         `;
         return;
@@ -2250,11 +2262,13 @@ const App = {
         else if (r.deductSource === 'cash') deductLabel = '💵 Cash Drawer';
         else deductLabel = '📝 Record Only';
 
+        const netClass = (r.network || 'dialog').toLowerCase().replace(/\s+/g, '');
+
         html += `
           <tr>
             <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${dateStr}</td>
             <td style="font-weight:700;">📶 ${r.routerName}</td>
-            <td><span class="network-badge">${r.network}</span></td>
+            <td><span class="network-badge ${netClass}">${r.network}</span></td>
             <td style="text-align:right; font-weight:800; color:var(--accent-purple); font-size:0.95rem;">${DB.formatCurrency(r.amount)}</td>
             <td style="font-size:0.82rem; color:var(--text-muted);">
               <span style="font-size:0.75rem; color:var(--accent-purple); font-weight:600;">[${deductLabel}]</span> ${r.note || ''}
@@ -2283,7 +2297,8 @@ const App = {
         container.innerHTML = `
           <div class="empty-state" style="padding:30px;">
             <div class="empty-icon">📥</div>
-            <div class="empty-text">ලැබුණු ස්ටොක් / ඩිස්ට්‍රිබියුටර් තැන්පතු නැත</div>
+            <div class="empty-text">${isSi ? 'ලැබුණු ස්ටොක් / ඩිස්ට්‍රිබියුටර් තැන්පතු නැත' : 'No distributor stock top-ups recorded'}</div>
+            <div class="empty-sub">${isSi ? 'ලැබුණු ස්ටොක් සටහන් කිරීමට "+ ලැබුණු ස්ටොක්" ඔබන්න.' : 'Click "+ Stock Top-up" to record stock received from distributors.'}</div>
           </div>
         `;
         return;
@@ -2333,49 +2348,50 @@ const App = {
 
     const nowFormatted = DB.formatDateTime(new Date().toISOString());
 
+    const isSi = I18N.currentLang === 'si';
     this.showModal(
-      '✅ ණය මුදල පියවීම (Mark Credit as Settled)',
+      isSi ? '✅ ණය මුදල පියවීම (Mark Credit as Settled)' : '✅ Mark Credit as Settled',
       `
       <div style="margin-bottom:14px; background:rgba(255,255,255,0.04); padding:12px; border-radius:8px; border:1px solid var(--border-glass);">
         <div style="font-weight:700; font-size:1.1rem; color:var(--text-primary);">👤 ${credit.customerName}</div>
         <div style="color:var(--text-muted); font-size:0.85rem; margin-top:4px;">
-          📞 දුරකථන: <strong>${credit.phone || 'නැත'}</strong> | ජාලය: <strong>${credit.network}</strong>
+          📞 ${isSi ? 'දුරකථන:' : 'Phone:'} <strong>${credit.phone || (isSi ? 'නැත' : 'None')}</strong> | ${isSi ? 'ජාලය:' : 'Network:'} <strong>${credit.network}</strong>
         </div>
         <div style="margin-top:6px; font-size:0.85rem; color:var(--text-secondary);">
-          📅 රීලෝඩ් දැමූ වේලාව (Sent At): <strong>${DB.formatDateTime(credit.timestamp)}</strong>
+          📅 ${isSi ? 'රීලෝඩ් දැමූ වේලාව (Sent At):' : 'Sent At:'} <strong>${DB.formatDateTime(credit.timestamp)}</strong>
         </div>
         <div style="margin-top:8px; font-size:1.2rem; font-weight:800; color:var(--accent-gold);">
-          මුදල (Amount): ${DB.formatCurrency(credit.amount)}
+          ${isSi ? 'මුදල (Amount):' : 'Amount:'} ${DB.formatCurrency(credit.amount)}
         </div>
       </div>
       <div style="font-size:0.85rem; color:var(--accent-green); margin-bottom:12px; font-weight:600;">
-        🕒 පියවන දිනය සහ වේලාව (Settling Now): ${nowFormatted}
+        🕒 ${isSi ? 'පියවන දිනය සහ වේලාව (Settling Now):' : 'Settling Now:'} ${nowFormatted}
       </div>
 
       <div class="form-group" style="margin-bottom:14px;">
-        <label class="form-label" style="font-weight:700;">මුදල් ලැබුණු ආකාරය / ගිණුම (Where was payment received?) *</label>
+        <label class="form-label" style="font-weight:700;">${isSi ? 'මුදල් ලැබුණු ආකාරය / ගිණුම (Where was payment received?) *' : 'Where was payment received? *'}</label>
         <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
             <input type="radio" name="settleDestinationType" value="cash" checked onchange="App.onSettleDestChange()">
-            <span>💵 <strong>ලාච්චුවේ මුදල් (Cash Drawer)</strong> <small style="color:var(--text-muted);">- ලාච්චුවේ මුදල් හා මුළු ශේෂයට එකතු වේ</small></span>
+            <span>💵 <strong>${isSi ? 'ලාච්චුවේ මුදල් (Cash Drawer)' : 'Cash Drawer'}</strong> <small style="color:var(--text-muted);">${isSi ? '- ලාච්චුවේ මුදල් හා මුළු ශේෂයට එකතු වේ' : '- Adds to Cash Drawer and Total Balance'}</small></span>
           </label>
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
             <input type="radio" name="settleDestinationType" value="bank" onchange="App.onSettleDestChange()">
-            <span>🏦 <strong>බැංකු ගිණුමකට (Bank Account)</strong> <small style="color:var(--text-muted);">- බැංකු ශේෂය හා මුළු මුදලට එකතු වේ</small></span>
+            <span>🏦 <strong>${isSi ? 'බැංකු ගිණුමකට (Bank Account)' : 'Bank Account'}</strong> <small style="color:var(--text-muted);">${isSi ? '- බැංකු ශේෂය හා මුළු මුදලට එකතු වේ' : '- Adds to Bank and Total Balance'}</small></span>
           </label>
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
             <input type="radio" name="settleDestinationType" value="sim" onchange="App.onSettleDestChange()">
-            <span>📱 <strong>සිම් / eZ Cash (SIM / eZ Cash)</strong> <small style="color:var(--text-muted);">- සිම් ශේෂය හා මුළු මුදලට එකතු වේ</small></span>
+            <span>📱 <strong>${isSi ? 'සිම් / eZ Cash (SIM / eZ Cash)' : 'SIM / eZ Cash'}</strong> <small style="color:var(--text-muted);">${isSi ? '- සිම් ශේෂය හා මුළු මුදලට එකතු වේ' : '- Adds to SIM and Total Balance'}</small></span>
           </label>
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; background:rgba(255,255,255,0.04); padding:9px 12px; border-radius:6px; border:1px solid var(--border-glass);">
             <input type="radio" name="settleDestinationType" value="none" onchange="App.onSettleDestChange()">
-            <span>📝 <strong>සටහන් කිරීම පමණි (Record Only)</strong> <small style="color:var(--text-muted);">- ශේෂයන් වෙනස් නොවේ</small></span>
+            <span>📝 <strong>${isSi ? 'සටහන් කිරීම පමණි (Record Only)' : 'Record Only'}</strong> <small style="color:var(--text-muted);">${isSi ? '- ශේෂයන් වෙනස් නොවේ' : '- Balances remain unchanged'}</small></span>
           </label>
         </div>
       </div>
 
       <div class="form-group" id="settleBankSelectGroup" style="display:none; margin-bottom:12px;">
-        <label class="form-label">බැංකුව තෝරන්න (Select Bank)</label>
+        <label class="form-label">${isSi ? 'බැංකුව තෝරන්න (Select Bank)' : 'Select Bank'}</label>
         <select id="settleBankSelect" class="form-select">
           <option value="Commercial Bank">Commercial Bank</option>
           <option value="HNB">HNB (Hatton National Bank)</option>
@@ -2387,7 +2403,7 @@ const App = {
       </div>
 
       <div class="form-group" id="settleSimSelectGroup" style="display:none; margin-bottom:12px;">
-        <label class="form-label">සිම් / ජාලය තෝරන්න (Select SIM)</label>
+        <label class="form-label">${isSi ? 'සිම් / ජාලය තෝරන්න (Select SIM)' : 'Select SIM'}</label>
         <select id="settleSimSelect" class="form-select">
           <option value="Dialog">Dialog</option>
           <option value="Mobitel">Mobitel</option>
@@ -2398,14 +2414,14 @@ const App = {
       </div>
 
       <div class="form-group">
-        <label class="form-label">Payment Settlement Note (ගෙවීම් සටහන)</label>
-        <input type="text" id="settleNoteInput" class="form-input" placeholder="උදා: කඩේට මුදල් ගෙවන ලදී, EZ Cash, Bank Transfer">
+        <label class="form-label">${isSi ? 'Payment Settlement Note (ගෙවීම් සටහන)' : 'Payment Settlement Note'}</label>
+        <input type="text" id="settleNoteInput" class="form-input" placeholder="${isSi ? 'උදා: කඩේට මුදල් ගෙවන ලදී, EZ Cash, Bank Transfer' : 'e.g. Paid cash at shop, eZ Cash, Bank Transfer'}">
       </div>
       `,
       [
-        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '✅ Confirm Settled (පියවූ බව සටහන් කරන්න)',
+          text: isSi ? '✅ Confirm Settled (පියවූ බව සටහන් කරන්න)' : '✅ Confirm Settled',
           class: 'btn-success',
           onClick: () => {
             const selectedDest = document.querySelector('input[name="settleDestinationType"]:checked');
@@ -2422,7 +2438,7 @@ const App = {
             DB.settleCredit(creditId, note, destination);
             this.closeModal();
             this.updateTopBarBadges();
-            this.showToast('✅ Credit settled & added to accounts! (ණය මුදල පියවා ගිණුම්වලට එකතු විය)', 'success');
+            this.showToast(isSi ? '✅ Credit settled & added to accounts! (ණය මුදල පියවා ගිණුම්වලට එකතු විය)' : '✅ Credit settled & added to accounts!', 'success');
             this.renderCreditsPage();
             if (this.currentPage === 'dashboard') {
               this.renderDashboard();
@@ -2477,20 +2493,23 @@ const App = {
     const amountStr = DB.formatCurrency(credit.amount);
     const settledTime = credit.settledAt ? DB.formatDateTime(credit.settledAt) : DB.formatDateTime(new Date().toISOString());
 
-    const message = 
+    const isSi = I18N.currentLang === 'si';
+    const message = isSi ?
 `ආයුබෝවන් ${credit.customerName},
 ඔබගේ ${credit.network} රීලෝඩ් මුදල (${amountStr}) ${settledTime} දින සාර්ථකව පියවා ඇති බව සතුටින් දන්වා සිටිමු.
-ස්තූතියි! - ${shopName}
-
-(Payment Receipt: Your pending reload of ${amountStr} has been successfully settled on ${settledTime}. Thank you for your business! - ${shopName})`;
+ස්තූතියි! - ${shopName}` :
+`Hello ${credit.customerName},
+Your ${credit.network} reload payment of ${amountStr} has been successfully settled on ${settledTime}.
+Thank you! - ${shopName}`;
 
     const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
   },
 
   promptWhatsAppPhone(credit) {
+    const isSi = I18N.currentLang === 'si';
     this.showModal(
-      '💬 WhatsApp අංකය ඇතුළත් කරන්න (Enter WhatsApp Number)',
+      isSi ? '💬 WhatsApp අංකය ඇතුළත් කරන්න (Enter WhatsApp Number)' : '💬 Enter WhatsApp Number',
       `
       <div style="margin-bottom:12px; background:rgba(255,255,255,0.04); padding:10px; border-radius:8px;">
         <div style="font-weight:700; font-size:1.05rem;">👤 ${credit.customerName}</div>
@@ -2499,15 +2518,15 @@ const App = {
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">Customer WhatsApp Number (දුරකථන අංකය)</label>
+        <label class="form-label">${isSi ? 'Customer WhatsApp Number (දුරකථන අංකය)' : 'Customer WhatsApp Number'}</label>
         <input type="tel" id="waPhoneInput" class="form-input" placeholder="07XXXXXXXX" autofocus>
-        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">උදා: 0771234567 හෝ 94771234567</div>
+        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:4px;">${isSi ? 'උදා: 0771234567 හෝ 94771234567' : 'e.g. 0771234567 or 94771234567'}</div>
       </div>
       `,
       [
-        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '💬 WhatsApp යවන්න (Send)',
+          text: isSi ? '💬 WhatsApp යවන්න (Send)' : '💬 Send WhatsApp',
           class: 'btn-primary',
           onClick: () => {
             const inputPhone = document.getElementById('waPhoneInput').value.trim();
@@ -2544,13 +2563,16 @@ const App = {
     const dateStr = DB.formatDateTime(credit.timestamp);
     const amountStr = DB.formatCurrency(credit.amount);
 
-    const message = 
+    const isSi = I18N.currentLang === 'si';
+    const message = isSi ?
 `ආයුබෝවන් ${credit.customerName},
 ඔබගේ ${credit.phone ? credit.phone + ' අංකයට ' : ''}${dateStr} දින ${credit.network} රීලෝඩ් (${amountStr}) දමා ඇත. 
 එම මුදල තවමත් ගෙවා නොමැති බැවින් කරුණාකර කඩයට මුදල් ගෙවීමට කාරුණික වන්න.
-ස්තූතියි! - ${shopName}
-
-(Friendly reminder from ${shopName} for your pending reload of ${amountStr} sent on ${dateStr}. Kindly settle when possible. Thank you!)`;
+ස්තූතියි! - ${shopName}` :
+`Hello ${credit.customerName},
+A reload of ${amountStr} (${credit.network}) was sent to ${credit.phone ? credit.phone + ' ' : ''}on ${dateStr}.
+This amount is currently pending. Kindly settle the payment at the shop when convenient.
+Thank you! - ${shopName}`;
 
     const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
     window.open(waUrl, '_blank');
@@ -2558,8 +2580,9 @@ const App = {
 
   showQuickAddCreditModal() {
     const shops = DB.getShops();
+    const isSi = I18N.currentLang === 'si';
     if (shops.length === 0) {
-      this.showToast('Please create a shop first (පළමුව සාප්පුවක් සාදන්න)', 'error');
+      this.showToast(isSi ? 'Please create a shop first (පළමුව සාප්පුවක් සාදන්න)' : 'Please create a shop first', 'error');
       return;
     }
 
@@ -2568,7 +2591,7 @@ const App = {
     if (!activeShopId || shops.length > 1) {
       shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Shop (සාප්පුව) *</label>
+        <label class="form-label">${isSi ? 'Shop (සාප්පුව) *' : 'Shop *'}</label>
         <select id="quickCreditShop" class="form-select">
           ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
         </select>
@@ -2577,19 +2600,19 @@ const App = {
     }
 
     this.showModal(
-      '👤 ණයට දුන් රීලෝඩ් එකතු කරන්න (Add Customer Credit)',
+      isSi ? '👤 ණයට දුන් රීලෝඩ් එකතු කරන්න (Add Customer Credit)' : '👤 Add Customer Credit',
       `
       ${shopSelectHtml}
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Customer Name (පාරිභෝගික නම) *</label>
-        <input type="text" id="quickCreditName" class="form-input" placeholder="උදා: නිමල්, කසුන්, සුරේෂ්" required autofocus>
+        <label class="form-label">${isSi ? 'Customer Name (පාරිභෝගික නම) *' : 'Customer Name *'}</label>
+        <input type="text" id="quickCreditName" class="form-input" placeholder="${isSi ? 'උදා: නිමල්, කසුන්, සුරේෂ්' : 'e.g. Nimal, Kasun, Suresh'}" required autofocus>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Phone / WhatsApp Number (දුරකථන අංකය)</label>
+        <label class="form-label">${isSi ? 'Phone / WhatsApp Number (දුරකථන අංකය)' : 'Phone / WhatsApp Number'}</label>
         <input type="tel" id="quickCreditPhone" class="form-input" placeholder="07XXXXXXXX">
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Network (ජාලය)</label>
+        <label class="form-label">${isSi ? 'Network (ජාලය)' : 'Network'}</label>
         <select id="quickCreditNetwork" class="form-select">
           <option value="Dialog">Dialog</option>
           <option value="Mobitel">Mobitel</option>
@@ -2598,18 +2621,18 @@ const App = {
         </select>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Amount (ණයට දුන් මුදල) *</label>
+        <label class="form-label">${isSi ? 'Amount (ණයට දුන් මුදල) *' : 'Credit Amount *'}</label>
         <input type="number" id="quickCreditAmount" class="form-input balance-input" placeholder="0.00" step="0.01" min="0" required>
       </div>
       <div class="form-group">
-        <label class="form-label">Note (විකල්ප සටහන)</label>
-        <input type="text" id="quickCreditNote" class="form-input" placeholder="උදා: හවසට මුදල් දෙනවා කිව්වා">
+        <label class="form-label">${isSi ? 'Note (විකල්ප සටහන)' : 'Note (Optional)'}</label>
+        <input type="text" id="quickCreditNote" class="form-input" placeholder="${isSi ? 'උදා: හවසට මුදල් දෙනවා කිව්වා' : 'e.g. Will pay this evening'}">
       </div>
       `,
       [
-        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '💾 Save Credit (සටහන් කරන්න)',
+          text: isSi ? '💾 Save Credit (සටහන් කරන්න)' : '💾 Save Credit',
           class: 'btn-primary',
           onClick: () => {
             const shopSelectEl = document.getElementById('quickCreditShop');
@@ -2621,11 +2644,11 @@ const App = {
             const note = document.getElementById('quickCreditNote').value.trim();
 
             if (!name) {
-              this.showToast('Please enter Customer Name (පාරිභෝගික නම ඇතුළත් කරන්න)', 'error');
+              this.showToast(isSi ? 'Please enter Customer Name (පාරිභෝගික නම ඇතුළත් කරන්න)' : 'Please enter Customer Name', 'error');
               return;
             }
             if (amount <= 0) {
-              this.showToast('Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)', 'error');
+              this.showToast(isSi ? 'Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)' : 'Please enter a valid amount', 'error');
               return;
             }
 
@@ -2655,8 +2678,9 @@ const App = {
 
   showQuickAddRouterModal() {
     const shops = DB.getShops();
+    const isSi = I18N.currentLang === 'si';
     if (shops.length === 0) {
-      this.showToast('Please create a shop first (පළමුව සාප්පුවක් සාදන්න)', 'error');
+      this.showToast(isSi ? 'Please create a shop first (පළමුව සාප්පුවක් සාදන්න)' : 'Please create a shop first', 'error');
       return;
     }
 
@@ -2665,7 +2689,7 @@ const App = {
     if (!activeShopId || shops.length > 1) {
       shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Shop (සාප්පුව) *</label>
+        <label class="form-label">${isSi ? 'Shop (සාප්පුව) *' : 'Shop *'}</label>
         <select id="quickRouterShop" class="form-select">
           ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
         </select>
@@ -2674,15 +2698,15 @@ const App = {
     }
 
     this.showModal(
-      '📶 සාප්පු රවුටර් / වියදම් එකතු කරන්න (Add Router Expense)',
+      isSi ? '📶 සාප්පු රවුටර් / වියදම් එකතු කරන්න (Add Router Expense)' : '📶 Add Router Expense',
       `
       ${shopSelectHtml}
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Router / Device Name (රවුටරයේ නම) *</label>
-        <input type="text" id="quickRouterName" class="form-input" placeholder="උදා: Shop Main Wi-Fi, CCTV Router" value="Shop Wi-Fi" required autofocus>
+        <label class="form-label">${isSi ? 'Router / Device Name (රවුටරයේ නම) *' : 'Router / Device Name *'}</label>
+        <input type="text" id="quickRouterName" class="form-input" placeholder="${isSi ? 'උදා: Shop Main Wi-Fi, CCTV Router' : 'e.g. Shop Main Wi-Fi, CCTV Router'}" value="Shop Wi-Fi" required autofocus>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Network (ජාලය) *</label>
+        <label class="form-label">${isSi ? 'Network (ජාලය) *' : 'Network *'}</label>
         <select id="quickRouterNetwork" class="form-select">
           <option value="Dialog">Dialog</option>
           <option value="Mobitel">Mobitel</option>
@@ -2691,26 +2715,26 @@ const App = {
         </select>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Amount (වියදම් කළ මුදල) *</label>
+        <label class="form-label">${isSi ? 'Amount (වියදම් කළ මුදල) *' : 'Amount *'}</label>
         <input type="number" id="quickRouterAmount" class="form-input balance-input" placeholder="0.00" step="0.01" min="0" required>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Deduct From Balance? (ශේෂයෙන් අඩු විය යුතුද?)</label>
+        <label class="form-label">${isSi ? 'Deduct From Balance? (ශේෂයෙන් අඩු විය යුතුද?)' : 'Deduct From Balance?'}</label>
         <select id="quickRouterDeductSource" class="form-select">
-          <option value="sim">📱 අදාළ සිම් එකෙන් අඩු කරන්න (Deduct from SIM)</option>
-          <option value="cash">💵 ලාච්චුවේ මුදලින් අඩු කරන්න (Deduct from Cash Drawer)</option>
-          <option value="none">📝 ශේෂයෙන් අඩු නොකරන්න - සටහනක් පමණි (Record Only)</option>
+          <option value="sim">${isSi ? '📱 අදාළ සිම් එකෙන් අඩු කරන්න (Deduct from SIM)' : '📱 Deduct from SIM'}</option>
+          <option value="cash">${isSi ? '💵 ලාච්චුවේ මුදලින් අඩු කරන්න (Deduct from Cash Drawer)' : '💵 Deduct from Cash Drawer'}</option>
+          <option value="none">${isSi ? '📝 ශේෂයෙන් අඩු නොකරන්න - සටහනක් පමණි (Record Only)' : '📝 Record Only (Do not deduct)'}</option>
         </select>
       </div>
       <div class="form-group">
-        <label class="form-label">Note (විකල්ප සටහන)</label>
-        <input type="text" id="quickRouterNote" class="form-input" placeholder="උදා: මාසික පැකේජය දමන ලදී">
+        <label class="form-label">${isSi ? 'Note (විකල්ප සටහන)' : 'Note (Optional)'}</label>
+        <input type="text" id="quickRouterNote" class="form-input" placeholder="${isSi ? 'උදා: මාසික පැකේජය දමන ලදී' : 'e.g. Monthly package renewal'}">
       </div>
       `,
       [
-        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '💾 Save Router Expense (සටහන් කරන්න)',
+          text: isSi ? '💾 Save Router Expense (සටහන් කරන්න)' : '💾 Save Router Expense',
           class: 'btn-primary',
           onClick: () => {
             const shopSelectEl = document.getElementById('quickRouterShop');
@@ -2722,7 +2746,7 @@ const App = {
             const note = document.getElementById('quickRouterNote').value.trim();
 
             if (amount <= 0) {
-              this.showToast('Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)', 'error');
+              this.showToast(isSi ? 'Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)' : 'Please enter a valid amount', 'error');
               return;
             }
 
@@ -2751,8 +2775,9 @@ const App = {
 
   showQuickAddTopupModal() {
     const shops = DB.getShops();
+    const isSi = I18N.currentLang === 'si';
     if (shops.length === 0) {
-      this.showToast('Please create a shop first (පළමුව සාප්පුවක් සාදන්න)', 'error');
+      this.showToast(isSi ? 'Please create a shop first (පළමුව සාප්පුවක් සාදන්න)' : 'Please create a shop first', 'error');
       return;
     }
 
@@ -2761,7 +2786,7 @@ const App = {
     if (!activeShopId || shops.length > 1) {
       shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Shop (සාප්පුව) *</label>
+        <label class="form-label">${isSi ? 'Shop (සාප්පුව) *' : 'Shop *'}</label>
         <select id="quickTopupShop" class="form-select">
           ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
         </select>
@@ -2770,15 +2795,15 @@ const App = {
     }
 
     this.showModal(
-      '📥 ලැබුණු ස්ටොක් / ඩිස්ට්‍රිබියුටර් තැන්පතු (Distributor Stock Top-up)',
+      isSi ? '📥 ලැබුණු ස්ටොක් / ඩිස්ට්‍රිබියුටර් තැන්පතු (Distributor Stock Top-up)' : '📥 Distributor Stock Top-up',
       `
       ${shopSelectHtml}
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Distributor / Depositor Name (ලබාදුන් පාර්ශ්වය) *</label>
-        <input type="text" id="quickTopupDistributor" class="form-input" placeholder="උදා: Dialog Distributor, Mobitel Agent" value="Distributor" required autofocus>
+        <label class="form-label">${isSi ? 'Distributor / Depositor Name (ලබාදුන් පාර්ශ්වය) *' : 'Distributor / Depositor Name *'}</label>
+        <input type="text" id="quickTopupDistributor" class="form-input" placeholder="${isSi ? 'උදා: Dialog Distributor, Mobitel Agent' : 'e.g. Dialog Distributor, Mobitel Agent'}" value="Distributor" required autofocus>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Target Account / SIM (ලැබුණු ගිණුම / සිම් පත) *</label>
+        <label class="form-label">${isSi ? 'Target Account / SIM (ලැබුණු ගිණුම / සිම් පත) *' : 'Target Account / SIM *'}</label>
         <select id="quickTopupTarget" class="form-select">
           <option value="Dialog">Dialog SIM</option>
           <option value="Mobitel">Mobitel SIM</option>
@@ -2790,24 +2815,24 @@ const App = {
         </select>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
-        <label class="form-label">Amount (ලැබුණු ස්ටොක් මුදල) *</label>
+        <label class="form-label">${isSi ? 'Amount (ලැබුණු ස්ටොක් මුදල) *' : 'Amount *'}</label>
         <input type="number" id="quickTopupAmount" class="form-input balance-input" placeholder="0.00" step="0.01" min="0" required>
       </div>
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label" style="display:flex; align-items:center; gap:8px; cursor:pointer;">
           <input type="checkbox" id="quickTopupAddToBalance" checked>
-          <span><strong>මෙම මුදල සාප්පුවේ සක්‍රීය ශේෂයට (Active Balance) එකතු කරන්න</strong></span>
+          <span><strong>${isSi ? 'මෙම මුදල සාප්පුවේ සක්‍රීය ශේෂයට (Active Balance) එකතු කරන්න' : 'Add this amount to shop Active Balance'}</strong></span>
         </label>
       </div>
       <div class="form-group">
-        <label class="form-label">Note / Reference (සටහන / රිසිට්පත් අංකය)</label>
-        <input type="text" id="quickTopupNote" class="form-input" placeholder="උදා: Invoice #12345, Cash paid to sales rep">
+        <label class="form-label">${isSi ? 'Note / Reference (සටහන / රිසිට්පත් අංකය)' : 'Note / Reference'}</label>
+        <input type="text" id="quickTopupNote" class="form-input" placeholder="${isSi ? 'උදා: Invoice #12345, Cash paid to sales rep' : 'e.g. Invoice #12345, Cash paid to sales rep'}">
       </div>
       `,
       [
-        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: '💾 Save Stock Top-up (සටහන් කරන්න)',
+          text: isSi ? '💾 Save Stock Top-up (සටහන් කරන්න)' : '💾 Save Stock Top-up',
           class: 'btn-primary',
           onClick: () => {
             const shopSelectEl = document.getElementById('quickTopupShop');
@@ -2819,7 +2844,7 @@ const App = {
             const note = document.getElementById('quickTopupNote').value.trim();
 
             if (amount <= 0) {
-              this.showToast('Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)', 'error');
+              this.showToast(isSi ? 'Please enter a valid amount (වලංගු මුදලක් ඇතුළත් කරන්න)' : 'Please enter a valid amount', 'error');
               return;
             }
 
@@ -2864,7 +2889,7 @@ const App = {
     this.showAdminPasswordModal(() => {
       DB.deleteCredit(creditId);
       this.updateTopBarBadges();
-      this.showToast('Credit deleted (මකා දැමුවා)', 'success');
+      this.showToast(I18N.currentLang === 'si' ? 'Credit deleted (මකා දැමුවා)' : 'Credit deleted', 'success');
       this.renderCreditsPage();
       if (this.currentPage === 'dashboard') {
         this.renderDashboard();
@@ -2875,7 +2900,7 @@ const App = {
   promptDeleteRouterExpense(id) {
     this.showAdminPasswordModal(() => {
       DB.deleteRouterExpense(id);
-      this.showToast('Router expense deleted (මකා දැමුවා)', 'success');
+      this.showToast(I18N.currentLang === 'si' ? 'Router expense deleted (මකා දැමුවා)' : 'Router expense deleted', 'success');
       this.renderCreditsPage();
       if (this.currentPage === 'dashboard') {
         this.renderDashboard();
@@ -2886,7 +2911,7 @@ const App = {
   promptDeleteDistributorTopup(id) {
     this.showAdminPasswordModal(() => {
       DB.deleteDistributorTopup(id);
-      this.showToast('Distributor top-up deleted (මකා දැමුවා)', 'success');
+      this.showToast(I18N.currentLang === 'si' ? 'Distributor top-up deleted (මකා දැමුවා)' : 'Distributor top-up deleted', 'success');
       this.renderCreditsPage();
       if (this.currentPage === 'dashboard') {
         this.renderDashboard();
@@ -2895,18 +2920,19 @@ const App = {
   },
 
   showAdminPasswordModal(onSuccess) {
+    const isSi = I18N.currentLang === 'si';
     this.showModal(
       '🔐 Enter Admin Password',
       `
-      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">මෙම දත්තය මකා දැමීමට Admin Password ලබා දෙන්න:</div>
+      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">${isSi ? 'මෙම දත්තය මකා දැමීමට Admin Password ලබා දෙන්න:' : 'Enter Admin Password to delete this record:'}</div>
       <div class="form-group">
         <input type="password" id="adminActionPwdInput" class="form-input" placeholder="Password (1234)" autofocus>
       </div>
       `,
       [
-        { text: 'Cancel (අවලංගු)', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
         {
-          text: 'Confirm (තහවුරු කරන්න)',
+          text: isSi ? 'Confirm (තහවුරු කරන්න)' : 'Confirm',
           class: 'btn-danger',
           onClick: () => {
             const pwd = document.getElementById('adminActionPwdInput').value;
@@ -2977,7 +3003,7 @@ const App = {
     const container = document.getElementById('reportResults');
 
     if (!shopId) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">කරුණාකර සාප්පුවක් තෝරන්න</div></div>';
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න' : 'Please select a shop'}</div></div>`;
       return;
     }
 
@@ -2985,14 +3011,14 @@ const App = {
     const endDate = document.getElementById('reportEndDate').value;
 
     if (!startDate || !endDate) {
-      this.showToast('කරුණාකර dates select කරන්න', 'error');
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර dates select කරන්න' : 'Please select date range', 'error');
       return;
     }
 
     const updates = DB.getDateRange(shopId, startDate, endDate);
 
     if (updates.length === 0) {
-      container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">මෙම කාලය තුළ Updates නැහැ</div></div>';
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'මෙම කාලය තුළ Updates නැහැ' : 'No updates found for this period'}</div></div>`;
       return;
     }
 
@@ -3133,7 +3159,7 @@ const App = {
       <!-- Chart Breakdown -->
       <div class="card" style="margin-top:20px; padding: 10px;">
         <div class="card-header" style="margin-bottom: 10px;">
-          <span class="card-title">📈 Profit/Loss Chart (ලාභ/අලාභ ප්‍රස්ථාරය)</span>
+          <span class="card-title">📈 ${I18N.currentLang === 'si' ? 'Profit/Loss Chart (ලාභ/අලාභ ප්‍රස්ථාරය)' : 'Profit/Loss Chart'}</span>
         </div>
         <div style="width: 100%; height: 300px; position: relative;">
           <canvas id="reportChart"></canvas>
@@ -3221,14 +3247,14 @@ const App = {
           labels: chartLabels,
           datasets: [
             {
-              label: 'Profit (ලාභ)',
+              label: I18N.currentLang === 'si' ? 'Profit (ලාභ)' : 'Profit',
               data: chartDataProfit,
               backgroundColor: 'rgba(22, 163, 74, 0.7)',
               borderColor: 'rgba(22, 163, 74, 1)',
               borderWidth: 1
             },
             {
-              label: 'Loss (අලාභ)',
+              label: I18N.currentLang === 'si' ? 'Loss (අලාභ)' : 'Loss',
               data: chartDataLoss,
               backgroundColor: 'rgba(228, 0, 43, 0.7)',
               borderColor: 'rgba(228, 0, 43, 1)',
@@ -3254,7 +3280,7 @@ const App = {
     document.getElementById('exportBtn').addEventListener('click', () => {
       DB.forceBackup();
       this.updateBackupStatus();
-      this.showToast('📤 Data export කරා! Backup safe!', 'success');
+      this.showToast(I18N.currentLang === 'si' ? '📤 Data export කරා! Backup safe!' : '📤 Data exported! Backup saved!', 'success');
     });
 
     document.getElementById('importBtn').addEventListener('click', () => {
@@ -3271,9 +3297,9 @@ const App = {
         if (success) {
           this.refreshShopSelector();
           this.navigateTo('dashboard');
-          this.showToast('📥 Data import කරා! Data restore වුණා!', 'success');
+          this.showToast(I18N.currentLang === 'si' ? '📥 Data import කරා! Data restore වුණා!' : '📥 Data imported! Data restored!', 'success');
         } else {
-          this.showToast('❌ Import failed! File එක check කරන්න', 'error');
+          this.showToast(I18N.currentLang === 'si' ? '❌ Import failed! File එක check කරන්න' : '❌ Import failed! Please check file', 'error');
         }
       };
       reader.readAsText(file);

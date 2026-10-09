@@ -1464,12 +1464,42 @@ select option {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   background: var(--bg-glass);
   border: 1px solid var(--border-glass);
+}
+
+.network-badge.dialog {
+  background: rgba(228, 0, 43, 0.08);
+  color: #e4002b;
+  border-color: rgba(228, 0, 43, 0.3);
+}
+
+.network-badge.mobitel {
+  background: rgba(2, 132, 199, 0.08);
+  color: #0284c7;
+  border-color: rgba(2, 132, 199, 0.3);
+}
+
+.network-badge.airtel {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.network-badge.hutch {
+  background: rgba(249, 115, 22, 0.08);
+  color: #ea580c;
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.network-badge.ezcash {
+  background: rgba(185, 28, 28, 0.08);
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.3);
 }
 
 /* ---- Top Quick Action Bar ---- */

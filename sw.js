@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shop-tracker-v10';
+const CACHE_NAME = 'shop-tracker-v13';
 const ASSETS = [
   './',
   './index.html',
@@ -37,34 +37,45 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      // Return cached response if found
-      if (cachedResponse) {
-        // Fetch in background to update cache (stale-while-revalidate strategy)
-        fetch(event.request).then(response => {
-          if (response && response.status === 200) {
+  const url = event.request.url;
+  const isCodeAsset = url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css') || url.endsWith('/') || url.includes('/?');
+
+  if (isCodeAsset) {
+    // Network-first strategy for code to guarantee instant updates
+    event.respondWith(
+      fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, response.clone());
+              cache.put(event.request, responseClone);
             });
           }
-        }).catch(() => {});
-        
+          return networkResponse;
+        })
+        .catch(() => {
+          // Fallback to cache when offline
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Cache-first for images/icons
+  event.respondWith(
+    caches.match(event.request).then(cachedResponse => {
+      if (cachedResponse) {
         return cachedResponse;
       }
-      
-      // If not in cache, fetch from network
-      return fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+      return fetch(event.request).then(networkResponse => {
+        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+          return networkResponse;
         }
-        
-        const responseToCache = response.clone();
+        const responseClone = networkResponse.clone();
         caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseToCache);
+          cache.put(event.request, responseClone);
         });
-        
-        return response;
+        return networkResponse;
       });
     })
   );
