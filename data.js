@@ -92,6 +92,8 @@ const DB = {
   CREDITS_KEY: 'spt_credits',
   ROUTER_EXPENSES_KEY: 'spt_router_expenses',
   DISTRIBUTOR_TOPUPS_KEY: 'spt_distributor_topups',
+  SHIFTS_KEY: 'spt_shifts',
+  EXPENSES_KEY: 'spt_expenses',
 
   _initialized: false,
 
@@ -140,6 +142,22 @@ const DB = {
       const idbTopups = await IDB.load(this.DISTRIBUTOR_TOPUPS_KEY);
       if (idbTopups && idbTopups.length > 0) {
         localStorage.setItem(this.DISTRIBUTOR_TOPUPS_KEY, JSON.stringify(idbTopups));
+      }
+    }
+
+    const lsShifts = localStorage.getItem(this.SHIFTS_KEY);
+    if (!lsShifts || lsShifts === '[]') {
+      const idbShifts = await IDB.load(this.SHIFTS_KEY);
+      if (idbShifts && idbShifts.length > 0) {
+        localStorage.setItem(this.SHIFTS_KEY, JSON.stringify(idbShifts));
+      }
+    }
+
+    const lsExpenses = localStorage.getItem(this.EXPENSES_KEY);
+    if (!lsExpenses || lsExpenses === '[]') {
+      const idbExpenses = await IDB.load(this.EXPENSES_KEY);
+      if (idbExpenses && idbExpenses.length > 0) {
+        localStorage.setItem(this.EXPENSES_KEY, JSON.stringify(idbExpenses));
       }
     }
 
@@ -468,7 +486,8 @@ const DB = {
       dialog, mobitel, airtel, hutch, ezcash,
       simTotal, reloadCash, reloadTotal,
       banks, totalBankAcct, totalBankCash, bankTotal,
-      totalCash, cashInDrawer: totalCash, totalCapital
+      totalCash, cashInDrawer: totalCash, totalCapital,
+      reloadDenominations: (u.reload && u.reload.denominations) ? u.reload.denominations : null
     };
   },
 
@@ -1177,6 +1196,112 @@ const DB = {
     return true;
   },
 
+  // ---- Daily Evening Shift Summaries & POS Tally ----
+  getShifts(shopId = null) {
+    let list = JSON.parse(localStorage.getItem(this.SHIFTS_KEY) || '[]');
+    if (shopId) list = list.filter(s => s.shopId === shopId);
+    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  saveShifts(list) {
+    this._dualSave(this.SHIFTS_KEY, list);
+  },
+
+  addShift(data) {
+    const list = this.getShifts(null);
+    const now = new Date();
+    const item = {
+      id: 'shift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: data.shopId,
+      shiftName: data.shiftName || 'Evening Closing',
+      date: data.date || now.toISOString().split('T')[0],
+      timestamp: data.timestamp || now.toISOString(),
+      cashierName: (data.cashierName || '').trim(),
+      openingFloat: parseFloat(data.openingFloat) || 0,
+      posSales: parseFloat(data.posSales) || 0,
+      reloadCashCollected: parseFloat(data.reloadCashCollected) || 0,
+      totalExpenses: parseFloat(data.totalExpenses) || 0,
+      ownerDrawings: parseFloat(data.ownerDrawings) || 0,
+      expectedCash: parseFloat(data.expectedCash) || 0,
+      actualCountedCash: parseFloat(data.actualCountedCash) || 0,
+      difference: parseFloat(data.difference) || 0,
+      status: data.status || 'balanced', // 'balanced', 'excess', 'shortage'
+      denominations: data.denominations || null,
+      note: (data.note || '').trim()
+    };
+    list.unshift(item);
+    this.saveShifts(list);
+    return item;
+  },
+
+  deleteShift(id) {
+    let list = this.getShifts(null);
+    list = list.filter(s => s.id !== id);
+    this.saveShifts(list);
+    return true;
+  },
+
+  // ---- Daily Expenses & Owner Wallet ----
+  getExpenses(shopId = null, date = null) {
+    let list = JSON.parse(localStorage.getItem(this.EXPENSES_KEY) || '[]');
+    if (shopId) list = list.filter(e => e.shopId === shopId);
+    if (date) list = list.filter(e => e.date === date);
+    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  saveExpenses(list) {
+    this._dualSave(this.EXPENSES_KEY, list);
+  },
+
+  addExpense(data) {
+    const list = this.getExpenses(null);
+    const now = new Date();
+    const item = {
+      id: 'exp_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: data.shopId,
+      category: data.category || 'other', // 'owner_drawing', 'shop_stock', 'staff_meal', 'bills_rent', 'maintenance', 'other'
+      amount: parseFloat(data.amount) || 0,
+      description: (data.description || '').trim(),
+      paidFrom: data.paidFrom || 'cash', // 'cash', 'bank', 'personal'
+      deductFromBalance: !!data.deductFromBalance,
+      date: data.date || now.toISOString().split('T')[0],
+      timestamp: data.timestamp || now.toISOString()
+    };
+    list.unshift(item);
+    this.saveExpenses(list);
+
+    // If deductFromBalance is true and shopId given, deduct from shop active cash drawer
+    if (data.deductFromBalance && data.shopId && item.paidFrom === 'cash') {
+      const lastUpdate = this.getLastUpdate(data.shopId);
+      if (lastUpdate) {
+        const amt = item.amount;
+        if (lastUpdate.reload) {
+          lastUpdate.reload.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.reload.cashInDrawer) || 0) - amt);
+          lastUpdate.reload.total = Math.max(0, (parseFloat(lastUpdate.reload.total) || 0) - amt);
+        }
+        lastUpdate.cashInDrawer = Math.max(0, (parseFloat(lastUpdate.cashInDrawer) || 0) - amt);
+        lastUpdate.totalCapital = Math.max(0, (parseFloat(lastUpdate.totalCapital) || 0) - amt);
+        const prevUpdate = this.getLastUpdateBefore(data.shopId, lastUpdate.timestamp);
+        lastUpdate.comparison = this.calculateComparison(lastUpdate, prevUpdate);
+        const allUpdates = this.getUpdates(true);
+        const idx = allUpdates.findIndex(u => u.id === lastUpdate.id);
+        if (idx !== -1) {
+          allUpdates[idx] = lastUpdate;
+          this.saveUpdates(allUpdates);
+        }
+      }
+    }
+
+    return item;
+  },
+
+  deleteExpense(id) {
+    let list = this.getExpenses(null);
+    list = list.filter(e => e.id !== id);
+    this.saveExpenses(list);
+    return true;
+  },
+
   // ---- Calculation Engine ----
 
   calculateReloadTotal(u) {
@@ -1614,9 +1739,11 @@ const DB = {
       credits: this.getCredits(null, true),
       routerExpenses: this.getRouterExpenses(null),
       distributorTopups: this.getDistributorTopups(null),
+      shifts: this.getShifts(null),
+      expenses: this.getExpenses(null),
       activeShopId: this.getActiveShopId(),
       exportedAt: new Date().toISOString(),
-      version: '2.0'
+      version: '3.0'
     }, null, 2);
   },
 
@@ -1629,6 +1756,8 @@ const DB = {
       if (data.credits) this.saveCredits(data.credits);
       if (data.routerExpenses) this.saveRouterExpenses(data.routerExpenses);
       if (data.distributorTopups) this.saveDistributorTopups(data.distributorTopups);
+      if (data.shifts) this.saveShifts(data.shifts);
+      if (data.expenses) this.saveExpenses(data.expenses);
       if (data.activeShopId) this.setActiveShop(data.activeShopId);
       return true;
     } catch (e) {

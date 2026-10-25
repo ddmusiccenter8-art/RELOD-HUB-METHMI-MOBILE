@@ -13,6 +13,15 @@ const App = {
   ledgerSearchTerm: '',
   editingUpdateId: null,
 
+  // V14 Shift, Expense & Denomination State
+  currentShiftTab: 'closings',
+  shiftDateFilter: '',
+  dashChartTimeframe: 'week',
+  dashChartInstance: null,
+  currentDenomTarget: null,
+  currentDenoms: null,
+  lastReloadDenominations: null,
+
   // ---- Initialize ----
   async init() {
     // Initialize dual storage (localStorage + IndexedDB)
@@ -29,6 +38,7 @@ const App = {
     this.setupShopSelector();
     this.setupUpdateForm();
     this.setupCreditsPage();
+    this.setupShiftsPage();
     this.setupShopsPage();
     this.setupHistoryPage();
     this.setupReportsPage();
@@ -182,6 +192,7 @@ const App = {
     switch (page) {
       case 'dashboard': this.renderDashboard(); break;
       case 'update': this.renderUpdateForm(); break;
+      case 'shifts': this.renderShiftsPage(); break;
       case 'credits': this.renderCreditsPage(); break;
       case 'history': this.renderHistory(); break;
       case 'shops': this.renderShops(); break;
@@ -379,6 +390,9 @@ const App = {
 
     // Recent updates
     this.renderRecentUpdates(shopId);
+
+    // V14 Performance Analytics Chart
+    this.renderDashboardAnalyticsChart();
   },
 
   renderEmptyShopDashboard(shop) {
@@ -410,6 +424,9 @@ const App = {
       compTable.innerHTML = `<div class="empty-state" style="padding:24px;"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? `"${shop.name}" සඳහා තවම Updates නැත` : `No updates yet for "${shop.name}"`}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමු update එක ලබාගැනීමට ➕ Add Update ඔබන්න.' : 'Click ➕ Add Update to create the first update.'}</div></div>`;
     }
     document.getElementById('dashRecentUpdates').innerHTML = `<div class="empty-state" style="padding:30px;"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'Updates නැහැ' : 'No updates yet'}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමු update එක ගන්න ➕ බොත්තම ඔබන්න' : 'Click ➕ to record your first update'}</div></div>`;
+
+    // V14 Performance Analytics Chart
+    this.renderDashboardAnalyticsChart();
   },
 
   renderComparisonTable(lastUpdate) {
@@ -595,6 +612,9 @@ const App = {
 
       // Render recent updates across all shops
       this.renderRecentUpdates(null);
+
+      // V14 Performance Analytics Chart
+      this.renderDashboardAnalyticsChart();
     } else {
       document.getElementById('overallValue').textContent = 'Rs.0.00';
       document.getElementById('overallValue').className = 'overall-value neutral';
@@ -891,7 +911,10 @@ const App = {
         <input type="number" class="form-input balance-input bank-acct-input" placeholder="0.00" step="0.01" min="0" value="${acctVal}">
       </div>
       <div>
-        <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold);">💵 ${I18N.t('upd_bank_cash_lbl') || 'Bank Cash in Drawer'}</label>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+          <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold); margin-bottom:0;">💵 ${I18N.t('upd_bank_cash_lbl') || 'Bank Cash in Drawer'}</label>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.openDenominationModalForBankRow('${rowId}')" title="Count Notes" style="font-size:0.7rem; padding:1px 5px; border:1px solid var(--accent-gold); color:var(--accent-gold); line-height:1; font-weight:700;">🧮</button>
+        </div>
         <input type="number" class="form-input balance-input bank-cash-input" placeholder="0.00" step="0.01" min="0" value="${cashVal}">
       </div>
       <div style="display:flex; flex-direction:column; align-items:flex-end;">
@@ -1388,7 +1411,8 @@ const App = {
         airtel,
         hutch,
         ezcash,
-        cashInDrawer: reloadCash
+        cashInDrawer: reloadCash,
+        denominations: this.lastReloadDenominations || null
       },
       mobileRental: {
         banks
@@ -1404,11 +1428,13 @@ const App = {
     if (this.editingUpdateId) {
       update = DB.editUpdate(this.editingUpdateId, updatePayload);
       this.editingUpdateId = null;
+      this.lastReloadDenominations = null;
       const btn = document.querySelector('#updateForm button[type="submit"]');
       if (btn) btn.innerHTML = '💾 Save Update';
       this.showToast(I18N.currentLang === 'si' ? '✅ Update එක සාර්ථකව සටහන් විය!' : '✅ Update successfully saved!', 'success');
     } else {
       update = DB.addUpdate(updatePayload);
+      this.lastReloadDenominations = null;
     }
 
     // Modal result
@@ -3274,8 +3300,940 @@ Thank you! - ${shopName}`;
   },
 
   // ================================================================
-  // EXPORT / IMPORT
+  // V14 CASH DENOMINATION COUNTER (මුදල් නෝට්ටු කවුන්ටරය)
   // ================================================================
+  openDenominationModal(targetInputIdOrFn, initialDenoms = null) {
+    this.currentDenomTarget = targetInputIdOrFn;
+    let counts = initialDenoms || (this.lastReloadDenominations && targetInputIdOrFn === 'reloadCashInput' ? this.lastReloadDenominations : {
+      n5000: 0, n2000: 0, n1000: 0, n500: 0, n100: 0, n50: 0, n20: 0, n10: 0, coins: 0
+    });
+    this.currentDenoms = { ...counts };
+
+    const denomsConfig = [
+      { key: 'n5000', val: 5000, label: 'Rs. 5,000', icon: '💵' },
+      { key: 'n2000', val: 2000, label: 'Rs. 2,000', icon: '💵' },
+      { key: 'n1000', val: 1000, label: 'Rs. 1,000', icon: '💵' },
+      { key: 'n500',  val: 500,  label: 'Rs. 500',   icon: '💵' },
+      { key: 'n100',  val: 100,  label: 'Rs. 100',   icon: '💵' },
+      { key: 'n50',   val: 50,   label: 'Rs. 50',    icon: '💵' },
+      { key: 'n20',   val: 20,   label: 'Rs. 20',    icon: '💵' },
+      { key: 'n10',   val: 10,   label: 'Rs. 10',    icon: '💵' },
+      { key: 'coins', val: 1,    label: I18N.t('denom_coins') || 'Coins / Small Change', icon: '🪙', isDirect: true }
+    ];
+
+    let rowsHtml = '';
+    denomsConfig.forEach(d => {
+      const cnt = this.currentDenoms[d.key] || 0;
+      const sub = d.isDirect ? cnt : cnt * d.val;
+      rowsHtml += `
+        <div class="denom-row" data-key="${d.key}">
+          <div class="denom-label"><span>${d.icon}</span> <span>${d.label}</span></div>
+          <div class="denom-stepper">
+            ${!d.isDirect ? `<button type="button" class="denom-btn-step" onclick="App.stepDenom('${d.key}', -1)">-</button>` : ''}
+            <input type="number" min="0" step="1" class="denom-count-input" id="denom_${d.key}" value="${cnt}" oninput="App.updateDenomCount('${d.key}', this.value)">
+            ${!d.isDirect ? `<button type="button" class="denom-btn-step" onclick="App.stepDenom('${d.key}', 1)">+</button>` : ''}
+          </div>
+          <div class="denom-subtotal" id="denom_sub_${d.key}">${DB.formatCurrency(sub)}</div>
+        </div>
+      `;
+    });
+
+    const bodyHtml = `
+      <div class="denom-calculator">
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:8px;">
+          ${I18N.t('denom_title') || 'Enter note & coin counts directly without manual calculation'}:
+        </div>
+        <div class="denom-grid">
+          ${rowsHtml}
+        </div>
+        <div class="denom-total-bar">
+          <div class="total-title">${I18N.t('denom_total') || 'Total Cash Counted'}:</div>
+          <div class="total-sum" id="denomGrandTotal">Rs.0.00</div>
+        </div>
+      </div>
+    `;
+
+    this.showModal(
+      `🧮 ${I18N.t('denom_title') || 'Cash Denomination Counter'}`,
+      bodyHtml,
+      `
+        <button type="button" class="btn btn-ghost" onclick="App.resetDenoms()">${I18N.t('denom_reset') || '🔄 Reset'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.applyDenominationTotal()">${I18N.t('denom_apply') || '✅ Apply to Cash Drawer'}</button>
+      `
+    );
+
+    this.recalcDenomTotal();
+  },
+
+  stepDenom(key, delta) {
+    if (!this.currentDenoms) return;
+    const cur = parseInt(this.currentDenoms[key] || 0, 10);
+    const nxt = Math.max(0, cur + delta);
+    this.currentDenoms[key] = nxt;
+    const inp = document.getElementById(`denom_${key}`);
+    if (inp) inp.value = nxt;
+    this.recalcDenomTotal();
+  },
+
+  updateDenomCount(key, value) {
+    if (!this.currentDenoms) return;
+    const val = parseFloat(value) || 0;
+    this.currentDenoms[key] = Math.max(0, val);
+    this.recalcDenomTotal();
+  },
+
+  resetDenoms() {
+    if (!this.currentDenoms) return;
+    Object.keys(this.currentDenoms).forEach(k => {
+      this.currentDenoms[k] = 0;
+      const inp = document.getElementById(`denom_${k}`);
+      if (inp) inp.value = 0;
+    });
+    this.recalcDenomTotal();
+  },
+
+  recalcDenomTotal() {
+    if (!this.currentDenoms) return 0;
+    const multipliers = {
+      n5000: 5000, n2000: 2000, n1000: 1000, n500: 500, n100: 100, n50: 50, n20: 20, n10: 10, coins: 1
+    };
+    let total = 0;
+    Object.keys(multipliers).forEach(k => {
+      const count = parseFloat(this.currentDenoms[k]) || 0;
+      const sub = count * multipliers[k];
+      total += sub;
+      const subEl = document.getElementById(`denom_sub_${k}`);
+      if (subEl) subEl.textContent = DB.formatCurrency(sub);
+    });
+    const gtEl = document.getElementById('denomGrandTotal');
+    if (gtEl) gtEl.textContent = DB.formatCurrency(total);
+    return total;
+  },
+
+  applyDenominationTotal() {
+    const total = this.recalcDenomTotal();
+    const denomsCopy = { ...this.currentDenoms };
+    if (typeof this.currentDenomTarget === 'function') {
+      this.currentDenomTarget(total, denomsCopy);
+    } else if (typeof this.currentDenomTarget === 'string') {
+      const inp = document.getElementById(this.currentDenomTarget);
+      if (inp) {
+        inp.value = total;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+        inp.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (this.currentDenomTarget === 'reloadCashInput') {
+        this.lastReloadDenominations = denomsCopy;
+      }
+    }
+    this.closeModal();
+    this.showToast(`✅ Cash count applied: ${DB.formatCurrency(total)}`, 'success');
+  },
+
+  openDenominationModalForBankRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const cashInput = row.querySelector('.bank-cash-input');
+    if (!cashInput) return;
+    this.openDenominationModal((total) => {
+      cashInput.value = total;
+      cashInput.dispatchEvent(new Event('input', { bubbles: true }));
+      cashInput.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  },
+
+  // ================================================================
+  // V14 SHIFTS & SALES TALLY (හවස් සමරි & POS TALLY)
+  // ================================================================
+  setupShiftsPage() {
+    const dateInput = document.getElementById('shiftDateFilter');
+    if (dateInput) {
+      dateInput.value = DB.getTodayDate();
+      dateInput.addEventListener('change', () => {
+        this.shiftDateFilter = dateInput.value;
+        this.renderShiftsPage();
+      });
+    }
+  },
+
+  setShiftTab(tab) {
+    this.currentShiftTab = tab;
+    document.querySelectorAll('.shift-tab-btn').forEach(b => {
+      if (b.dataset.tab === tab) {
+        b.className = 'btn btn-primary btn-sm shift-tab-btn active';
+      } else {
+        b.className = 'btn btn-ghost btn-sm shift-tab-btn';
+      }
+    });
+    this.renderShiftsPage();
+  },
+
+  resetShiftDateFilter() {
+    this.shiftDateFilter = '';
+    const dateInput = document.getElementById('shiftDateFilter');
+    if (dateInput) dateInput.value = '';
+    this.renderShiftsPage();
+  },
+
+  renderShiftsPage() {
+    const shopId = DB.getActiveShopId();
+    const today = DB.getTodayDate();
+    const filterDate = this.shiftDateFilter;
+
+    // Fetch shifts & expenses
+    const allShifts = shopId ? DB.getShiftsForShop(shopId) : DB.getShifts();
+    const allExpenses = shopId ? DB.getExpensesForShop(shopId) : DB.getExpenses();
+
+    // Today's summary metrics
+    const todayShifts = allShifts.filter(s => s.date === today);
+    const todayExpenses = allExpenses.filter(e => e.date === today);
+
+    const posSalesToday = todayShifts.reduce((s, sh) => s + (parseFloat(sh.posGrossSales) || 0), 0);
+    const expensesToday = todayExpenses.reduce((s, ex) => s + (parseFloat(ex.amount) || 0), 0);
+    const latestShiftToday = todayShifts.length > 0 ? todayShifts[0] : null;
+
+    // Update KPI cards
+    const kpiPos = document.getElementById('kpiShiftPosSales');
+    const kpiPosCount = document.getElementById('kpiShiftPosCount');
+    if (kpiPos) kpiPos.textContent = DB.formatCurrency(posSalesToday);
+    if (kpiPosCount) kpiPosCount.textContent = `${todayShifts.length} ${I18N.t('tab_shift_closings') || 'Shifts Recorded'}`;
+
+    const kpiCounted = document.getElementById('kpiShiftCountedCash');
+    const kpiExpected = document.getElementById('kpiShiftExpectedCash');
+    if (latestShiftToday) {
+      if (kpiCounted) kpiCounted.textContent = DB.formatCurrency(latestShiftToday.countedCash || 0);
+      if (kpiExpected) kpiExpected.textContent = `${I18N.t('shift_expected_cash') || 'Expected'}: ${DB.formatCurrency(latestShiftToday.expectedCash || 0)}`;
+    } else {
+      if (kpiCounted) kpiCounted.textContent = 'Rs.0.00';
+      if (kpiExpected) kpiExpected.textContent = `${I18N.t('shift_expected_cash') || 'Expected'}: Rs.0.00`;
+    }
+
+    const kpiExp = document.getElementById('kpiShiftExpenses');
+    const kpiExpCount = document.getElementById('kpiShiftExpensesCount');
+    if (kpiExp) kpiExp.textContent = DB.formatCurrency(expensesToday);
+    if (kpiExpCount) kpiExpCount.textContent = `${todayExpenses.length} ${I18N.t('tab_expenses') || 'Records'}`;
+
+    const kpiVerdict = document.getElementById('kpiShiftVerdict');
+    const kpiDiff = document.getElementById('kpiShiftDiff');
+    if (latestShiftToday) {
+      const diff = latestShiftToday.difference || 0;
+      if (kpiVerdict) {
+        if (latestShiftToday.status === 'balanced') {
+          kpiVerdict.textContent = I18N.t('shift_balanced') || 'Balanced';
+          kpiVerdict.style.color = 'var(--accent-green)';
+        } else if (latestShiftToday.status === 'excess') {
+          kpiVerdict.textContent = I18N.t('shift_excess') || 'Cash Excess';
+          kpiVerdict.style.color = 'var(--accent-blue)';
+        } else {
+          kpiVerdict.textContent = I18N.t('shift_shortage') || 'Cash Shortage';
+          kpiVerdict.style.color = 'var(--accent-red)';
+        }
+      }
+      if (kpiDiff) {
+        kpiDiff.textContent = `${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}`;
+        kpiDiff.className = `card-diff ${diff >= 0 ? 'profit' : 'loss'}`;
+      }
+    } else {
+      if (kpiVerdict) {
+        kpiVerdict.textContent = I18N.t('shift_no_shifts') || 'No Shift Today';
+        kpiVerdict.style.color = 'var(--text-muted)';
+      }
+      if (kpiDiff) {
+        kpiDiff.textContent = 'Diff: Rs.0.00';
+        kpiDiff.className = 'card-diff neutral';
+      }
+    }
+
+    // Render table
+    const tableContainer = document.getElementById('shiftsTableContainer');
+    if (!tableContainer) return;
+
+    if (this.currentShiftTab === 'closings') {
+      const shiftsToShow = filterDate ? allShifts.filter(s => s.date === filterDate) : allShifts;
+      if (shiftsToShow.length === 0) {
+        tableContainer.innerHTML = `<div class="empty-state" style="padding:32px;"><div class="empty-icon">🌙</div><div class="empty-text">${I18N.t('shift_no_shifts') || 'No shift reconciliation records found'}</div></div>`;
+        return;
+      }
+
+      let html = `
+        <table class="data-table" style="width:100%; min-width:850px;">
+          <thead>
+            <tr>
+              <th>${I18N.t('hist_col_date') || 'Date / Time'}</th>
+              <th>${I18N.t('shift_type') || 'Shift Type'}</th>
+              <th>${I18N.t('upd_emp_name') || 'Cashier'}</th>
+              <th style="text-align:right;">${I18N.t('shift_opening_float') || 'Opening Float'}</th>
+              <th style="text-align:right;">${I18N.t('shift_pos_sales') || 'POS Sales'}</th>
+              <th style="text-align:right;">${I18N.t('shift_reload_cash') || 'Reload Cash'}</th>
+              <th style="text-align:right;">${I18N.t('stat_daily_expenses') || 'Expenses'}</th>
+              <th style="text-align:right;">${I18N.t('shift_expected_cash') || 'Expected Cash'}</th>
+              <th style="text-align:right;">${I18N.t('shift_counted_cash') || 'Counted Cash'}</th>
+              <th style="text-align:center;">${I18N.t('shift_status_verdict') || 'Status'}</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      shiftsToShow.forEach(s => {
+        const diff = s.difference || 0;
+        let badgeHtml = '';
+        if (s.status === 'balanced') {
+          badgeHtml = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'}</span>`;
+        } else if (s.status === 'excess') {
+          badgeHtml = `<span class="tally-badge excess">🟢 +${DB.formatCurrency(diff)}</span>`;
+        } else {
+          badgeHtml = `<span class="tally-badge shortage">🔴 -${DB.formatCurrency(Math.abs(diff))}</span>`;
+        }
+
+        const shiftTypeLabel = s.shiftType === 'evening' ? (I18N.t('shift_evening') || 'Evening') : s.shiftType === 'morning' ? (I18N.t('shift_morning') || 'Morning') : (I18N.t('shift_fullday') || 'Full Day');
+
+        html += `
+          <tr style="border-bottom:1px solid var(--border-glass);">
+            <td>
+              <div style="font-weight:700;">${DB.formatDate(s.date)}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">${DB.formatTime(s.timestamp)}</div>
+            </td>
+            <td><span class="date-pill" style="font-size:0.75rem;">${shiftTypeLabel}</span></td>
+            <td>${s.cashier || '--'}</td>
+            <td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td>
+            <td style="text-align:right; font-weight:700; color:var(--accent-blue);">${DB.formatCurrency(s.posGrossSales || 0)}</td>
+            <td style="text-align:right;">${DB.formatCurrency(s.reloadCashInDrawer || 0)}</td>
+            <td style="text-align:right; color:var(--accent-red);">${DB.formatCurrency(s.drawerExpenses || 0)}</td>
+            <td style="text-align:right; font-weight:600;">${DB.formatCurrency(s.expectedCash || 0)}</td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(s.countedCash || 0)}</td>
+            <td style="text-align:center;">${badgeHtml}</td>
+            <td style="text-align:center;">
+              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      tableContainer.innerHTML = html;
+    } else {
+      // Expenses table
+      const expensesToShow = filterDate ? allExpenses.filter(e => e.date === filterDate) : allExpenses;
+      if (expensesToShow.length === 0) {
+        tableContainer.innerHTML = `<div class="empty-state" style="padding:32px;"><div class="empty-icon">💸</div><div class="empty-text">${I18N.t('exp_no_expenses') || 'No expense records found'}</div></div>`;
+        return;
+      }
+
+      let html = `
+        <table class="data-table" style="width:100%; min-width:700px;">
+          <thead>
+            <tr>
+              <th>${I18N.t('hist_col_date') || 'Date / Time'}</th>
+              <th>${I18N.t('exp_col_category') || 'Category'}</th>
+              <th>${I18N.t('exp_col_description') || 'Description'}</th>
+              <th>${I18N.t('exp_col_paid_from') || 'Paid From'}</th>
+              <th style="text-align:center;">${I18N.t('exp_col_drawer_deduct') || 'Drawer Deduct'}</th>
+              <th style="text-align:right;">${I18N.t('exp_col_amount') || 'Amount'}</th>
+              <th style="text-align:center;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      expensesToShow.forEach(e => {
+        const catKey = e.category || 'other';
+        const catClass = catKey.includes('owner') ? 'owner' : catKey.includes('shop') ? 'shop' : catKey.includes('staff') ? 'staff' : catKey.includes('utility') ? 'utility' : catKey.includes('maint') ? 'maintenance' : 'other';
+        const catLabel = I18N.t('exp_cat_' + catKey) || catKey;
+
+        const paidFromLabel = e.paidFrom === 'drawer' ? (I18N.t('exp_paid_drawer') || 'Cash Drawer') : e.paidFrom === 'bank' ? (I18N.t('exp_paid_bank') || 'Bank') : (I18N.t('exp_paid_personal') || 'Personal');
+
+        html += `
+          <tr style="border-bottom:1px solid var(--border-glass);">
+            <td>
+              <div style="font-weight:700;">${DB.formatDate(e.date)}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">${DB.formatTime(e.timestamp)}</div>
+            </td>
+            <td><span class="expense-cat-badge ${catClass}">${catLabel}</span></td>
+            <td style="font-weight:600;">${e.description || '--'}</td>
+            <td><span class="date-pill" style="font-size:0.75rem;">${paidFromLabel}</span></td>
+            <td style="text-align:center;">${e.deductFromDrawer ? '✅ Yes' : '➖ No'}</td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-red);">${DB.formatCurrency(e.amount || 0)}</td>
+            <td style="text-align:center;">
+              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteExpense('${e.id}')" title="Delete Expense">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      tableContainer.innerHTML = html;
+    }
+  },
+
+  showShiftSummaryModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+      return;
+    }
+    const shop = DB.getShop(shopId);
+    const today = DB.getTodayDate();
+
+    // Default opening float: fetch latest shift for this shop
+    const shopShifts = DB.getShiftsForShop(shopId);
+    const lastShift = shopShifts.length > 0 ? shopShifts[0] : null;
+    const defaultFloat = lastShift ? (lastShift.countedCash || 0) : 0;
+
+    // Default reload cash from latest update today
+    const todayUpdates = DB.getUpdatesForShopByDate(shopId, today);
+    let defaultReloadCash = 0;
+    if (todayUpdates.length > 0) {
+      const latestUpd = todayUpdates[0];
+      defaultReloadCash = latestUpd.reload?.cashInDrawer || latestUpd.sim?.cashInDrawer || 0;
+    }
+
+    // Default drawer expenses today
+    const todayExpenses = DB.getExpensesForShopByDate(shopId, today).filter(e => e.deductFromDrawer !== false);
+    const defaultExpenses = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+    const bodyHtml = `
+      <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
+          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.8rem;">${I18N.t('shift_type') || 'Shift Type'}</label>
+            <select class="form-select" id="shiftModalType" style="padding:8px;">
+              <option value="evening" selected>🌙 ${I18N.t('shift_evening') || 'Evening Closing'}</option>
+              <option value="morning">🌅 ${I18N.t('shift_morning') || 'Morning Shift'}</option>
+              <option value="fullday">☀️ ${I18N.t('shift_fullday') || 'Full Day Closing'}</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.8rem;">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
+            <input type="text" class="form-input" id="shiftModalCashier" placeholder="Cashier Name" style="padding:8px;">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; background:var(--bg-glass); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.75rem;">1. ${I18N.t('shift_opening_float') || 'Opening Cash Float'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue); font-weight:700;">2. ${I18N.t('shift_pos_sales') || 'POS Gross Sales'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosSales" placeholder="0.00" value="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.75rem;">3. ${I18N.t('shift_reload_cash') || 'Reload Cash Collected'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalReloadCash" value="${defaultReloadCash}">
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-size:0.75rem; color:var(--accent-red);">4. ${I18N.t('stat_daily_expenses') || 'Daily Expenses Deducted'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalExpenses" value="${defaultExpenses}">
+          </div>
+        </div>
+
+        <!-- Expected Cash Badge -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:10px 14px;">
+          <div style="font-weight:700; font-size:0.88rem; color:var(--text-secondary);">${I18N.t('shift_expected_cash') || 'Expected Cash in Drawer'}:</div>
+          <div style="font-size:1.25rem; font-weight:800; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
+        </div>
+
+        <!-- Actual Counted Cash & Note Counter Trigger -->
+        <div class="form-group" style="margin-top:4px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 5. ${I18N.t('shift_counted_cash') || 'Actual Physical Counted Cash'}</label>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 8px; border:1px solid var(--accent-gold); color:var(--accent-gold); font-weight:700;">🧮 Count Notes</button>
+          </div>
+          <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.1rem; font-weight:700;">
+        </div>
+
+        <!-- Tally Verdict Live Badge -->
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:var(--radius-sm); background:var(--bg-glass); border:1px solid var(--border-glass);" id="shiftModalVerdictBar">
+          <div style="font-weight:700; font-size:0.88rem;">${I18N.t('shift_status_verdict') || 'Reconciliation Verdict'}:</div>
+          <div id="shiftModalVerdictBadge"><span class="tally-badge balanced">✅ Balanced (Rs. 0.00)</span></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.8rem;">${I18N.t('exp_col_description') || 'Shift Notes / Remarks'}</label>
+          <input type="text" class="form-input" id="shiftModalNotes" placeholder="e.g. Evening closing ok, float left for tomorrow">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      `🌙 ${I18N.t('shift_modal_title') || 'Evening Shift Summary & POS Tally'}`,
+      bodyHtml,
+      `
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.saveShiftSummaryModal()">${I18N.t('shift_btn_save') || '💾 Save Shift Closing'}</button>
+      `
+    );
+
+    // Setup live calculation in modal
+    const fltInp = document.getElementById('shiftModalFloat');
+    const posInp = document.getElementById('shiftModalPosSales');
+    const relInp = document.getElementById('shiftModalReloadCash');
+    const expInp = document.getElementById('shiftModalExpenses');
+    const cntInp = document.getElementById('shiftModalCounted');
+
+    const updateCalc = () => {
+      const flt = parseFloat(fltInp.value) || 0;
+      const pos = parseFloat(posInp.value) || 0;
+      const rel = parseFloat(relInp.value) || 0;
+      const exp = parseFloat(expInp.value) || 0;
+      const cnt = parseFloat(cntInp.value) || 0;
+
+      const expected = flt + pos + rel - exp;
+      const diff = cnt - expected;
+
+      const expEl = document.getElementById('shiftModalExpectedVal');
+      if (expEl) expEl.textContent = DB.formatCurrency(expected);
+
+      const vBadge = document.getElementById('shiftModalVerdictBadge');
+      if (vBadge) {
+        if (Math.abs(diff) < 0.01) {
+          vBadge.innerHTML = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'} (Rs. 0.00)</span>`;
+        } else if (diff > 0) {
+          vBadge.innerHTML = `<span class="tally-badge excess">🟢 ${I18N.t('shift_excess') || 'Excess'} (+${DB.formatCurrency(diff)})</span>`;
+        } else {
+          vBadge.innerHTML = `<span class="tally-badge shortage">🔴 ${I18N.t('shift_shortage') || 'Shortage'} (-${DB.formatCurrency(Math.abs(diff))})</span>`;
+        }
+      }
+    };
+
+    [fltInp, posInp, relInp, expInp, cntInp].forEach(inp => {
+      if (inp) inp.addEventListener('input', updateCalc);
+    });
+
+    updateCalc();
+  },
+
+  openDenominationModalForShiftModal() {
+    this.openDenominationModal((total, denoms) => {
+      const cntInp = document.getElementById('shiftModalCounted');
+      if (cntInp) {
+        cntInp.value = total;
+        cntInp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      this.lastShiftDenominations = denoms;
+    });
+  },
+
+  saveShiftSummaryModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) return;
+
+    const shiftType = document.getElementById('shiftModalType')?.value || 'evening';
+    const cashier = document.getElementById('shiftModalCashier')?.value || '';
+    const openingFloat = parseFloat(document.getElementById('shiftModalFloat')?.value) || 0;
+    const posGrossSales = parseFloat(document.getElementById('shiftModalPosSales')?.value) || 0;
+    const reloadCashInDrawer = parseFloat(document.getElementById('shiftModalReloadCash')?.value) || 0;
+    const drawerExpenses = parseFloat(document.getElementById('shiftModalExpenses')?.value) || 0;
+    const countedCash = parseFloat(document.getElementById('shiftModalCounted')?.value) || 0;
+    const notes = document.getElementById('shiftModalNotes')?.value || '';
+
+    const expectedCash = openingFloat + posGrossSales + reloadCashInDrawer - drawerExpenses;
+    const difference = countedCash - expectedCash;
+    let status = 'balanced';
+    if (difference > 0.01) status = 'excess';
+    else if (difference < -0.01) status = 'shortage';
+
+    const shiftData = {
+      shopId,
+      shiftType,
+      cashier,
+      openingFloat,
+      posGrossSales,
+      reloadCashInDrawer,
+      drawerExpenses,
+      expectedCash,
+      countedCash,
+      difference,
+      status,
+      notes,
+      denominations: this.lastShiftDenominations || null
+    };
+
+    DB.addShift(shiftData);
+    this.lastShiftDenominations = null;
+    this.closeModal();
+    this.showToast(`✅ ${I18N.t('shift_saved_success') || 'Shift closing saved successfully!'}`, 'success');
+
+    if (this.currentPage === 'shifts') {
+      this.renderShiftsPage();
+    }
+    this.renderDashboard();
+  },
+
+  promptDeleteShift(shiftId) {
+    const pin = prompt(I18N.t('admin_prompt') || 'Enter Admin PIN to delete (Default: 1234):');
+    if (pin !== '1234') {
+      this.showToast(I18N.t('admin_incorrect') || 'Incorrect PIN', 'error');
+      return;
+    }
+    DB.deleteShift(shiftId);
+    this.showToast('✅ Shift record deleted', 'info');
+    this.renderShiftsPage();
+    this.renderDashboard();
+  },
+
+  // ================================================================
+  // V14 DAILY EXPENSES & OWNER DRAWINGS
+  // ================================================================
+  showAddExpenseModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+      return;
+    }
+    const shop = DB.getShop(shopId);
+
+    const bodyHtml = `
+      <form id="addExpenseForm" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
+          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(DB.getTodayDate())}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">${I18N.t('exp_modal_category') || 'Expense Category / Type'}</label>
+          <select class="form-select" id="expModalCategory" style="padding:8px;">
+            <option value="owner_drawing">👤 ${I18N.t('exp_cat_owner_drawing') || 'Owner Personal Drawings / Wallet (අයිතිකරු මුදල් ගැනීම)'}</option>
+            <option value="shop_purchase">🛒 ${I18N.t('exp_cat_shop_purchase') || 'Outside Shop Inventory / Purchases (කඩේ පිට බඩු ගැනීම)'}</option>
+            <option value="staff_expense">🍱 ${I18N.t('exp_cat_staff_expense') || 'Staff Meals / Advances (ස්ටාෆ් වියදම් / කෑම)'}</option>
+            <option value="utility_bill">💡 ${I18N.t('exp_cat_utility_bill') || 'Electricity / Water / Rent (විදුලි / වතුර / කුලී)'}</option>
+            <option value="maintenance">🔧 ${I18N.t('exp_cat_maintenance') || 'Shop Maintenance & Repairs (නඩත්තු)'}</option>
+            <option value="other">📦 ${I18N.t('exp_cat_other') || 'Other Shop Expenses (වෙනත් වියදම්)'}</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700; color:var(--accent-red);">${I18N.t('exp_col_amount') || 'Expense Amount (Rs.)'}</label>
+          <input type="number" step="0.01" min="0" class="form-input" id="expModalAmount" placeholder="0.00" required style="font-size:1.15rem; font-weight:700;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">${I18N.t('exp_col_description') || 'Description / Reason'}</label>
+          <input type="text" class="form-input" id="expModalDesc" placeholder="e.g. Owner cash withdrawal, Lunch for staff, etc." required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">${I18N.t('exp_modal_paid_from') || 'Paid From / Account Source'}</label>
+          <select class="form-select" id="expModalPaidFrom" style="padding:8px;">
+            <option value="drawer" selected>💵 ${I18N.t('exp_paid_drawer') || 'Shop Cash Drawer'}</option>
+            <option value="bank">🏦 ${I18N.t('exp_paid_bank') || 'Shop Bank Account'}</option>
+            <option value="personal">👛 ${I18N.t('exp_paid_personal') || 'Personal Wallet / Owner Funds'}</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+          <input type="checkbox" id="expModalDeductDrawer" checked style="width:18px; height:18px; accent-color:var(--accent-blue);">
+          <label for="expModalDeductDrawer" style="font-size:0.85rem; font-weight:600; cursor:pointer;">
+            ${I18N.t('exp_modal_deduct_check') || 'Deduct this amount from active Shop Cash Drawer'}
+          </label>
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      `💸 ${I18N.t('exp_modal_title') || 'Add Daily Expense / Owner Drawing'}`,
+      bodyHtml,
+      `
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.saveAddExpenseModal()">${I18N.t('exp_btn_save') || '💾 Save Expense'}</button>
+      `
+    );
+
+    const paidFromSel = document.getElementById('expModalPaidFrom');
+    const deductChk = document.getElementById('expModalDeductDrawer');
+    if (paidFromSel && deductChk) {
+      paidFromSel.addEventListener('change', () => {
+        deductChk.checked = paidFromSel.value === 'drawer';
+      });
+    }
+  },
+
+  saveAddExpenseModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) return;
+
+    const category = document.getElementById('expModalCategory')?.value || 'other';
+    const amount = parseFloat(document.getElementById('expModalAmount')?.value) || 0;
+    const description = document.getElementById('expModalDesc')?.value?.trim() || '';
+    const paidFrom = document.getElementById('expModalPaidFrom')?.value || 'drawer';
+    const deductFromDrawer = document.getElementById('expModalDeductDrawer')?.checked ?? true;
+
+    if (amount <= 0) {
+      this.showToast(I18N.t('exp_err_amount') || 'Please enter a valid amount', 'error');
+      return;
+    }
+
+    const expenseData = {
+      shopId,
+      category,
+      amount,
+      description: description || (I18N.t('exp_cat_' + category) || category),
+      paidFrom,
+      deductFromDrawer
+    };
+
+    DB.addExpense(expenseData);
+    this.closeModal();
+    this.showToast(`✅ ${I18N.t('exp_saved_success') || 'Expense recorded successfully!'}`, 'success');
+
+    if (this.currentPage === 'shifts') {
+      this.renderShiftsPage();
+    }
+    this.renderDashboard();
+  },
+
+  promptDeleteExpense(expenseId) {
+    const pin = prompt(I18N.t('admin_prompt') || 'Enter Admin PIN to delete (Default: 1234):');
+    if (pin !== '1234') {
+      this.showToast(I18N.t('admin_incorrect') || 'Incorrect PIN', 'error');
+      return;
+    }
+    DB.deleteExpense(expenseId);
+    this.showToast('✅ Expense record deleted', 'info');
+    this.renderShiftsPage();
+    this.renderDashboard();
+  },
+
+  // ================================================================
+  // V14 DASHBOARD INTERACTIVE ANALYTICS CHART
+  // ================================================================
+  setDashChartTimeframe(tf) {
+    this.dashChartTimeframe = tf;
+    document.querySelectorAll('#chartTimeframeGroup .timeframe-btn').forEach(btn => {
+      if (btn.dataset.timeframe === tf) {
+        btn.className = 'btn btn-xs btn-primary timeframe-btn active';
+      } else {
+        btn.className = 'btn btn-xs btn-ghost timeframe-btn';
+      }
+    });
+    this.renderDashboardAnalyticsChart();
+  },
+
+  renderDashboardAnalyticsChart() {
+    const chartCanvas = document.getElementById('dashAnalyticsChart');
+    if (!chartCanvas || !window.Chart) return;
+
+    if (this.dashChartInstance) {
+      this.dashChartInstance.destroy();
+      this.dashChartInstance = null;
+    }
+
+    const shopId = DB.getActiveShopId();
+    const timeframe = this.dashChartTimeframe || 'week';
+
+    let labels = [];
+    let dataValues = [];
+    let backgroundColors = [];
+    let borderColors = [];
+
+    if (timeframe === 'week') {
+      const days = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        days.push(d.toISOString().slice(0, 10));
+      }
+
+      labels = days.map(d => {
+        const dateObj = new Date(d);
+        return dateObj.toLocaleDateString(I18N.currentLang === 'si' ? 'si-LK' : 'en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+      });
+
+      days.forEach(dayStr => {
+        const updates = shopId ? DB.getUpdatesForShopByDate(shopId, dayStr) : DB.getUpdatesByDate(dayStr);
+        let net = 0;
+        updates.forEach(u => {
+          if (u.comparison && !u.comparison.isFirst) {
+            net += (u.comparison.overall?.diff || 0);
+          }
+        });
+        const shifts = shopId ? DB.getShiftsForShopByDate(shopId, dayStr) : DB.getShiftsByDate(dayStr);
+        shifts.forEach(s => {
+          net += (s.difference || 0);
+        });
+        dataValues.push(net);
+        backgroundColors.push(net >= 0 ? 'rgba(22, 163, 74, 0.75)' : 'rgba(228, 0, 43, 0.75)');
+        borderColors.push(net >= 0 ? '#16a34a' : '#e4002b');
+      });
+    } else if (timeframe === 'month') {
+      const now = new Date();
+      const currentYear = now.getFullYear();
+      const monthNamesEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      labels = monthNamesEn;
+
+      for (let m = 0; m < 12; m++) {
+        const monthPrefix = `${currentYear}-${String(m + 1).padStart(2, '0')}`;
+        const allUpdates = shopId ? DB.getUpdatesForShop(shopId) : DB.getUpdates();
+        const monthUpdates = allUpdates.filter(u => u.date && u.date.startsWith(monthPrefix));
+        let net = 0;
+        monthUpdates.forEach(u => {
+          if (u.comparison && !u.comparison.isFirst) {
+            net += (u.comparison.overall?.diff || 0);
+          }
+        });
+        const allShifts = shopId ? DB.getShiftsForShop(shopId) : DB.getShifts();
+        const monthShifts = allShifts.filter(s => s.date && s.date.startsWith(monthPrefix));
+        monthShifts.forEach(s => {
+          net += (s.difference || 0);
+        });
+        dataValues.push(net);
+        backgroundColors.push(net >= 0 ? 'rgba(22, 163, 74, 0.75)' : 'rgba(228, 0, 43, 0.75)');
+        borderColors.push(net >= 0 ? '#16a34a' : '#e4002b');
+      }
+    } else if (timeframe === 'year') {
+      const allUpdates = shopId ? DB.getUpdatesForShop(shopId) : DB.getUpdates();
+      const yearsSet = new Set();
+      allUpdates.forEach(u => {
+        if (u.date) yearsSet.add(u.date.slice(0, 4));
+      });
+      const nowYear = new Date().getFullYear().toString();
+      yearsSet.add(nowYear);
+      const sortedYears = Array.from(yearsSet).sort();
+      labels = sortedYears;
+
+      sortedYears.forEach(yr => {
+        let net = 0;
+        allUpdates.filter(u => u.date && u.date.startsWith(yr)).forEach(u => {
+          if (u.comparison && !u.comparison.isFirst) {
+            net += (u.comparison.overall?.diff || 0);
+          }
+        });
+        const allShifts = shopId ? DB.getShiftsForShop(shopId) : DB.getShifts();
+        allShifts.filter(s => s.date && s.date.startsWith(yr)).forEach(s => {
+          net += (s.difference || 0);
+        });
+        dataValues.push(net);
+        backgroundColors.push(net >= 0 ? 'rgba(22, 163, 74, 0.75)' : 'rgba(228, 0, 43, 0.75)');
+        borderColors.push(net >= 0 ? '#16a34a' : '#e4002b');
+      });
+    }
+
+    const ctx = chartCanvas.getContext('2d');
+    this.dashChartInstance = new window.Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: I18N.t('chart_profit_loss') || 'Net Profit / Loss (Rs.)',
+          data: dataValues,
+          backgroundColor: backgroundColors,
+          borderColor: borderColors,
+          borderWidth: 1.5,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => {
+                const val = context.parsed.y;
+                return `${val >= 0 ? '▲ Profit: +' : '▼ Loss: '}${DB.formatCurrency(val)}`;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            grid: { color: 'rgba(0, 0, 0, 0.05)' },
+            ticks: {
+              callback: (val) => `${val >= 0 ? '+' : ''}${Math.round(val / 1000)}k`
+            }
+          },
+          x: {
+            grid: { display: false }
+          }
+        }
+      }
+    });
+  },
+
+  // ================================================================
+  // V14 1-CLICK WHATSAPP SUMMARY & PRINT/PDF STATEMENT
+  // ================================================================
+  shareDailyWhatsAppSummary() {
+    const shopId = DB.getActiveShopId();
+    const shop = shopId ? DB.getShop(shopId) : null;
+    const shopName = shop ? shop.name : (I18N.t('all_shops') || 'All Shops');
+    const today = DB.getTodayDate();
+    const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // Latest Update totals
+    const lastUpdate = shopId ? DB.getLastUpdate(shopId) : null;
+    const vals = lastUpdate ? DB.extractValues(lastUpdate) : { totalCapital: 0, totalCash: 0, reloadTotal: 0, bankTotal: 0 };
+
+    // Today's shift closings
+    const todayShifts = shopId ? DB.getShiftsForShopByDate(shopId, today) : DB.getShiftsByDate(today);
+    const latestShift = todayShifts.length > 0 ? todayShifts[0] : null;
+
+    // Today's expenses
+    const todayExpenses = shopId ? DB.getExpensesForShopByDate(shopId, today) : DB.getExpensesByDate(today);
+    const totalExpenses = todayExpenses.reduce((s, ex) => s + (parseFloat(ex.amount) || 0), 0);
+
+    const ownerDrawings = todayExpenses.filter(e => (e.category || '').includes('owner')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    const shopPurchases = todayExpenses.filter(e => (e.category || '').includes('shop')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+    // Pending credits
+    const creditStats = DB.getCreditsStats(shopId);
+
+    let shiftText = '';
+    if (latestShift) {
+      const vEmoji = latestShift.status === 'balanced' ? '✅ BALANCED' : latestShift.status === 'excess' ? `🟢 EXCESS (+${DB.formatCurrency(latestShift.difference)})` : `🔴 SHORTAGE (-${DB.formatCurrency(Math.abs(latestShift.difference))})`;
+      shiftText = `
+🌙 *Evening Shift & POS Tally:*
+• Opening Float: ${DB.formatCurrency(latestShift.openingFloat || 0)}
+• POS Gross Sales: ${DB.formatCurrency(latestShift.posGrossSales || 0)}
+• Drawer Expenses: ${DB.formatCurrency(latestShift.drawerExpenses || 0)}
+• Expected Drawer Cash: ${DB.formatCurrency(latestShift.expectedCash || 0)}
+• Counted Drawer Cash: ${DB.formatCurrency(latestShift.countedCash || 0)}
+• Verdict: ${vEmoji}`;
+    } else {
+      shiftText = `
+🌙 *Evening Shift:* Not yet recorded today.`;
+    }
+
+    let expText = '';
+    if (totalExpenses > 0) {
+      expText = `
+💸 *Day's Expenses & Drawings:*
+• Total: ${DB.formatCurrency(totalExpenses)}
+  - Owner Drawings: ${DB.formatCurrency(ownerDrawings)}
+  - Shop Outside Purchases: ${DB.formatCurrency(shopPurchases)}`;
+    }
+
+    const message = `🏪 *${shopName}* - Daily Business Summary 📊
+📅 Date: ${DB.formatDate(today)} | ⏰ ${nowTime}
+━━━━━━━━━━━━━━━━━━━━
+💰 *Capital & Drawer Balances:*
+• Total Balance: ${DB.formatCurrency(vals.totalCapital)}
+• Cash in Drawer: ${DB.formatCurrency(vals.totalCash)}
+• Reload SIMs: ${DB.formatCurrency(vals.reloadTotal)}
+• Bank Total: ${DB.formatCurrency(vals.bankTotal)}
+${shiftText}
+${expText}
+📒 *Customer Credits:*
+• Unsettled: ${DB.formatCurrency(creditStats.totalPending)} (${creditStats.countPending} Customers)
+━━━━━━━━━━━━━━━━━━━━
+Generated via Shop Payment Tracker v14`;
+
+    const encoded = encodeURIComponent(message.trim());
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(message.trim());
+    }
+    window.open(`https://wa.me/?text=${encoded}`, '_blank');
+    this.showToast('📲 WhatsApp summary opened & copied to clipboard!', 'success');
+  },
+
+  printDailyStatement() {
+    window.print();
+  },
   setupExportImport() {
     document.getElementById('exportBtn').addEventListener('click', () => {
       DB.forceBackup();

@@ -171,7 +171,63 @@ const I18N = {
       'profit': 'Profit',
       'loss': 'Loss',
       'neutral': 'Neutral',
-      'delete_confirm': 'Are you sure you want to delete this?'
+      'delete_confirm': 'Are you sure you want to delete this?',
+
+      // Denomination Counter
+      'denom_title': '🧮 Cash Denomination Counter',
+      'denom_subtitle': 'Calculate physical notes and coins in cash drawer',
+      'denom_btn_count': '🧮 Count Notes',
+      'denom_total': 'Total Counted Cash',
+      'denom_apply': 'Apply to Cash Drawer',
+      'denom_reset': 'Reset Counter',
+      'denom_notes_lbl': 'Currency Notes (LKR)',
+      'denom_coins_lbl': 'Coins / Small Change (LKR)',
+      
+      // Daily Evening Shift & POS Reconciliation
+      'nav_shifts': 'Shift & Sales Tally',
+      'shift_title': 'Evening Shift Closing & POS Reconciliation',
+      'shift_subtitle': 'Tally daily cash against POS machine sales, reload collections, and expenses',
+      'top_btn_shift': '🌙 Evening Shift Tally',
+      'top_btn_expense': '💸 + Add Expense',
+      'shift_opening_float': 'Opening Cash / Float',
+      'shift_pos_sales': "Today's POS Gross Sales",
+      'shift_reload_cash': 'Reload & Bill Cash In Drawer',
+      'shift_total_expenses': "Today's Expenses / Deductions",
+      'shift_owner_drawings': 'Owner Drawings / Wallet',
+      'shift_expected_cash': 'Expected Total Cash',
+      'shift_actual_cash': 'Actual Counted Physical Cash',
+      'shift_diff': 'Tally Discrepancy (Difference)',
+      'shift_status_balanced': '✅ Perfectly Balanced (Tally OK)',
+      'shift_status_excess': '🟢 Cash Excess (Over)',
+      'shift_status_shortage': '🔴 Cash Shortage (Under)',
+      'shift_btn_save': '💾 Save Evening Shift Summary',
+      'shift_btn_whatsapp': '📱 WhatsApp Shift Report',
+      'shift_btn_pdf': '📄 Download PDF / Print Statement',
+      
+      // Daily Expenses & Owner Wallet
+      'exp_title': 'Shop Expenses & Owner Wallet',
+      'exp_subtitle': 'Track shop outside purchases, owner personal drawings, staff meals, and bills',
+      'exp_cat_owner': '👤 Owner Personal Drawing / Wallet',
+      'exp_cat_stock': '📦 Shop Stock / Outside Purchases',
+      'exp_cat_staff': '👥 Staff Meals / Tea / Advances',
+      'exp_cat_bills': '⚡ Utility Bills & Rent',
+      'exp_cat_repair': '🛠️ Maintenance & Repairs',
+      'exp_cat_other': '📝 Other Expenses',
+      'exp_amount': 'Expense Amount',
+      'exp_desc': 'Description / Note',
+      'exp_paid_from': 'Paid From',
+      'exp_from_cash': '💵 Shop Cash Drawer',
+      'exp_from_bank': '🏦 Bank Account',
+      'exp_from_personal': '👤 Personal / Outside Pocket',
+      'exp_deduct_check': 'Deduct from active Shop Cash Balance',
+      'exp_btn_save': '💾 Record Expense',
+      
+      // Advanced Chart & Comparisons
+      'chart_view_week': '📅 This Week vs Last Week',
+      'chart_view_month': '📆 Month-by-Month (12 Months)',
+      'chart_view_year': '📊 Yearly & All-Time Trend',
+      'chart_metric_capital': '💰 Total Capital',
+      'chart_metric_profit': '📈 Profit / Loss'
     },
     si: {
       // Sidebar
@@ -338,7 +394,63 @@ const I18N = {
       'profit': 'ලාභය',
       'loss': 'අලාභය',
       'neutral': 'වෙනසක් නෑ',
-      'delete_confirm': 'ඔබට විශ්වාසද මෙය මකා දැමිය යුතුයි කියා?'
+      'delete_confirm': 'ඔබට විශ්වාසද මෙය මකා දැමිය යුතුයි කියා?',
+
+      // Denomination Counter
+      'denom_title': '🧮 මුදල් නෝට්ටු කවුන්ටරය',
+      'denom_subtitle': 'ලාච්චුවේ ඇති නෝට්ටු සහ කාසි ගණනය කිරීම',
+      'denom_btn_count': '🧮 නෝට්ටු ගණන් කරන්න',
+      'denom_total': 'ගණන් කළ මුළු මුදල',
+      'denom_apply': 'ලාච්චුවේ මුදලට ඇතුළත් කරන්න',
+      'denom_reset': 'නැවත මුල සිට',
+      'denom_notes_lbl': 'මුදල් නෝට්ටු (LKR)',
+      'denom_coins_lbl': 'කාසි සහ සුළු මුදල් (LKR)',
+      
+      // Daily Evening Shift & POS Reconciliation
+      'nav_shifts': 'හවස් සාරාංශය & Tally',
+      'shift_title': 'හවස් ෂිෆ්ට් සමරි & POS සංසන්දනය',
+      'shift_subtitle': 'දවසේ සේල්, රීලෝඩ්, වියදම් සහ භෞතික මුදල් හරියටම ගලපා ගැනීම (Tally)',
+      'top_btn_shift': '🌙 හවස් සමරි (Shift Tally)',
+      'top_btn_expense': '💸 + වියදමක් / Drawing',
+      'shift_opening_float': 'උදෑසන ආරම්භක මුදල (Float)',
+      'shift_pos_sales': 'පොස් (POS) දවසේ මුළු සේල් එක',
+      'shift_reload_cash': 'රීලෝඩ් ලාච්චුවේ මුදල',
+      'shift_total_expenses': 'දවසේ මුළු වියදම්',
+      'shift_owner_drawings': 'අයිතිකරු ලබාගත් මුදල් (Wallet)',
+      'shift_expected_cash': 'තිබිය යුතු මුළු මුදල',
+      'shift_actual_cash': 'ලාච්චුවේ ගණන් කළ මුදල',
+      'shift_diff': 'වෙනස (Tally Discrepancy)',
+      'shift_status_balanced': '✅ හරියටම ටැලි විය (Tally OK)',
+      'shift_status_excess': '🟢 මුදල් වැඩියි (Excess)',
+      'shift_status_shortage': '🔴 මුදල් හිඟයි (Shortage)',
+      'shift_btn_save': '💾 හවස් සාරාංශය සුරකින්න',
+      'shift_btn_whatsapp': '📱 WhatsApp සමරි යවන්න',
+      'shift_btn_pdf': '📄 PDF / Print වාර්තාව',
+      
+      // Daily Expenses & Owner Wallet
+      'exp_title': 'දවසේ වියදම් සහ අයිතිකරුගේ මුදල්',
+      'exp_subtitle': 'කඩේ පිට බඩු ගැනීම්, අයිතිකරු ලබාගත් මුදල්, කාර්ය මණ්ඩල වියදම් සටහන් කිරීම',
+      'exp_cat_owner': '👤 අයිතිකරු ලබාගත් මුදල් (Owner Wallet)',
+      'exp_cat_stock': '📦 කඩේ පිට බඩු / ස්ටොක් ගැනීම්',
+      'exp_cat_staff': '👥 කාර්ය මණ්ඩල කෑම / තේ / අත්තිකාරම්',
+      'exp_cat_bills': '⚡ බිල්පත් සහ කුලී',
+      'exp_cat_repair': '🛠️ නඩත්තු සහ අලුත්වැඩියා',
+      'exp_cat_other': '📝 වෙනත් වියදම්',
+      'exp_amount': 'වියදම් මුදල',
+      'exp_desc': 'විස්තරය / සටහන',
+      'exp_paid_from': 'ගෙවූ ආකාරය',
+      'exp_from_cash': '💵 සාප්පුවේ ලාච්චුවේ මුදල්',
+      'exp_from_bank': '🏦 බැංකු ගිණුමෙන්',
+      'exp_from_personal': '👤 පුද්ගලික සාක්කුවෙන්',
+      'exp_deduct_check': 'සාප්පුවේ සක්‍රීය මුදල් ශේෂයෙන් අඩු කරන්න',
+      'exp_btn_save': '💾 වියදම සටහන් කරන්න',
+      
+      // Advanced Chart & Comparisons
+      'chart_view_week': '📅 මේ සතිය සහ ගිය සතිය',
+      'chart_view_month': '📆 මාසික ප්‍රවණතාවය (මාස 12)',
+      'chart_view_year': '📊 වාර්ෂික සමස්ත ප්‍රස්ථාරය',
+      'chart_metric_capital': '💰 සම්පූර්ණ ප්‍රාග්ධනය',
+      'chart_metric_profit': '📈 ලාභ / අලාභ'
     },
     ta: {
       // Sidebar
@@ -505,7 +617,63 @@ const I18N = {
       'profit': 'லாபம்',
       'loss': 'நஷ்டம்',
       'neutral': 'சமம்',
-      'delete_confirm': 'நிச்சயமாக நீக்க விரும்புகிறீர்களா?'
+      'delete_confirm': 'நிச்சயமாக நீக்க விரும்புகிறீர்களா?',
+
+      // Denomination Counter
+      'denom_title': '🧮 பணத்தாள் எண்ணும் கால்குலேட்டர்',
+      'denom_subtitle': 'டிராயரில் உள்ள தாள்கள் மற்றும் நாணயங்களை கணக்கிடுங்கள்',
+      'denom_btn_count': '🧮 பணத்தாள்களை எண்ணு',
+      'denom_total': 'எண்ணப்பட்ட மொத்த பணம்',
+      'denom_apply': 'டிராயர் பணத்தில் சேர்க்க',
+      'denom_reset': 'மீட்டமைக்க',
+      'denom_notes_lbl': 'பணத்தாள்கள் (LKR)',
+      'denom_coins_lbl': 'நாணயங்கள் (LKR)',
+      
+      // Daily Evening Shift & POS Reconciliation
+      'nav_shifts': 'ஷிப்ட் & விற்பனை ஒப்பீடு',
+      'shift_title': 'மாலை ஷிப்ட் முடிவு & POS ஒப்பீடு',
+      'shift_subtitle': 'விற்பனை, ரீலோட், செலவுகள் மற்றும் ரொக்கப் பணத்தை ஒப்பிடுதல்',
+      'top_btn_shift': '🌙 ஷிப்ட் ஒப்பீடு (Tally)',
+      'top_btn_expense': '💸 + செலவு / வரைவு',
+      'shift_opening_float': 'தொடக்கப் பணம்',
+      'shift_pos_sales': 'இன்றைய POS விற்பனை',
+      'shift_reload_cash': 'ரீலோட் டிராயர் பணம்',
+      'shift_total_expenses': 'இன்றைய மொத்த செலவுகள்',
+      'shift_owner_drawings': 'உரிமையாளர் பெற்ற பணம்',
+      'shift_expected_cash': 'இருக்க வேண்டிய பணம்',
+      'shift_actual_cash': 'எண்ணப்பட்ட ரொக்கப் பணம்',
+      'shift_diff': 'வித்தியாசம் (Difference)',
+      'shift_status_balanced': '✅ சரியானது (Balanced)',
+      'shift_status_excess': '🟢 கூடுதல் பணம் (Excess)',
+      'shift_status_shortage': '🔴 குறைவான பணம் (Shortage)',
+      'shift_btn_save': '💾 ஷிப்ட் சுருக்கத்தை சேமி',
+      'shift_btn_whatsapp': '📱 WhatsApp அறிக்கை',
+      'shift_btn_pdf': '📄 PDF / அறிக்கை அச்சிடு',
+      
+      // Daily Expenses & Owner Wallet
+      'exp_title': 'செலவுகள் & உரிமையாளர் வரைவு',
+      'exp_subtitle': 'கடை செலவுகள் மற்றும் உரிமையாளர் எடுத்த பணம்',
+      'exp_cat_owner': '👤 உரிமையாளர் வரைவு',
+      'exp_cat_stock': '📦 வெளிப்புற கொள்முதல்',
+      'exp_cat_staff': '👥 பணியாளர் செலவுகள்',
+      'exp_cat_bills': '⚡ கட்டணங்கள் & வாடகை',
+      'exp_cat_repair': '🛠️ பராமரிப்பு',
+      'exp_cat_other': '📝 பிற செலவுகள்',
+      'exp_amount': 'செலவு தொகை',
+      'exp_desc': 'விளக்கம் / குறிப்பு',
+      'exp_paid_from': 'செலுத்தப்பட்ட வழி',
+      'exp_from_cash': '💵 கடை டிராயர் பணம்',
+      'exp_from_bank': '🏦 வங்கி கணக்கு',
+      'exp_from_personal': '👤 தனிப்பட்ட பணம்',
+      'exp_deduct_check': 'கடை இருப்பில் இருந்து கழிக்க',
+      'exp_btn_save': '💾 செலவை சேமி',
+      
+      // Advanced Chart & Comparisons
+      'chart_view_week': '📅 இந்த வாரம் vs கடந்த வாரம்',
+      'chart_view_month': '📆 மாத சுருக்கம் (12 மாதங்கள்)',
+      'chart_view_year': '📊 ஆண்டு கண்ணோட்டம்',
+      'chart_metric_capital': '💰 மொத்த மூலதனம்',
+      'chart_metric_profit': '📈 லாபம் / நஷ்டம்'
     }
   },
 

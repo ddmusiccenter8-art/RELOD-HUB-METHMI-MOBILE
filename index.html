@@ -58,6 +58,7 @@
       <ul class="nav-links">
         <li><a href="#" data-page="dashboard" class="active" onclick="App.showMainDashboard()"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
         <li><a href="#" data-page="update"><span class="nav-icon">➕</span> <span data-i18n="nav_update">Add Update</span></a></li>
+        <li><a href="#" data-page="shifts"><span class="nav-icon">🌙</span> <span data-i18n="nav_shifts">Shift & Sales Tally</span></a></li>
         <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
         <li><a href="#" data-page="credits"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
         <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops</span></a></li>
@@ -100,6 +101,14 @@
             <span class="btn-icon">📥</span>
             <span class="btn-text" data-i18n="top_btn_topup">+ Stock Top-up</span>
           </button>
+          <button type="button" class="top-bar-btn shift-btn" onclick="App.showShiftSummaryModal()" title="Evening Shift Summary & POS Tally">
+            <span class="btn-icon">🌙</span>
+            <span class="btn-text" data-i18n="top_btn_shift">Shift Summary</span>
+          </button>
+          <button type="button" class="top-bar-btn expense-btn" onclick="App.showAddExpenseModal()" title="Add Daily Expense / Owner Drawing">
+            <span class="btn-icon">💸</span>
+            <span class="btn-text" data-i18n="top_btn_expense">+ Expense</span>
+          </button>
         </div>
         <div class="top-bar-right">
           <button type="button" class="top-bar-btn ledger-btn" onclick="App.navigateTo('credits')" title="Open Credits & Expenses Ledger">
@@ -113,9 +122,15 @@
       <div class="page active" id="page-dashboard">
         <div class="page-header">
           <h1><span class="header-icon">📊</span> <span data-i18n="dash_title">Dashboard</span></h1>
-          <div class="header-actions" style="display:flex; gap:10px; align-items:center;">
+          <div class="header-actions" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
             <button class="btn btn-primary btn-sm" onclick="App.showQuickAddCreditModal()" title="Add Customer Credit" style="font-weight:700;">
               <span>📒</span> <span data-i18n="quick_add_credit">+ Add Credit</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="App.shareDailyWhatsAppSummary()" title="Share WhatsApp Daily Summary" style="border:1px solid rgba(37,211,102,0.4); color:#16a34a; font-weight:700;">
+              <span>📲</span> <span data-i18n="btn_whatsapp">WhatsApp Summary</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="App.printDailyStatement()" title="Print Statement / PDF" style="border:1px solid rgba(0,0,0,0.15); font-weight:700;">
+              <span>🖨️</span> <span data-i18n="btn_print_pdf">Print / PDF</span>
             </button>
             <span class="date-pill" id="todayDate">📅 Today</span>
           </div>
@@ -193,6 +208,26 @@
             </div>
             <div class="card-value" id="dashCreditTotal" style="color:var(--accent-gold);">Rs.0.00</div>
             <div class="card-diff neutral" id="dashCreditDiff">0 Pending</div>
+          </div>
+        </div>
+
+        <!-- Interactive Analytics Chart Card (Green Up / Red Down) -->
+        <div class="card dash-chart-card" id="dashAnalyticsChartCard" style="margin-bottom: 24px; padding: 18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom: 14px;">
+            <div>
+              <div style="font-weight:700; color:var(--text-primary); font-size: 1rem; display:flex; align-items:center; gap:8px;">
+                <span>📈</span> <span data-i18n="dash_chart_title">Business Performance & Trend Analytics</span>
+              </div>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;" data-i18n="dash_chart_sub">Visual profit (green) vs loss/expense (red) comparisons</div>
+            </div>
+            <div class="timeframe-btn-group" id="chartTimeframeGroup" style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-xs btn-primary timeframe-btn active" data-timeframe="week" onclick="App.setDashChartTimeframe('week')" data-i18n="chart_week">This Week vs Last Week</button>
+              <button type="button" class="btn btn-xs btn-ghost timeframe-btn" data-timeframe="month" onclick="App.setDashChartTimeframe('month')" data-i18n="chart_month">12 Months Trend</button>
+              <button type="button" class="btn btn-xs btn-ghost timeframe-btn" data-timeframe="year" onclick="App.setDashChartTimeframe('year')" data-i18n="chart_year">Yearly Trend</button>
+            </div>
+          </div>
+          <div style="height: 240px; position: relative;">
+            <canvas id="dashAnalyticsChart"></canvas>
           </div>
         </div>
 
@@ -299,7 +334,10 @@
               <div class="prev-value" id="prevEzcashHint"></div>
             </div>
             <div class="form-group">
-              <label class="form-label" style="font-weight:700; color:var(--accent-gold);" data-i18n="upd_reload_cash">💵 Reload Cash in Drawer</label>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <label class="form-label" style="font-weight:700; color:var(--accent-gold); margin-bottom:0;" data-i18n="upd_reload_cash">💵 Reload Cash in Drawer</label>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.openDenominationModal('reloadCashInput')" style="font-size:0.75rem; padding:2px 8px; border:1px solid var(--accent-gold); color:var(--accent-gold); font-weight:700;" data-i18n="btn_count_notes">🧮 Count Notes</button>
+              </div>
               <input type="number" class="form-input balance-input" id="reloadCashInput" placeholder="0.00" step="0.01" min="0">
               <div class="prev-value" id="prevReloadCashHint"></div>
             </div>
@@ -459,6 +497,84 @@
         <div class="card">
           <div id="ledgerTableContainer" style="overflow-x:auto;">
             <!-- Populated via App.renderCreditsPage() -->
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SHIFT & SALES TALLY PAGE ===== -->
+      <div class="page" id="page-shifts">
+        <div class="page-header">
+          <div>
+            <h1><span class="header-icon">🌙</span> <span data-i18n="shift_title">Shift & POS Sales Tally</span></h1>
+            <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="shift_subtitle">Evening cash drawer reconciliation, POS sales tally, and expenses</p>
+          </div>
+          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" onclick="App.showShiftSummaryModal()">
+              <span>🌙</span> <span data-i18n="shift_btn_add">+ Evening Shift Closing</span>
+            </button>
+            <button class="btn btn-ghost" onclick="App.showAddExpenseModal()" style="border:1px solid rgba(0,0,0,0.15);">
+              <span>💸</span> <span data-i18n="exp_btn_add">+ Daily Expense / Drawing</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Shift KPI Summary Cards -->
+        <div class="summary-grid" style="margin-bottom:24px;">
+          <div class="card accent-blue">
+            <div class="card-header">
+              <span class="card-title" data-i18n="shift_pos_sales">🛒 Today's POS Sales</span>
+              <div class="card-icon">🛒</div>
+            </div>
+            <div class="card-value" id="kpiShiftPosSales">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiShiftPosCount">0 Shifts Recorded</div>
+          </div>
+
+          <div class="card accent-gold">
+            <div class="card-header">
+              <span class="card-title" data-i18n="shift_counted_cash">💵 Counted Cash in Drawer</span>
+              <div class="card-icon">💵</div>
+            </div>
+            <div class="card-value" id="kpiShiftCountedCash">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiShiftExpectedCash">Expected: Rs.0.00</div>
+          </div>
+
+          <div class="card accent-red">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_daily_expenses">💸 Today's Expenses & Drawings</span>
+              <div class="card-icon">💸</div>
+            </div>
+            <div class="card-value" id="kpiShiftExpenses">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiShiftExpensesCount">0 Records</div>
+          </div>
+
+          <div class="card accent-green">
+            <div class="card-header">
+              <span class="card-title" data-i18n="shift_status_verdict">⚖️ Tally Status</span>
+              <div class="card-icon">⚖️</div>
+            </div>
+            <div class="card-value" id="kpiShiftVerdict" style="font-size:1.15rem; font-weight:800; color:var(--accent-green);">No Shift Today</div>
+            <div class="card-diff neutral" id="kpiShiftDiff">Diff: Rs.0.00</div>
+          </div>
+        </div>
+
+        <!-- Shift Subtabs & Filter Bar -->
+        <div class="card" style="margin-bottom:20px; padding:16px;">
+          <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
+            <div style="display:flex; gap:8px;" id="shiftTabButtons">
+              <button type="button" class="btn btn-primary btn-sm shift-tab-btn active" data-tab="closings" onclick="App.setShiftTab('closings')" data-i18n="tab_shift_closings">🌙 Shift Closings</button>
+              <button type="button" class="btn btn-ghost btn-sm shift-tab-btn" data-tab="expenses" onclick="App.setShiftTab('expenses')" data-i18n="tab_expenses">💸 Expenses & Drawings</button>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="date" class="form-input" id="shiftDateFilter" style="width:auto; padding:6px 10px;">
+              <button type="button" class="btn btn-ghost btn-sm" onclick="App.resetShiftDateFilter()" data-i18n="hist_btn_all">View All</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Shift Table Card -->
+        <div class="card">
+          <div id="shiftsTableContainer" style="overflow-x:auto;">
+            <!-- Populated via App.renderShiftsPage() -->
           </div>
         </div>
       </div>
