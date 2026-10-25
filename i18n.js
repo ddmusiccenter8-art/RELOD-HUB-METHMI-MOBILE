@@ -61,11 +61,19 @@ const I18N = {
       'upd_sim_airtel': 'Airtel SIM',
       'upd_sim_hutch': 'Hutch SIM',
       'upd_sim_ezcash': 'eZ Cash Balance',
+      'upd_sims_total_badge': '🔄 Reload SIMs Total',
       'upd_reload_cash': '💵 Reload Cash in Drawer',
       'upd_reload_total_badge': '🔄 Reload Total (SIMs + Reload Cash)',
       
-      // Section 2: Bank & Mobile Rental
-      'upd_bank_sec_title': '🏦 Section 2: Bank & Mobile Payments',
+      // Section 2: Shop Cash in Drawer (Dedicated)
+      'upd_cash_sec_title': '💵 Section 2: Shop Cash in Drawer (සාප්පුවේ මුදල් ලාච්චුව)',
+      'upd_cash_drawer_lbl': '💵 Physical Cash in Drawer (සාප්පුවේ ලාච්චුවේ මුදල්)',
+      'upd_cash_drawer_desc': 'Enter physical cash in drawer or click "Count Notes" to calculate note denominations',
+      'upd_prev_cash_hint': 'Previous Cash Drawer',
+      'upd_cash_total_badge': '💵 Total Cash in Drawer',
+
+      // Section 3: Bank & Mobile Rental
+      'upd_bank_sec_title': '🏦 Section 3: Bank & Mobile Payments',
       'upd_bank_name_lbl': 'Bank Name',
       'upd_bank_acct_lbl': 'Account Amount',
       'upd_bank_cash_lbl': 'Bank Cash in Drawer',
@@ -74,7 +82,7 @@ const I18N = {
       'select_bank': '-- Select Bank --',
       
       // Section 2.5: Shift Adjustments
-      'upd_adj_sec_title': '⚖️ Section 2.5: Shift Adjustments (Credits, Routers & Top-ups)',
+      'upd_adj_sec_title': '⚖️ Shift Adjustments (Credits, Routers & Top-ups)',
       'upd_adj_credit_title': '👤 Customer Credit Reloads',
       'btn_add_credit': '+ Add Customer Credit',
       'upd_adj_router_title': '📶 Shop Router Reloads',
@@ -84,9 +92,9 @@ const I18N = {
       'upd_adj_summary_badge': '⚖️ Shift Adjustments Total',
       'add_shop': '➕ Add Shop',
 
-      // Section 3: Grand Total
-      'upd_grand_sec_title': '💰 Section 3: Grand Total Capital',
-      'upd_grand_total': 'Grand Total Capital (Reload + Bank)',
+      // Section 4: Grand Total
+      'upd_grand_sec_title': '💰 Section 4: Grand Total Capital',
+      'upd_grand_total': 'Grand Total Capital (SIMs + Bank + Cash Drawer)',
       'btn_save_update': '💾 Save Update',
       'btn_cancel': 'Cancel',
       
@@ -292,17 +300,25 @@ const I18N = {
       'upd_balances_title': '💰 අද දින ශේෂයන් සහ ලාච්චුවේ මුදල්',
       
       // Section 1: Reload / SIMs
-      'upd_reload_sec_title': '🔄 අංශය 1: රීලෝඩ් සහ සිම්පත් ශේෂයන්',
+      'upd_reload_sec_title': '🔄 කොටස 1: රීලෝඩ් සහ සිම්පත් ශේෂයන්',
       'upd_sim_dialog': 'Dialog සිම් එක',
       'upd_sim_mobitel': 'Mobitel සිම් එක',
       'upd_sim_airtel': 'Airtel සිම් එක',
       'upd_sim_hutch': 'Hutch සිම් එක',
       'upd_sim_ezcash': 'eZ Cash ශේෂය',
+      'upd_sims_total_badge': '🔄 රීලෝඩ් සිම් එකතුව',
       'upd_reload_cash': '💵 රීලෝඩ් ලාච්චුවේ මුදල්',
       'upd_reload_total_badge': '🔄 රීලෝඩ් මුළු එකතුව (සිම් + ලාච්චුවේ මුදල්)',
       
-      // Section 2: Bank & Mobile Rental
-      'upd_bank_sec_title': '🏦 අංශය 2: බැංකු සහ ජංගම ගෙවීම්',
+      // Section 2: Shop Cash in Drawer (Dedicated)
+      'upd_cash_sec_title': '💵 කොටස 2: සාප්පුවේ මුදල් ලාච්චුව (Cash in Drawer)',
+      'upd_cash_drawer_lbl': '💵 සාප්පුවේ ලාච්චුවේ ඇති මුදල් (Cash in Drawer)',
+      'upd_cash_drawer_desc': 'ලාච්චුවේ ඇති මුළු මුදල් ප්‍රමාණය ඇතුළත් කරන්න හෝ "නෝට්ටු ගණන් කරන්න" ක්ලික් කරන්න',
+      'upd_prev_cash_hint': 'කලින් ලාච්චුවේ මුදල',
+      'upd_cash_total_badge': '💵 ලාච්චුවේ මුළු මුදල',
+
+      // Section 3: Bank & Mobile Rental
+      'upd_bank_sec_title': '🏦 කොටස 3: බැංකු සහ ජංගම ගෙවීම්',
       'upd_bank_name_lbl': 'බැංකුව',
       'upd_bank_acct_lbl': 'ගිණුමේ මුදල',
       'upd_bank_cash_lbl': 'බැංකුවට අදාළ ලාච්චුවේ මුදල්',
@@ -311,7 +327,7 @@ const I18N = {
       'select_bank': '-- Bank තෝරන්න --',
       
       // Section 2.5: Shift Adjustments
-      'upd_adj_sec_title': '⚖️ අංශය 2.5: දෛනික ගැලපීම් (ණය, රවුටර් සහ ලැබුණු ස්ටොක්)',
+      'upd_adj_sec_title': '⚖️ දෛනික ගැලපීම් (ණය, රවුටර් සහ ලැබුණු ස්ටොක්)',
       'upd_adj_credit_title': '👤 පාරිභෝගිකයින්ට ණයට දුන් රීලෝඩ් (Customer Credits)',
       'btn_add_credit': '+ ණයට දුන් රීලෝඩ් එකතු කරන්න',
       'upd_adj_router_title': '📶 සාප්පුවේ රවුටර් රීලෝඩ් (Shop Router Expenses)',
@@ -321,9 +337,9 @@ const I18N = {
       'upd_adj_summary_badge': '⚖️ ගැලපීම් ශුද්ධ අගය',
       'add_shop': '➕ නව සාප්පුවක්',
 
-      // Section 3: Grand Total
-      'upd_grand_sec_title': '💰 අංශය 3: සම්පූර්ණ ප්‍රාග්ධනය',
-      'upd_grand_total': 'සම්පූර්ණ ප්‍රාග්ධනය (රීලෝඩ් + බැංකු)',
+      // Section 4: Grand Total
+      'upd_grand_sec_title': '💰 කොටස 4: සම්පූර්ණ ප්‍රාග්ධනය',
+      'upd_grand_total': 'සම්පූර්ණ ප්‍රාග්ධනය (සිම් + බැංකු + ලාච්චුවේ මුදල්)',
       'btn_save_update': '💾 Save කරන්න',
       'btn_cancel': 'අවලංගු කරන්න',
       
@@ -535,11 +551,19 @@ const I18N = {
       'upd_sim_airtel': 'Airtel சிம்',
       'upd_sim_hutch': 'Hutch SIM',
       'upd_sim_ezcash': 'eZ Cash இருப்பு',
+      'upd_sims_total_badge': '🔄 ரீலோட் சிம் மொத்தம்',
       'upd_reload_cash': '💵 ரீலோட் டிராயர் பணம்',
       'upd_reload_total_badge': '🔄 ரீலோட் மொத்தம் (சிம் + பணம்)',
       
-      // Section 2: Bank & Mobile Rental
-      'upd_bank_sec_title': '🏦 பிரிவு 2: வங்கி & மொபைல் கொடுப்பனவுகள்',
+      // Section 2: Shop Cash in Drawer (Dedicated)
+      'upd_cash_sec_title': '💵 பிரிவு 2: பணப் பெட்டி (Cash in Drawer)',
+      'upd_cash_drawer_lbl': '💵 பணப் பெட்டியில் உள்ள பணம் (Cash in Drawer)',
+      'upd_cash_drawer_desc': 'பணப் பெட்டியில் உள்ள தொகையை உள்ளிடவும் அல்லது நோட்டுகளை எண்ணவும்',
+      'upd_prev_cash_hint': 'முந்தைய பணப் பெட்டி',
+      'upd_cash_total_badge': '💵 பணப் பெட்டி மொத்தம்',
+
+      // Section 3: Bank & Mobile Rental
+      'upd_bank_sec_title': '🏦 பிரிவு 3: வங்கி & மொபைல் கொடுப்பனவுகள்',
       'upd_bank_name_lbl': 'வங்கி பெயர்',
       'upd_bank_acct_lbl': 'கணக்கு இருப்பு',
       'upd_bank_cash_lbl': 'வங்கி டிராயர் பணம்',
@@ -548,7 +572,7 @@ const I18N = {
       'select_bank': '-- வங்கியைத் தேர்ந்தெடு --',
       
       // Section 2.5: Shift Adjustments
-      'upd_adj_sec_title': '⚖️ பிரிவு 2.5: சரிசெய்தல்கள் (கடன்கள், ரூட்டர்கள் & டாப்-அப்)',
+      'upd_adj_sec_title': '⚖️ சரிசெய்தல்கள் (கடன்கள், ரூட்டர்கள் & டாப்-அப்)',
       'upd_adj_credit_title': '👤 வாடிக்கையாளர் கடன் ரீலோட்கள்',
       'btn_add_credit': '+ கடன் ரீலோட் சேர்',
       'upd_adj_router_title': '📶 கடை ரூட்டர் ரீலோட்கள் (செலவுகள்)',
@@ -558,9 +582,9 @@ const I18N = {
       'upd_adj_summary_badge': '⚖️ சரிசெய்தல் நிகர மொத்தம்',
       'add_shop': '➕ புதிய கடை',
 
-      // Section 3: Grand Total
-      'upd_grand_sec_title': '💰 பிரிவு 3: மொத்த மூலதனம்',
-      'upd_grand_total': 'மொத்த மூலதனம் (ரீலோட் + வங்கி)',
+      // Section 4: Grand Total
+      'upd_grand_sec_title': '💰 பிரிவு 4: மொத்த மூலதனம்',
+      'upd_grand_total': 'மொத்த மூலதனம் (சிம்கள் + வங்கி + ரொக்கம்)',
       'btn_save_update': '💾 சேமி',
       'btn_cancel': 'ரத்து செய்',
       

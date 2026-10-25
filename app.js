@@ -899,7 +899,7 @@ const App = {
   // UPDATE FORM (2-TRACK SYSTEM)
   // ================================================================
   setupUpdateForm() {
-    // Inputs in Section 1 (Individual SIMs + Reload Cash)
+    // Inputs in Section 1 (Individual SIMs + Cash Drawer)
     const simInputs = ['simDialog', 'simMobitel', 'simAirtel', 'simHutch', 'simEzcash', 'reloadCashInput'];
     simInputs.forEach(id => {
       const el = document.getElementById(id);
@@ -907,6 +907,22 @@ const App = {
         el.addEventListener('input', () => this.calculateLiveBalances());
       }
     });
+
+    // Cash Drawer manual input clears denomination chip if mismatched
+    const cashDrawerEl = document.getElementById('reloadCashInput');
+    if (cashDrawerEl) {
+      cashDrawerEl.addEventListener('input', () => {
+        if (this.lastReloadDenominations) {
+          let sum = 0;
+          const map = { n5000: 5000, n2000: 2000, n1000: 1000, n500: 500, n100: 100, n50: 50, n20: 20, n10: 10, coins: 1 };
+          Object.keys(map).forEach(k => { sum += (this.lastReloadDenominations[k] || 0) * map[k]; });
+          if (Math.abs(sum - (parseFloat(cashDrawerEl.value) || 0)) > 0.01) {
+            this.lastReloadDenominations = null;
+            this.renderDenomsSummaryChip(null);
+          }
+        }
+      });
+    }
 
     // Add Bank Row Button
     const addBankBtn = document.getElementById('addBankRowBtn');
@@ -955,6 +971,8 @@ const App = {
       clearBtn.addEventListener('click', () => {
         updateForm.reset();
         this.editingUpdateId = null;
+        this.lastReloadDenominations = null;
+        this.renderDenomsSummaryChip(null);
         const btn = updateForm.querySelector('button[type="submit"]');
         if (btn) btn.innerHTML = '💾 Save Update';
         const bankContainer = document.getElementById('bankRowsContainer');
@@ -1258,7 +1276,7 @@ const App = {
         `;
       }
 
-      // Hints under Section 1 inputs
+      // Hints under Section 1 & 2 inputs
       const setHint = (id, label, val) => {
         const el = document.getElementById(id);
         if (el) el.textContent = `${label}: ${DB.formatCurrency(val)}`;
@@ -1268,7 +1286,8 @@ const App = {
       setHint('prevAirtelHint', 'Prev', prevVals.airtel);
       setHint('prevHutchHint', 'Prev', prevVals.hutch);
       setHint('prevEzcashHint', 'Prev', prevVals.ezcash);
-      setHint('prevReloadCashHint', 'Prev Cash', prevVals.reloadCash);
+      setHint('prevReloadCashHint', I18N.t('upd_prev_cash_hint') || (I18N.currentLang === 'si' ? 'කලින් ලාච්චුවේ මුදල' : 'Previous Cash Drawer'), prevVals.totalCash || prevVals.reloadCash);
+      this.renderDenomsSummaryChip(this.lastReloadDenominations);
     } else {
       const prevInfo = document.getElementById('prevUpdateInfo');
       if (prevInfo) prevInfo.style.display = 'none';
@@ -1276,6 +1295,7 @@ const App = {
         const el = document.getElementById(id);
         if (el) el.textContent = '';
       });
+      this.renderDenomsSummaryChip(this.lastReloadDenominations);
     }
 
     // If bankRowsContainer is empty and not editing, add 1 initial bank row
@@ -1299,6 +1319,9 @@ const App = {
     const reloadSimTotal = dialog + mobitel + airtel + hutch + ezcash;
     const reloadTotal = reloadSimTotal + reloadCash;
 
+    const liveReloadSimTotalEl = document.getElementById('liveReloadSimTotal');
+    if (liveReloadSimTotalEl) liveReloadSimTotalEl.textContent = DB.formatCurrency(reloadSimTotal);
+
     const liveReloadTotalEl = document.getElementById('liveReloadTotal');
     if (liveReloadTotalEl) liveReloadTotalEl.textContent = DB.formatCurrency(reloadTotal);
 
@@ -1321,6 +1344,17 @@ const App = {
 
     const liveBankTotalEl = document.getElementById('liveBankTotal');
     if (liveBankTotalEl) liveBankTotalEl.textContent = DB.formatCurrency(bankGrandTotal);
+
+    // Live Breakdown values in Section 4
+    const totalCashInDrawer = reloadCash + totalBankCash;
+    const liveSimsBreakdownVal = document.getElementById('liveSimsBreakdownVal');
+    if (liveSimsBreakdownVal) liveSimsBreakdownVal.textContent = DB.formatCurrency(reloadSimTotal);
+
+    const liveCashBreakdownVal = document.getElementById('liveCashBreakdownVal');
+    if (liveCashBreakdownVal) liveCashBreakdownVal.textContent = DB.formatCurrency(totalCashInDrawer);
+
+    const liveBankBreakdownVal = document.getElementById('liveBankBreakdownVal');
+    if (liveBankBreakdownVal) liveBankBreakdownVal.textContent = DB.formatCurrency(totalBankAcct);
 
     // 2.5 Section 2.5: Shift Adjustments
     let creditsTotal = 0;
@@ -1358,12 +1392,16 @@ const App = {
     // Diffs vs Previous Update
     const shopId = DB.getActiveShopId();
     const prevUpdate = shopId ? DB.getLastUpdate(shopId) : null;
+    const simsDiffBadge = document.getElementById('liveSimsDiffBadge');
+    const cashDrawerDiffBadge = document.getElementById('liveCashDrawerDiffBadge');
     const reloadDiffBadge = document.getElementById('liveReloadDiffBadge');
     const bankDiffBadge = document.getElementById('liveBankDiffBadge');
     const overallDiffBadge = document.getElementById('updateOverallDiffBadge');
     const container = document.getElementById('overallSummaryPreview');
 
     if (!prevUpdate) {
+      if (simsDiffBadge) simsDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
+      if (cashDrawerDiffBadge) cashDrawerDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (reloadDiffBadge) reloadDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (bankDiffBadge) bankDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (overallDiffBadge) overallDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
@@ -1372,6 +1410,8 @@ const App = {
     }
 
     const prevVals = DB.extractValues(prevUpdate);
+    const simsDiff = reloadSimTotal - prevVals.simTotal;
+    const cashDiff = totalCashInDrawer - prevVals.totalCash;
     const reloadDiff = reloadTotal - prevVals.reloadTotal;
     const bankDiff = bankGrandTotal - prevVals.bankTotal;
     const physicalDiff = physicalCapital - prevVals.totalCapital;
@@ -1385,6 +1425,8 @@ const App = {
       return `<span style="font-size:0.82rem; font-weight:700; color:${color};">${icon} ${diff >= 0 ? '+' : ''}${DB.formatCurrency(diff)}</span>`;
     };
 
+    if (simsDiffBadge) simsDiffBadge.innerHTML = formatBadge(simsDiff);
+    if (cashDrawerDiffBadge) cashDrawerDiffBadge.innerHTML = formatBadge(cashDiff);
     if (reloadDiffBadge) reloadDiffBadge.innerHTML = formatBadge(reloadDiff);
     if (bankDiffBadge) bankDiffBadge.innerHTML = formatBadge(bankDiff);
     if (overallDiffBadge) overallDiffBadge.innerHTML = formatBadge(adjustedDiff);
@@ -1982,6 +2024,8 @@ const App = {
     setVal('simHutch', vals.hutch);
     setVal('simEzcash', vals.ezcash);
     setVal('reloadCashInput', vals.reloadCash);
+    this.lastReloadDenominations = vals.reloadDenominations || null;
+    this.renderDenomsSummaryChip(this.lastReloadDenominations);
 
     // Section 2: Bank rows
     const container = document.getElementById('bankRowsContainer');
@@ -3629,10 +3673,36 @@ Thank you! - ${shopName}`;
       }
       if (this.currentDenomTarget === 'reloadCashInput') {
         this.lastReloadDenominations = denomsCopy;
+        this.renderDenomsSummaryChip(denomsCopy);
       }
     }
     this.closeModal();
     this.showToast(`✅ Cash count applied: ${DB.formatCurrency(total)}`, 'success');
+  },
+
+  renderDenomsSummaryChip(denoms) {
+    const el = document.getElementById('countedDenomsSummary');
+    if (!el) return;
+    if (!denoms) {
+      el.innerHTML = '';
+      return;
+    }
+    const parts = [];
+    if (denoms.n5000 > 0) parts.push(`5000×${denoms.n5000}`);
+    if (denoms.n2000 > 0) parts.push(`2000×${denoms.n2000}`);
+    if (denoms.n1000 > 0) parts.push(`1000×${denoms.n1000}`);
+    if (denoms.n500  > 0) parts.push(`500×${denoms.n500}`);
+    if (denoms.n100  > 0) parts.push(`100×${denoms.n100}`);
+    if (denoms.n50   > 0) parts.push(`50×${denoms.n50}`);
+    if (denoms.n20   > 0) parts.push(`20×${denoms.n20}`);
+    if (denoms.n10   > 0) parts.push(`10×${denoms.n10}`);
+    if (denoms.coins > 0) parts.push(`Coins: ${DB.formatCurrency(denoms.coins)}`);
+
+    if (parts.length > 0) {
+      el.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:6px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.35); color:var(--accent-gold); font-size:0.78rem; font-weight:700;">🧮 ${parts.join(', ')}</span>`;
+    } else {
+      el.innerHTML = '';
+    }
   },
 
   openDenominationModalForBankRow(rowId) {

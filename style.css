@@ -678,6 +678,15 @@ select option {
 .section-divider.green .divider-icon { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); }
 .section-divider.gold .divider-icon, .section-divider.amber .divider-icon { background: rgba(245, 158, 11, 0.15); color: var(--accent-gold); }
 
+/* ---- Dedicated Cash Drawer Section ---- */
+.cash-drawer-card {
+  transition: all 0.2s ease-in-out;
+}
+.cash-drawer-card:hover {
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.12) !important;
+}
+
 /* ---- Auto Total Display ---- */
 .auto-total {
   display: flex;

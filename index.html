@@ -362,29 +362,59 @@
               <input type="number" class="form-input balance-input" id="simEzcash" placeholder="0.00" step="0.01" min="0">
               <div class="prev-value" id="prevEzcashHint"></div>
             </div>
-            <div class="form-group">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label class="form-label" style="font-weight:700; color:var(--accent-gold); margin-bottom:0;" data-i18n="upd_reload_cash">💵 Reload Cash in Drawer</label>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="App.openDenominationModal('reloadCashInput')" style="font-size:0.75rem; padding:2px 8px; border:1px solid var(--accent-gold); color:var(--accent-gold); font-weight:700;" data-i18n="btn_count_notes">🧮 Count Notes</button>
-              </div>
-              <input type="number" class="form-input balance-input" id="reloadCashInput" placeholder="0.00" step="0.01" min="0">
-              <div class="prev-value" id="prevReloadCashHint"></div>
-            </div>
           </div>
 
-          <!-- Live Reload Total Badge -->
-          <div class="auto-total" style="padding:14px; border-radius:var(--radius-md); background:rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.2); margin-bottom:24px;">
+          <!-- Live Reload SIMs Total Badge -->
+          <div class="auto-total" style="padding:12px 16px; border-radius:var(--radius-md); background:rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.2); margin-bottom:24px;">
             <div>
-              <span class="total-label" style="font-size:0.95rem; font-weight:700;" data-i18n="upd_reload_total_badge">🔄 Reload Total (SIMs + Reload Cash)</span>
-              <div id="liveReloadDiffBadge" style="margin-top:4px;"></div>
+              <span class="total-label" style="font-size:0.95rem; font-weight:700;" data-i18n="upd_sims_total_badge">🔄 Reload SIMs Total</span>
+              <div id="liveSimsDiffBadge" style="margin-top:4px;"></div>
             </div>
-            <span class="total-value" id="liveReloadTotal" style="font-size:1.35rem; color:var(--accent-blue);">Rs.0.00</span>
+            <span class="total-value" id="liveReloadSimTotal" style="font-size:1.35rem; color:var(--accent-blue);">Rs.0.00</span>
           </div>
 
-          <!-- SECTION 2: BANK & MOBILE PAYMENTS -->
+          <!-- SECTION 2: SHOP CASH IN DRAWER (DEDICATED SECTION) -->
+          <div class="section-divider gold">
+            <div class="divider-icon">💵</div>
+            <div class="divider-text" data-i18n="upd_cash_sec_title">Section 2: Shop Cash in Drawer (සාප්පුවේ මුදල් ලාච්චුව)</div>
+            <div class="divider-line"></div>
+          </div>
+
+          <!-- Prominent Cash Drawer Card -->
+          <div class="card cash-drawer-card" style="margin-bottom:24px; padding:20px; background:linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%); border:2px solid rgba(245,158,11,0.35); border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(245,158,11,0.08);">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+              <div>
+                <label class="form-label" style="font-size:1.08rem; font-weight:800; color:var(--accent-gold); margin-bottom:4px; display:flex; align-items:center; gap:6px;" data-i18n="upd_cash_drawer_lbl">
+                  💵 Physical Cash in Drawer (සාප්පුවේ ලාච්චුවේ මුදල්)
+                </label>
+                <div style="font-size:0.83rem; color:var(--text-secondary);" data-i18n="upd_cash_drawer_desc">
+                  Enter physical cash in drawer or click "Count Notes" to calculate note denominations
+                </div>
+              </div>
+              <button type="button" class="btn btn-warning" onclick="App.openDenominationModal('reloadCashInput')" style="font-weight:700; padding:9px 18px; border-radius:var(--radius-sm); display:flex; align-items:center; gap:8px; box-shadow:0 2px 8px rgba(245,158,11,0.3); font-size:0.9rem;">
+                <span style="font-size:1.15rem;">🧮</span> <span data-i18n="btn_count_notes">Count Notes (5000, 2000, 1000...)</span>
+              </button>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+              <div style="flex:1; min-width:240px;">
+                <input type="number" class="form-input balance-input" id="reloadCashInput" placeholder="0.00" step="0.01" min="0" style="font-size:1.45rem; font-weight:800; color:var(--accent-gold); padding:10px 16px; border:2px solid var(--accent-gold); background:var(--bg-glass-card); border-radius:var(--radius-sm); width:100%;">
+              </div>
+              <div id="liveCashDrawerDiffBadge" style="display:flex; align-items:center;"></div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-top:12px; padding-top:10px; border-top:1px dashed rgba(245,158,11,0.25);">
+              <div class="prev-value" id="prevReloadCashHint" style="font-size:0.88rem; font-weight:700; color:var(--text-secondary);">
+                Previous Cash Drawer: Rs.0.00
+              </div>
+              <div id="countedDenomsSummary" style="font-size:0.82rem; color:var(--accent-gold); font-weight:700;"></div>
+            </div>
+          </div>
+
+          <!-- SECTION 3: BANK & MOBILE PAYMENTS -->
           <div class="section-divider purple">
             <div class="divider-icon">🏦</div>
-            <div class="divider-text" data-i18n="upd_bank_sec_title">Section 2: Bank & Mobile Payments</div>
+            <div class="divider-text" data-i18n="upd_bank_sec_title">Section 3: Bank & Mobile Payments</div>
             <div class="divider-line"></div>
           </div>
 
@@ -414,20 +444,36 @@
             </button>
           </div>
 
-          <!-- SECTION 3: GRAND TOTAL CAPITAL -->
+          <!-- SECTION 4: GRAND TOTAL CAPITAL -->
           <div class="section-divider green">
             <div class="divider-icon">💰</div>
-            <div class="divider-text" data-i18n="upd_grand_sec_title">Section 3: Grand Total Capital</div>
+            <div class="divider-text" data-i18n="upd_grand_sec_title">Section 4: Grand Total Capital</div>
             <div class="divider-line"></div>
           </div>
 
-          <!-- Live Grand Total Card -->
-          <div class="auto-total" style="padding:16px; border-radius:var(--radius-md); background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.25); margin-bottom:20px;">
-            <div>
-              <span class="total-label" style="font-size:1.05rem; font-weight:700;" data-i18n="upd_grand_total">Grand Total Capital (Reload + Bank)</span>
-              <div id="updateOverallDiffBadge" style="margin-top:4px;"></div>
+          <!-- Live Capital Breakdown Grid & Grand Total -->
+          <div class="auto-total" style="flex-direction:column; align-items:stretch; padding:18px 20px; border-radius:var(--radius-md); background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.28); margin-bottom:20px;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px dashed rgba(16,185,129,0.25);">
+              <div style="background:var(--bg-glass-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(59,130,246,0.2);">
+                <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:var(--accent-blue);" data-i18n="upd_sims_total_badge">🔄 Reload SIMs Total</div>
+                <div id="liveSimsBreakdownVal" style="font-size:1.15rem; font-weight:800; color:var(--accent-blue); margin-top:2px;">Rs.0.00</div>
+              </div>
+              <div style="background:var(--bg-glass-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(245,158,11,0.3);">
+                <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:var(--accent-gold);" data-i18n="upd_cash_total_badge">💵 Total Cash in Drawer</div>
+                <div id="liveCashBreakdownVal" style="font-size:1.15rem; font-weight:800; color:var(--accent-gold); margin-top:2px;">Rs.0.00</div>
+              </div>
+              <div style="background:var(--bg-glass-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(139,92,246,0.2);">
+                <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:var(--accent-purple);" data-i18n="upd_bank_total_badge">🏦 Bank Total</div>
+                <div id="liveBankBreakdownVal" style="font-size:1.15rem; font-weight:800; color:var(--accent-purple); margin-top:2px;">Rs.0.00</div>
+              </div>
             </div>
-            <span class="total-value" id="updateTotalCapital" style="font-size:1.6rem; color:var(--accent-green);">Rs.0.00</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <span class="total-label" style="font-size:1.05rem; font-weight:800;" data-i18n="upd_grand_total">Grand Total Capital (SIMs + Bank + Cash Drawer)</span>
+                <div id="updateOverallDiffBadge" style="margin-top:4px;"></div>
+              </div>
+              <span class="total-value" id="updateTotalCapital" style="font-size:1.7rem; font-weight:900; color:var(--accent-green);">Rs.0.00</span>
+            </div>
           </div>
 
           <!-- OVERALL SUMMARY PREVIEW -->
