@@ -1203,6 +1203,18 @@ const DB = {
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
 
+  getShiftsForShop(shopId) {
+    return this.getShifts(shopId);
+  },
+
+  getShiftsForShopByDate(shopId, date) {
+    return this.getShifts(shopId).filter(s => s.date === date);
+  },
+
+  getShiftsByDate(date) {
+    return this.getShifts(null).filter(s => s.date === date);
+  },
+
   saveShifts(list) {
     this._dualSave(this.SHIFTS_KEY, list);
   },
@@ -1210,24 +1222,43 @@ const DB = {
   addShift(data) {
     const list = this.getShifts(null);
     const now = new Date();
+    const posCash = parseFloat(data.posCash || data.posCashSales) || 0;
+    const posCard = parseFloat(data.posCard || data.posCardSales) || 0;
+    const posCheque = parseFloat(data.posCheque || data.posChequeSales) || 0;
+    const posTotal = (parseFloat(data.posSales || data.posGrossSales) || 0) || (posCash + posCard + posCheque);
+
     const item = {
       id: 'shift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       shopId: data.shopId,
       shiftName: data.shiftName || 'Evening Closing',
+      shiftType: data.shiftType || 'evening',
       date: data.date || now.toISOString().split('T')[0],
       timestamp: data.timestamp || now.toISOString(),
-      cashierName: (data.cashierName || '').trim(),
+      cashierName: (data.cashierName || data.cashier || '').trim(),
+      cashier: (data.cashierName || data.cashier || '').trim(),
       openingFloat: parseFloat(data.openingFloat) || 0,
-      posSales: parseFloat(data.posSales) || 0,
-      reloadCashCollected: parseFloat(data.reloadCashCollected) || 0,
-      totalExpenses: parseFloat(data.totalExpenses) || 0,
+      
+      // Detailed POS breakdown
+      posSales: posTotal,
+      posGrossSales: posTotal,
+      posCashSales: posCash,
+      posCardSales: posCard,
+      posChequeSales: posCheque,
+      
+      reloadCashCollected: parseFloat(data.reloadCashCollected || data.reloadCashInDrawer) || 0,
+      reloadCashInDrawer: parseFloat(data.reloadCashCollected || data.reloadCashInDrawer) || 0,
+      drawerExpenses: parseFloat(data.drawerExpenses || data.totalExpenses) || 0,
+      totalExpenses: parseFloat(data.drawerExpenses || data.totalExpenses) || 0,
       ownerDrawings: parseFloat(data.ownerDrawings) || 0,
+      
       expectedCash: parseFloat(data.expectedCash) || 0,
-      actualCountedCash: parseFloat(data.actualCountedCash) || 0,
+      actualCountedCash: parseFloat(data.actualCountedCash || data.countedCash) || 0,
+      countedCash: parseFloat(data.actualCountedCash || data.countedCash) || 0,
       difference: parseFloat(data.difference) || 0,
       status: data.status || 'balanced', // 'balanced', 'excess', 'shortage'
       denominations: data.denominations || null,
-      note: (data.note || '').trim()
+      note: (data.note || data.notes || '').trim(),
+      notes: (data.note || data.notes || '').trim()
     };
     list.unshift(item);
     this.saveShifts(list);
@@ -1247,6 +1278,18 @@ const DB = {
     if (shopId) list = list.filter(e => e.shopId === shopId);
     if (date) list = list.filter(e => e.date === date);
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  getExpensesForShop(shopId) {
+    return this.getExpenses(shopId);
+  },
+
+  getExpensesForShopByDate(shopId, date) {
+    return this.getExpenses(shopId, date);
+  },
+
+  getExpensesByDate(date) {
+    return this.getExpenses(null, date);
   },
 
   saveExpenses(list) {

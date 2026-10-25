@@ -132,15 +132,19 @@ const App = {
     document.getElementById('modalBody').innerHTML = bodyHTML;
     const actionsEl = document.getElementById('modalActions');
     actionsEl.innerHTML = '';
-    actions.forEach(action => {
-      const btn = document.createElement('button');
-      btn.className = `btn ${action.class || 'btn-ghost'}`;
-      btn.textContent = action.text;
-      btn.onclick = () => {
-        action.onClick();
-      };
-      actionsEl.appendChild(btn);
-    });
+    if (typeof actions === 'string') {
+      actionsEl.innerHTML = actions;
+    } else if (Array.isArray(actions)) {
+      actions.forEach(action => {
+        const btn = document.createElement('button');
+        btn.className = `btn ${action.class || 'btn-ghost'}`;
+        btn.textContent = action.text;
+        btn.onclick = () => {
+          action.onClick();
+        };
+        actionsEl.appendChild(btn);
+      });
+    }
     document.getElementById('modalOverlay').classList.add('active');
   },
 
@@ -393,6 +397,9 @@ const App = {
 
     // V14 Performance Analytics Chart
     this.renderDashboardAnalyticsChart();
+
+    // V14 Shift Status Banner
+    this.updateDashboardShiftStatusBanner();
   },
 
   renderEmptyShopDashboard(shop) {
@@ -427,6 +434,9 @@ const App = {
 
     // V14 Performance Analytics Chart
     this.renderDashboardAnalyticsChart();
+
+    // V14 Shift Status Banner
+    this.updateDashboardShiftStatusBanner();
   },
 
   renderComparisonTable(lastUpdate) {
@@ -615,6 +625,9 @@ const App = {
 
       // V14 Performance Analytics Chart
       this.renderDashboardAnalyticsChart();
+
+      // V14 Shift Status Banner
+      this.updateDashboardShiftStatusBanner();
     } else {
       document.getElementById('overallValue').textContent = 'Rs.0.00';
       document.getElementById('overallValue').className = 'overall-value neutral';
@@ -784,6 +797,102 @@ const App = {
     });
     html += '</div>';
     container.innerHTML = html;
+  },
+
+  updateDashboardShiftStatusBanner() {
+    const banner = document.getElementById('dashShiftStatusBanner');
+    if (!banner) return;
+    const shopId = DB.getActiveShopId();
+    const today = DB.getTodayDate();
+    const todayShifts = shopId ? DB.getShiftsForShopByDate(shopId, today) : DB.getShiftsByDate(today);
+
+    const subEl = document.getElementById('dashShiftStatusSubtitle');
+    const badgeEl = document.getElementById('dashShiftStatusBadge');
+    const printBtn = document.getElementById('dashShiftPrintBtn');
+
+    if (todayShifts.length > 0) {
+      const s = todayShifts[0];
+      const diff = s.difference || 0;
+      const posTotal = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
+      const counted = s.countedCash || s.actualCountedCash || 0;
+
+      if (badgeEl) {
+        if (s.status === 'balanced') {
+          badgeEl.className = 'tally-badge balanced';
+          badgeEl.textContent = '✅ BALANCED (Rs. 0.00)';
+        } else if (s.status === 'excess') {
+          badgeEl.className = 'tally-badge excess';
+          badgeEl.textContent = `🟢 CASH EXCESS (+${DB.formatCurrency(diff)})`;
+        } else {
+          badgeEl.className = 'tally-badge shortage';
+          badgeEl.textContent = `🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})`;
+        }
+      }
+
+      if (subEl) {
+        subEl.innerHTML = `Cashier: <strong>${s.cashier || s.cashierName || 'Staff'}</strong> | Counted Cash: <strong>${DB.formatCurrency(counted)}</strong> | POS Gross: <strong>${DB.formatCurrency(posTotal)}</strong>`;
+      }
+
+      if (printBtn) printBtn.style.display = 'inline-flex';
+    } else {
+      if (badgeEl) {
+        badgeEl.className = 'tally-badge shortage';
+        badgeEl.textContent = '⏳ Not Closed Today';
+      }
+      if (subEl) {
+        subEl.textContent = I18N.currentLang === 'si' ? 'අද දවසේ හවස සමරි එක තවම ගලපා නැත. ආරම්භ කිරීමට බොත්තම ඔබන්න.' : 'Evening shift reconciliation not closed yet today. Click button to tally.';
+      }
+      if (printBtn) printBtn.style.display = 'none';
+    }
+  },
+
+  filterDashboardView(view) {
+    const banner = document.getElementById('dashShiftStatusBanner');
+    const summaryCards = document.getElementById('summaryCards');
+    const chartCard = document.getElementById('dashAnalyticsChartCard');
+    const compSection = document.getElementById('dashComparisonSection');
+    const updatesSection = document.getElementById('dashRecentUpdates')?.closest('.card');
+
+    if (!summaryCards) return;
+
+    if (view === 'all') {
+      if (banner) banner.style.display = 'block';
+      summaryCards.style.display = 'grid';
+      if (chartCard) chartCard.style.display = 'block';
+      if (compSection) compSection.style.display = 'block';
+      if (updatesSection) updatesSection.style.display = 'block';
+      summaryCards.querySelectorAll('.card').forEach(c => c.style.display = 'block');
+    } else if (view === 'shifts') {
+      if (banner) {
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth' });
+      }
+      summaryCards.style.display = 'grid';
+      summaryCards.querySelectorAll('.card').forEach(c => {
+        const isCash = c.classList.contains('accent-gold') || c.classList.contains('accent-green');
+        c.style.display = isCash ? 'block' : 'none';
+      });
+      if (chartCard) chartCard.style.display = 'block';
+      if (compSection) compSection.style.display = 'none';
+    } else if (view === 'reload') {
+      summaryCards.style.display = 'grid';
+      summaryCards.querySelectorAll('.card').forEach(c => {
+        const isReload = c.classList.contains('accent-blue') || c.classList.contains('accent-green');
+        c.style.display = isReload ? 'block' : 'none';
+      });
+      if (compSection) compSection.style.display = 'block';
+      if (banner) banner.style.display = 'none';
+    } else if (view === 'bank') {
+      summaryCards.style.display = 'grid';
+      summaryCards.querySelectorAll('.card').forEach(c => {
+        const isBank = c.classList.contains('accent-purple') || c.classList.contains('accent-green');
+        c.style.display = isBank ? 'block' : 'none';
+      });
+      if (compSection) compSection.style.display = 'block';
+      if (banner) banner.style.display = 'none';
+    } else if (view === 'credits') {
+      this.navigateTo('credits');
+    }
   },
 
   // ================================================================
@@ -1599,6 +1708,102 @@ const App = {
 
     html += '</div>';
     container.innerHTML = html;
+  },
+
+  updateDashboardShiftStatusBanner() {
+    const banner = document.getElementById('dashShiftStatusBanner');
+    if (!banner) return;
+    const shopId = DB.getActiveShopId();
+    const today = DB.getTodayDate();
+    const todayShifts = shopId ? DB.getShiftsForShopByDate(shopId, today) : DB.getShiftsByDate(today);
+
+    const subEl = document.getElementById('dashShiftStatusSubtitle');
+    const badgeEl = document.getElementById('dashShiftStatusBadge');
+    const printBtn = document.getElementById('dashShiftPrintBtn');
+
+    if (todayShifts.length > 0) {
+      const s = todayShifts[0];
+      const diff = s.difference || 0;
+      const posTotal = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
+      const counted = s.countedCash || s.actualCountedCash || 0;
+
+      if (badgeEl) {
+        if (s.status === 'balanced') {
+          badgeEl.className = 'tally-badge balanced';
+          badgeEl.textContent = '✅ BALANCED (Rs. 0.00)';
+        } else if (s.status === 'excess') {
+          badgeEl.className = 'tally-badge excess';
+          badgeEl.textContent = `🟢 CASH EXCESS (+${DB.formatCurrency(diff)})`;
+        } else {
+          badgeEl.className = 'tally-badge shortage';
+          badgeEl.textContent = `🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})`;
+        }
+      }
+
+      if (subEl) {
+        subEl.innerHTML = `Cashier: <strong>${s.cashier || s.cashierName || 'Staff'}</strong> | Counted Cash: <strong>${DB.formatCurrency(counted)}</strong> | POS Gross: <strong>${DB.formatCurrency(posTotal)}</strong>`;
+      }
+
+      if (printBtn) printBtn.style.display = 'inline-flex';
+    } else {
+      if (badgeEl) {
+        badgeEl.className = 'tally-badge shortage';
+        badgeEl.textContent = '⏳ Not Closed Today';
+      }
+      if (subEl) {
+        subEl.textContent = I18N.currentLang === 'si' ? 'අද දවසේ හවස සමරි එක තවම ගලපා නැත. ආරම්භ කිරීමට බොත්තම ඔබන්න.' : 'Evening shift reconciliation not closed yet today. Click button to tally.';
+      }
+      if (printBtn) printBtn.style.display = 'none';
+    }
+  },
+
+  filterDashboardView(view) {
+    const banner = document.getElementById('dashShiftStatusBanner');
+    const summaryCards = document.getElementById('summaryCards');
+    const chartCard = document.getElementById('dashAnalyticsChartCard');
+    const compSection = document.getElementById('dashComparisonSection');
+    const updatesSection = document.getElementById('dashRecentUpdates')?.closest('.card');
+
+    if (!summaryCards) return;
+
+    if (view === 'all') {
+      if (banner) banner.style.display = 'block';
+      summaryCards.style.display = 'grid';
+      if (chartCard) chartCard.style.display = 'block';
+      if (compSection) compSection.style.display = 'block';
+      if (updatesSection) updatesSection.style.display = 'block';
+      summaryCards.querySelectorAll('.card').forEach(c => c.style.display = 'block');
+    } else if (view === 'shifts') {
+      if (banner) {
+        banner.style.display = 'block';
+        banner.scrollIntoView({ behavior: 'smooth' });
+      }
+      summaryCards.style.display = 'grid';
+      summaryCards.querySelectorAll('.card').forEach(c => {
+        const isCash = c.classList.contains('accent-gold') || c.classList.contains('accent-green');
+        c.style.display = isCash ? 'block' : 'none';
+      });
+      if (chartCard) chartCard.style.display = 'block';
+      if (compSection) compSection.style.display = 'none';
+    } else if (view === 'reload') {
+      summaryCards.style.display = 'grid';
+      summaryCards.querySelectorAll('.card').forEach(c => {
+        const isReload = c.classList.contains('accent-blue') || c.classList.contains('accent-green');
+        c.style.display = isReload ? 'block' : 'none';
+      });
+      if (compSection) compSection.style.display = 'block';
+      if (banner) banner.style.display = 'none';
+    } else if (view === 'bank') {
+      summaryCards.style.display = 'grid';
+      summaryCards.querySelectorAll('.card').forEach(c => {
+        const isBank = c.classList.contains('accent-purple') || c.classList.contains('accent-green');
+        c.style.display = isBank ? 'block' : 'none';
+      });
+      if (compSection) compSection.style.display = 'block';
+      if (banner) banner.style.display = 'none';
+    } else if (view === 'credits') {
+      this.navigateTo('credits');
+    }
   },
 
   showUpdateDetail(updateId) {
@@ -3480,7 +3685,7 @@ Thank you! - ${shopName}`;
     const today = DB.getTodayDate();
     const filterDate = this.shiftDateFilter;
 
-    // Fetch shifts & expenses
+    // Fetch shifts & expenses safely
     const allShifts = shopId ? DB.getShiftsForShop(shopId) : DB.getShifts();
     const allExpenses = shopId ? DB.getExpensesForShop(shopId) : DB.getExpenses();
 
@@ -3488,7 +3693,7 @@ Thank you! - ${shopName}`;
     const todayShifts = allShifts.filter(s => s.date === today);
     const todayExpenses = allExpenses.filter(e => e.date === today);
 
-    const posSalesToday = todayShifts.reduce((s, sh) => s + (parseFloat(sh.posGrossSales) || 0), 0);
+    const posSalesToday = todayShifts.reduce((s, sh) => s + (parseFloat(sh.posGrossSales || sh.posSales) || 0), 0);
     const expensesToday = todayExpenses.reduce((s, ex) => s + (parseFloat(ex.amount) || 0), 0);
     const latestShiftToday = todayShifts.length > 0 ? todayShifts[0] : null;
 
@@ -3501,7 +3706,7 @@ Thank you! - ${shopName}`;
     const kpiCounted = document.getElementById('kpiShiftCountedCash');
     const kpiExpected = document.getElementById('kpiShiftExpectedCash');
     if (latestShiftToday) {
-      if (kpiCounted) kpiCounted.textContent = DB.formatCurrency(latestShiftToday.countedCash || 0);
+      if (kpiCounted) kpiCounted.textContent = DB.formatCurrency(latestShiftToday.countedCash || latestShiftToday.actualCountedCash || 0);
       if (kpiExpected) kpiExpected.textContent = `${I18N.t('shift_expected_cash') || 'Expected'}: ${DB.formatCurrency(latestShiftToday.expectedCash || 0)}`;
     } else {
       if (kpiCounted) kpiCounted.textContent = 'Rs.0.00';
@@ -3556,18 +3761,20 @@ Thank you! - ${shopName}`;
       }
 
       let html = `
-        <table class="data-table" style="width:100%; min-width:850px;">
+        <table class="data-table" style="width:100%; min-width:900px;">
           <thead>
             <tr>
               <th>${I18N.t('hist_col_date') || 'Date / Time'}</th>
-              <th>${I18N.t('shift_type') || 'Shift Type'}</th>
               <th>${I18N.t('upd_emp_name') || 'Cashier'}</th>
               <th style="text-align:right;">${I18N.t('shift_opening_float') || 'Opening Float'}</th>
-              <th style="text-align:right;">${I18N.t('shift_pos_sales') || 'POS Sales'}</th>
+              <th style="text-align:right;">${I18N.t('shift_pos_cash') || 'POS Cash'}</th>
+              <th style="text-align:right;">${I18N.t('shift_pos_card') || 'POS Cards'}</th>
+              <th style="text-align:right;">${I18N.t('shift_pos_cheque') || 'POS Cheques'}</th>
+              <th style="text-align:right; font-weight:800;">${I18N.t('shift_pos_sales') || 'POS Total'}</th>
               <th style="text-align:right;">${I18N.t('shift_reload_cash') || 'Reload Cash'}</th>
               <th style="text-align:right;">${I18N.t('stat_daily_expenses') || 'Expenses'}</th>
               <th style="text-align:right;">${I18N.t('shift_expected_cash') || 'Expected Cash'}</th>
-              <th style="text-align:right;">${I18N.t('shift_counted_cash') || 'Counted Cash'}</th>
+              <th style="text-align:right; font-weight:800;">${I18N.t('shift_counted_cash') || 'Counted Cash'}</th>
               <th style="text-align:center;">${I18N.t('shift_status_verdict') || 'Status'}</th>
               <th style="text-align:center;">Actions</th>
             </tr>
@@ -3586,7 +3793,10 @@ Thank you! - ${shopName}`;
           badgeHtml = `<span class="tally-badge shortage">🔴 -${DB.formatCurrency(Math.abs(diff))}</span>`;
         }
 
-        const shiftTypeLabel = s.shiftType === 'evening' ? (I18N.t('shift_evening') || 'Evening') : s.shiftType === 'morning' ? (I18N.t('shift_morning') || 'Morning') : (I18N.t('shift_fullday') || 'Full Day');
+        const posCash = s.posCashSales || 0;
+        const posCard = s.posCardSales || 0;
+        const posCheque = s.posChequeSales || 0;
+        const posTotal = s.posGrossSales || s.posSales || (posCash + posCard + posCheque);
 
         html += `
           <tr style="border-bottom:1px solid var(--border-glass);">
@@ -3594,17 +3804,20 @@ Thank you! - ${shopName}`;
               <div style="font-weight:700;">${DB.formatDate(s.date)}</div>
               <div style="font-size:0.75rem; color:var(--text-muted);">${DB.formatTime(s.timestamp)}</div>
             </td>
-            <td><span class="date-pill" style="font-size:0.75rem;">${shiftTypeLabel}</span></td>
-            <td>${s.cashier || '--'}</td>
+            <td><strong>${s.cashier || s.cashierName || '--'}</strong></td>
             <td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td>
-            <td style="text-align:right; font-weight:700; color:var(--accent-blue);">${DB.formatCurrency(s.posGrossSales || 0)}</td>
-            <td style="text-align:right;">${DB.formatCurrency(s.reloadCashInDrawer || 0)}</td>
-            <td style="text-align:right; color:var(--accent-red);">${DB.formatCurrency(s.drawerExpenses || 0)}</td>
+            <td style="text-align:right; color:var(--accent-blue);">${DB.formatCurrency(posCash)}</td>
+            <td style="text-align:right; color:var(--accent-purple);">${DB.formatCurrency(posCard)}</td>
+            <td style="text-align:right; color:var(--accent-gold);">${DB.formatCurrency(posCheque)}</td>
+            <td style="text-align:right; font-weight:800; color:var(--text-primary);">${DB.formatCurrency(posTotal)}</td>
+            <td style="text-align:right;">${DB.formatCurrency(s.reloadCashInDrawer || s.reloadCashCollected || 0)}</td>
+            <td style="text-align:right; color:var(--accent-red);">${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td>
             <td style="text-align:right; font-weight:600;">${DB.formatCurrency(s.expectedCash || 0)}</td>
-            <td style="text-align:right; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(s.countedCash || 0)}</td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td>
             <td style="text-align:center;">${badgeHtml}</td>
-            <td style="text-align:center;">
-              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift">🗑️</button>
+            <td style="text-align:center; white-space:nowrap;">
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Print Settlement Slip / PDF" style="padding:3px 7px; margin-right:4px;">🖨️</button>
+              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:3px 7px;">🗑️</button>
             </td>
           </tr>
         `;
@@ -3652,7 +3865,7 @@ Thank you! - ${shopName}`;
             <td><span class="expense-cat-badge ${catClass}">${catLabel}</span></td>
             <td style="font-weight:600;">${e.description || '--'}</td>
             <td><span class="date-pill" style="font-size:0.75rem;">${paidFromLabel}</span></td>
-            <td style="text-align:center;">${e.deductFromDrawer ? '✅ Yes' : '➖ No'}</td>
+            <td style="text-align:center;">${e.deductFromDrawer || e.deductFromBalance ? '✅ Yes' : '➖ No'}</td>
             <td style="text-align:right; font-weight:800; color:var(--accent-red);">${DB.formatCurrency(e.amount || 0)}</td>
             <td style="text-align:center;">
               <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteExpense('${e.id}')" title="Delete Expense">🗑️</button>
@@ -3678,7 +3891,7 @@ Thank you! - ${shopName}`;
     // Default opening float: fetch latest shift for this shop
     const shopShifts = DB.getShiftsForShop(shopId);
     const lastShift = shopShifts.length > 0 ? shopShifts[0] : null;
-    const defaultFloat = lastShift ? (lastShift.countedCash || 0) : 0;
+    const defaultFloat = lastShift ? (lastShift.countedCash || lastShift.actualCountedCash || 0) : 0;
 
     // Default reload cash from latest update today
     const todayUpdates = DB.getUpdatesForShopByDate(shopId, today);
@@ -3689,13 +3902,14 @@ Thank you! - ${shopName}`;
     }
 
     // Default drawer expenses today
-    const todayExpenses = DB.getExpensesForShopByDate(shopId, today).filter(e => e.deductFromDrawer !== false);
+    const todayExpenses = DB.getExpensesForShopByDate(shopId, today).filter(e => e.deductFromDrawer !== false && e.deductFromBalance !== false);
     const defaultExpenses = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
     const bodyHtml = `
       <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
-          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+          <div>🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}</div>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.showAddExpenseModal()" style="font-size:0.75rem; color:var(--accent-red); border:1px solid rgba(228,0,43,0.3);">+ Add Expense</button>
         </div>
 
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
@@ -3709,42 +3923,67 @@ Thank you! - ${shopName}`;
           </div>
           <div class="form-group">
             <label class="form-label" style="font-size:0.8rem;">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
-            <input type="text" class="form-input" id="shiftModalCashier" placeholder="Cashier Name" style="padding:8px;">
+            <input type="text" class="form-input" id="shiftModalCashier" placeholder="Cashier Name" style="padding:8px;" required>
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; background:var(--bg-glass); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
-          <div class="form-group">
-            <label class="form-label" style="font-size:0.75rem;">1. ${I18N.t('shift_opening_float') || 'Opening Cash Float'}</label>
-            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}">
+        <!-- Section: Opening Float & POS Sales Breakdown -->
+        <div style="background:var(--bg-card); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+            <span>🛒</span> <span>POS Machine Breakdown & Opening Float</span>
           </div>
-          <div class="form-group">
-            <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue); font-weight:700;">2. ${I18N.t('shift_pos_sales') || 'POS Gross Sales'}</label>
-            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosSales" placeholder="0.00" value="0">
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+            <div class="form-group">
+              <label class="form-label" style="font-size:0.75rem;">1. ${I18N.t('shift_opening_float') || 'Opening Float'}</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue); font-weight:700;">2. ${I18N.t('shift_pos_cash') || 'POS Cash Sales'}</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCash" placeholder="0.00" value="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:0.75rem; color:var(--accent-purple); font-weight:700;">3. ${I18N.t('shift_pos_card') || 'POS Card Sales'}</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCard" placeholder="0.00" value="0">
+            </div>
+            <div class="form-group">
+              <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold); font-weight:700;">4. ${I18N.t('shift_pos_cheque') || 'POS Cheques/QR'}</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCheque" placeholder="0.00" value="0">
+            </div>
           </div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-glass); display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
+            <span style="color:var(--text-secondary); font-weight:600;">Total POS Gross Sales:</span>
+            <span id="shiftModalPosTotal" style="font-weight:800; color:var(--accent-blue); font-size:1.05rem;">Rs.0.00</span>
+          </div>
+        </div>
+
+        <!-- Section: Reload Cash & Expenses -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:var(--bg-glass); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
           <div class="form-group">
-            <label class="form-label" style="font-size:0.75rem;">3. ${I18N.t('shift_reload_cash') || 'Reload Cash Collected'}</label>
+            <label class="form-label" style="font-size:0.75rem;">5. ${I18N.t('shift_reload_cash') || 'Reload Cash in Drawer'}</label>
             <input type="number" step="0.01" min="0" class="form-input" id="shiftModalReloadCash" value="${defaultReloadCash}">
           </div>
           <div class="form-group">
-            <label class="form-label" style="font-size:0.75rem; color:var(--accent-red);">4. ${I18N.t('stat_daily_expenses') || 'Daily Expenses Deducted'}</label>
+            <label class="form-label" style="font-size:0.75rem; color:var(--accent-red);">6. ${I18N.t('stat_daily_expenses') || 'Daily Expenses Deducted'}</label>
             <input type="number" step="0.01" min="0" class="form-input" id="shiftModalExpenses" value="${defaultExpenses}">
           </div>
         </div>
 
         <!-- Expected Cash Badge -->
         <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:10px 14px;">
-          <div style="font-weight:700; font-size:0.88rem; color:var(--text-secondary);">${I18N.t('shift_expected_cash') || 'Expected Cash in Drawer'}:</div>
-          <div style="font-size:1.25rem; font-weight:800; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
+          <div>
+            <div style="font-weight:700; font-size:0.88rem; color:var(--text-secondary);">${I18N.t('shift_expected_cash') || 'Expected Cash in Drawer'}:</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">(Float + POS Cash + Reload Cash - Expenses)</div>
+          </div>
+          <div style="font-size:1.3rem; font-weight:800; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
         </div>
 
         <!-- Actual Counted Cash & Note Counter Trigger -->
         <div class="form-group" style="margin-top:4px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 5. ${I18N.t('shift_counted_cash') || 'Actual Physical Counted Cash'}</label>
-            <button type="button" class="btn btn-xs btn-ghost" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 8px; border:1px solid var(--accent-gold); color:var(--accent-gold); font-weight:700;">🧮 Count Notes</button>
+            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 7. ${I18N.t('shift_counted_cash') || 'Actual Physical Counted Cash'}</label>
+            <button type="button" class="btn btn-xs btn-primary" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 10px; font-weight:700;">🧮 Count Notes (5000, 2000...)</button>
           </div>
-          <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.1rem; font-weight:700;">
+          <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.2rem; font-weight:800;">
         </div>
 
         <!-- Tally Verdict Live Badge -->
@@ -3755,7 +3994,7 @@ Thank you! - ${shopName}`;
 
         <div class="form-group">
           <label class="form-label" style="font-size:0.8rem;">${I18N.t('exp_col_description') || 'Shift Notes / Remarks'}</label>
-          <input type="text" class="form-input" id="shiftModalNotes" placeholder="e.g. Evening closing ok, float left for tomorrow">
+          <input type="text" class="form-input" id="shiftModalNotes" placeholder="e.g. Evening closing ok, all notes tallied, float kept for tomorrow">
         </div>
       </form>
     `;
@@ -3771,19 +4010,28 @@ Thank you! - ${shopName}`;
 
     // Setup live calculation in modal
     const fltInp = document.getElementById('shiftModalFloat');
-    const posInp = document.getElementById('shiftModalPosSales');
+    const posCashInp = document.getElementById('shiftModalPosCash');
+    const posCardInp = document.getElementById('shiftModalPosCard');
+    const posChequeInp = document.getElementById('shiftModalPosCheque');
     const relInp = document.getElementById('shiftModalReloadCash');
     const expInp = document.getElementById('shiftModalExpenses');
     const cntInp = document.getElementById('shiftModalCounted');
 
     const updateCalc = () => {
       const flt = parseFloat(fltInp.value) || 0;
-      const pos = parseFloat(posInp.value) || 0;
+      const posCash = parseFloat(posCashInp.value) || 0;
+      const posCard = parseFloat(posCardInp.value) || 0;
+      const posCheque = parseFloat(posChequeInp.value) || 0;
+      const posTotal = posCash + posCard + posCheque;
       const rel = parseFloat(relInp.value) || 0;
       const exp = parseFloat(expInp.value) || 0;
       const cnt = parseFloat(cntInp.value) || 0;
 
-      const expected = flt + pos + rel - exp;
+      const posTotEl = document.getElementById('shiftModalPosTotal');
+      if (posTotEl) posTotEl.textContent = DB.formatCurrency(posTotal);
+
+      // Expected Drawer Cash = Float + POS Cash + Reload Cash - Expenses
+      const expected = flt + posCash + rel - exp;
       const diff = cnt - expected;
 
       const expEl = document.getElementById('shiftModalExpectedVal');
@@ -3794,14 +4042,14 @@ Thank you! - ${shopName}`;
         if (Math.abs(diff) < 0.01) {
           vBadge.innerHTML = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'} (Rs. 0.00)</span>`;
         } else if (diff > 0) {
-          vBadge.innerHTML = `<span class="tally-badge excess">🟢 ${I18N.t('shift_excess') || 'Excess'} (+${DB.formatCurrency(diff)})</span>`;
+          vBadge.innerHTML = `<span class="tally-badge excess">🟢 ${I18N.t('shift_excess') || 'Cash Excess'} (+${DB.formatCurrency(diff)})</span>`;
         } else {
-          vBadge.innerHTML = `<span class="tally-badge shortage">🔴 ${I18N.t('shift_shortage') || 'Shortage'} (-${DB.formatCurrency(Math.abs(diff))})</span>`;
+          vBadge.innerHTML = `<span class="tally-badge shortage">🔴 ${I18N.t('shift_shortage') || 'Cash Shortage'} (-${DB.formatCurrency(Math.abs(diff))})</span>`;
         }
       }
     };
 
-    [fltInp, posInp, relInp, expInp, cntInp].forEach(inp => {
+    [fltInp, posCashInp, posCardInp, posChequeInp, relInp, expInp, cntInp].forEach(inp => {
       if (inp) inp.addEventListener('input', updateCalc);
     });
 
@@ -3824,15 +4072,19 @@ Thank you! - ${shopName}`;
     if (!shopId) return;
 
     const shiftType = document.getElementById('shiftModalType')?.value || 'evening';
-    const cashier = document.getElementById('shiftModalCashier')?.value || '';
+    const cashier = document.getElementById('shiftModalCashier')?.value?.trim() || '';
     const openingFloat = parseFloat(document.getElementById('shiftModalFloat')?.value) || 0;
-    const posGrossSales = parseFloat(document.getElementById('shiftModalPosSales')?.value) || 0;
+    const posCashSales = parseFloat(document.getElementById('shiftModalPosCash')?.value) || 0;
+    const posCardSales = parseFloat(document.getElementById('shiftModalPosCard')?.value) || 0;
+    const posChequeSales = parseFloat(document.getElementById('shiftModalPosCheque')?.value) || 0;
+    const posGrossSales = posCashSales + posCardSales + posChequeSales;
+
     const reloadCashInDrawer = parseFloat(document.getElementById('shiftModalReloadCash')?.value) || 0;
     const drawerExpenses = parseFloat(document.getElementById('shiftModalExpenses')?.value) || 0;
     const countedCash = parseFloat(document.getElementById('shiftModalCounted')?.value) || 0;
     const notes = document.getElementById('shiftModalNotes')?.value || '';
 
-    const expectedCash = openingFloat + posGrossSales + reloadCashInDrawer - drawerExpenses;
+    const expectedCash = openingFloat + posCashSales + reloadCashInDrawer - drawerExpenses;
     const difference = countedCash - expectedCash;
     let status = 'balanced';
     if (difference > 0.01) status = 'excess';
@@ -3842,19 +4094,28 @@ Thank you! - ${shopName}`;
       shopId,
       shiftType,
       cashier,
+      cashierName: cashier,
       openingFloat,
       posGrossSales,
+      posSales: posGrossSales,
+      posCashSales,
+      posCardSales,
+      posChequeSales,
       reloadCashInDrawer,
+      reloadCashCollected: reloadCashInDrawer,
       drawerExpenses,
+      totalExpenses: drawerExpenses,
       expectedCash,
       countedCash,
+      actualCountedCash: countedCash,
       difference,
       status,
       notes,
+      note: notes,
       denominations: this.lastShiftDenominations || null
     };
 
-    DB.addShift(shiftData);
+    const savedShift = DB.addShift(shiftData);
     this.lastShiftDenominations = null;
     this.closeModal();
     this.showToast(`✅ ${I18N.t('shift_saved_success') || 'Shift closing saved successfully!'}`, 'success');
@@ -3863,6 +4124,13 @@ Thank you! - ${shopName}`;
       this.renderShiftsPage();
     }
     this.renderDashboard();
+
+    // Prompt user to print or view settlement slip
+    setTimeout(() => {
+      if (confirm(I18N.currentLang === 'si' ? 'හවස් සාරාංශ පත්‍රිකාව (Settlement Slip / PDF) Print කිරීමට අවශ්‍යද?' : 'Would you like to print/download the Daily Settlement Slip now?')) {
+        this.printShiftSlip(savedShift.id);
+      }
+    }, 400);
   },
 
   promptDeleteShift(shiftId) {
@@ -3877,363 +4145,166 @@ Thank you! - ${shopName}`;
     this.renderDashboard();
   },
 
-  // ================================================================
-  // V14 DAILY EXPENSES & OWNER DRAWINGS
-  // ================================================================
-  showAddExpenseModal() {
+  printTodayShiftSlip() {
     const shopId = DB.getActiveShopId();
-    if (!shopId) {
-      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+    const today = DB.getTodayDate();
+    const todayShifts = shopId ? DB.getShiftsForShopByDate(shopId, today) : DB.getShiftsByDate(today);
+    if (todayShifts.length === 0) {
+      this.showToast('No shift closed today yet', 'info');
       return;
     }
-    const shop = DB.getShop(shopId);
+    this.printShiftSlip(todayShifts[0].id);
+  },
 
-    const bodyHtml = `
-      <form id="addExpenseForm" style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
-          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(DB.getTodayDate())}
+  printShiftSlip(shiftId) {
+    const shifts = DB.getShifts();
+    const s = shifts.find(x => x.id === shiftId);
+    if (!s) {
+      this.showToast('Shift not found', 'error');
+      return;
+    }
+    const shop = DB.getShop(s.shopId);
+    const shopName = shop ? shop.name : 'Shop Payment Tracker';
+
+    const posCash = s.posCashSales || 0;
+    const posCard = s.posCardSales || 0;
+    const posCheque = s.posChequeSales || 0;
+    const posTotal = s.posGrossSales || s.posSales || (posCash + posCard + posCheque);
+
+    const denoms = s.denominations || {};
+    const denomMultipliers = [
+      { key: 'n5000', label: 'Rs. 5,000', val: 5000 },
+      { key: 'n2000', label: 'Rs. 2,000', val: 2000 },
+      { key: 'n1000', label: 'Rs. 1,000', val: 1000 },
+      { key: 'n500',  label: 'Rs. 500',   val: 500 },
+      { key: 'n100',  label: 'Rs. 100',   val: 100 },
+      { key: 'n50',   label: 'Rs. 50',    val: 50 },
+      { key: 'n20',   label: 'Rs. 20',    val: 20 },
+      { key: 'n10',   label: 'Rs. 10',    val: 10 },
+      { key: 'coins', label: 'Coins',     val: 1 }
+    ];
+
+    let denomRows = '';
+    denomMultipliers.forEach(d => {
+      const count = denoms[d.key] || 0;
+      if (count > 0 || d.key === 'coins' && count > 0) {
+        const sub = d.key === 'coins' ? count : count * d.val;
+        denomRows += `
+          <tr>
+            <td style="padding:4px 8px; border:1px solid #ddd;">${d.label}</td>
+            <td style="padding:4px 8px; text-align:center; border:1px solid #ddd;">${count}</td>
+            <td style="padding:4px 8px; text-align:right; border:1px solid #ddd;">${DB.formatCurrency(sub)}</td>
+          </tr>
+        `;
+      }
+    });
+
+    if (!denomRows) {
+      denomRows = `<tr><td colspan="3" style="padding:8px; text-align:center; color:#777; border:1px solid #ddd;">Counted directly as cash: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td></tr>`;
+    }
+
+    const diff = s.difference || 0;
+    const verdictText = s.status === 'balanced' ? 'BALANCED (Rs. 0.00)' : s.status === 'excess' ? `CASH EXCESS (+${DB.formatCurrency(diff)})` : `CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})`;
+    const verdictColor = s.status === 'balanced' ? '#16a34a' : s.status === 'excess' ? '#0284c7' : '#e4002b';
+
+    const printHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Daily Shift Reconciliation Slip - ${shopName}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 20px; color: #111; max-width: 600px; margin: auto; }
+          .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 10px; margin-bottom: 14px; }
+          .shop-title { font-size: 1.4rem; font-weight: 800; text-transform: uppercase; }
+          .sub-title { font-size: 0.9rem; color: #555; }
+          .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.85rem; margin-bottom: 14px; background: #f9fafb; padding: 10px; border-radius: 6px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 0.85rem; }
+          th { background: #f3f4f6; border: 1px solid #ddd; padding: 6px 8px; }
+          td { border: 1px solid #ddd; padding: 6px 8px; }
+          .section-head { font-weight: 800; font-size: 0.9rem; margin: 12px 0 6px 0; border-bottom: 1px solid #ccc; padding-bottom: 3px; }
+          .verdict-box { border: 2px solid ${verdictColor}; background: #fafafa; border-radius: 6px; padding: 12px; text-align: center; margin: 16px 0; }
+          .verdict-title { font-size: 0.85rem; font-weight: 700; color: #555; text-transform: uppercase; }
+          .verdict-val { font-size: 1.3rem; font-weight: 900; color: ${verdictColor}; margin-top: 4px; }
+          .sig-row { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 10px; font-size: 0.85rem; }
+          .sig-line { width: 42%; border-top: 1px solid #444; text-align: center; padding-top: 4px; }
+          @media print {
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="shop-title">🏪 ${shopName}</div>
+          <div class="sub-title">Daily Evening Shift Reconciliation & Cash Flow Settlement</div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">${I18N.t('exp_modal_category') || 'Expense Category / Type'}</label>
-          <select class="form-select" id="expModalCategory" style="padding:8px;">
-            <option value="owner_drawing">👤 ${I18N.t('exp_cat_owner_drawing') || 'Owner Personal Drawings / Wallet (අයිතිකරු මුදල් ගැනීම)'}</option>
-            <option value="shop_purchase">🛒 ${I18N.t('exp_cat_shop_purchase') || 'Outside Shop Inventory / Purchases (කඩේ පිට බඩු ගැනීම)'}</option>
-            <option value="staff_expense">🍱 ${I18N.t('exp_cat_staff_expense') || 'Staff Meals / Advances (ස්ටාෆ් වියදම් / කෑම)'}</option>
-            <option value="utility_bill">💡 ${I18N.t('exp_cat_utility_bill') || 'Electricity / Water / Rent (විදුලි / වතුර / කුලී)'}</option>
-            <option value="maintenance">🔧 ${I18N.t('exp_cat_maintenance') || 'Shop Maintenance & Repairs (නඩත්තු)'}</option>
-            <option value="other">📦 ${I18N.t('exp_cat_other') || 'Other Shop Expenses (වෙනත් වියදම්)'}</option>
-          </select>
+        <div class="meta-grid">
+          <div><strong>Date:</strong> ${DB.formatDate(s.date)}</div>
+          <div><strong>Closing Time:</strong> ${DB.formatTime(s.timestamp)}</div>
+          <div><strong>Cashier:</strong> ${s.cashier || s.cashierName || 'Staff'}</div>
+          <div><strong>Shift:</strong> ${s.shiftType ? s.shiftType.toUpperCase() : 'EVENING'}</div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" style="font-weight:700; color:var(--accent-red);">${I18N.t('exp_col_amount') || 'Expense Amount (Rs.)'}</label>
-          <input type="number" step="0.01" min="0" class="form-input" id="expModalAmount" placeholder="0.00" required style="font-size:1.15rem; font-weight:700;">
+        <div class="section-head">🛒 POS Machine Sales Breakdown</div>
+        <table>
+          <tr><td>POS Cash Sales (In Drawer)</td><td style="text-align:right; font-weight:700;">${DB.formatCurrency(posCash)}</td></tr>
+          <tr><td>POS Card / Credit Sales (Bank)</td><td style="text-align:right;">${DB.formatCurrency(posCard)}</td></tr>
+          <tr><td>POS Cheque / Bank Transfer</td><td style="text-align:right;">${DB.formatCurrency(posCheque)}</td></tr>
+          <tr style="background:#f3f4f6; font-weight:800;"><td>Total POS Machine Gross Sales</td><td style="text-align:right;">${DB.formatCurrency(posTotal)}</td></tr>
+        </table>
+
+        <div class="section-head">💵 Cash Drawer Flow Reconciliation</div>
+        <table>
+          <tr><td>1. Opening Cash Float</td><td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td></tr>
+          <tr><td>2. Add: POS Cash Sales</td><td style="text-align:right;">+ ${DB.formatCurrency(posCash)}</td></tr>
+          <tr><td>3. Add: Reload & Bill Drawer Cash</td><td style="text-align:right;">+ ${DB.formatCurrency(s.reloadCashInDrawer || s.reloadCashCollected || 0)}</td></tr>
+          <tr><td>4. Less: Daily Drawer Expenses</td><td style="text-align:right; color:#e4002b;">- ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td></tr>
+          <tr style="background:#f0f9ff; font-weight:800;"><td>Expected Cash in Drawer</td><td style="text-align:right; color:#0284c7;">${DB.formatCurrency(s.expectedCash || 0)}</td></tr>
+        </table>
+
+        <div class="section-head">🧮 Physical Cash Denominations Counted</div>
+        <table>
+          <thead>
+            <tr><th>Denomination</th><th style="text-align:center;">Count</th><th style="text-align:right;">Subtotal</th></tr>
+          </thead>
+          <tbody>
+            ${denomRows}
+            <tr style="background:#ecfdf5; font-weight:800;">
+              <td colspan="2">Total Actual Counted Physical Cash</td>
+              <td style="text-align:right; color:#16a34a; font-size:1rem;">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="verdict-box">
+          <div class="verdict-title">Tally Reconciliation Verdict</div>
+          <div class="verdict-val">${verdictText}</div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">${I18N.t('exp_col_description') || 'Description / Reason'}</label>
-          <input type="text" class="form-input" id="expModalDesc" placeholder="e.g. Owner cash withdrawal, Lunch for staff, etc." required>
-        </div>
+        ${s.notes || s.note ? `<div style="font-size:0.85rem; margin-top:10px; background:#f9fafb; padding:8px; border-radius:4px;"><strong>Remarks:</strong> ${s.notes || s.note}</div>` : ''}
 
-        <div class="form-group">
-          <label class="form-label">${I18N.t('exp_modal_paid_from') || 'Paid From / Account Source'}</label>
-          <select class="form-select" id="expModalPaidFrom" style="padding:8px;">
-            <option value="drawer" selected>💵 ${I18N.t('exp_paid_drawer') || 'Shop Cash Drawer'}</option>
-            <option value="bank">🏦 ${I18N.t('exp_paid_bank') || 'Shop Bank Account'}</option>
-            <option value="personal">👛 ${I18N.t('exp_paid_personal') || 'Personal Wallet / Owner Funds'}</option>
-          </select>
+        <div class="sig-row">
+          <div class="sig-line">Prepared by (Cashier)<br><small>${s.cashier || s.cashierName || 'Staff'}</small></div>
+          <div class="sig-line">Verified & Approved by<br><small>Manager / Owner</small></div>
         </div>
-
-        <div class="form-group" style="display:flex; align-items:center; gap:8px; margin-top:4px;">
-          <input type="checkbox" id="expModalDeductDrawer" checked style="width:18px; height:18px; accent-color:var(--accent-blue);">
-          <label for="expModalDeductDrawer" style="font-size:0.85rem; font-weight:600; cursor:pointer;">
-            ${I18N.t('exp_modal_deduct_check') || 'Deduct this amount from active Shop Cash Drawer'}
-          </label>
-        </div>
-      </form>
+      </body>
+      </html>
     `;
 
-    this.showModal(
-      `💸 ${I18N.t('exp_modal_title') || 'Add Daily Expense / Owner Drawing'}`,
-      bodyHtml,
-      `
-        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
-        <button type="button" class="btn btn-primary" onclick="App.saveAddExpenseModal()">${I18N.t('exp_btn_save') || '💾 Save Expense'}</button>
-      `
-    );
-
-    const paidFromSel = document.getElementById('expModalPaidFrom');
-    const deductChk = document.getElementById('expModalDeductDrawer');
-    if (paidFromSel && deductChk) {
-      paidFromSel.addEventListener('change', () => {
-        deductChk.checked = paidFromSel.value === 'drawer';
-      });
-    }
-  },
-
-  saveAddExpenseModal() {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) return;
-
-    const category = document.getElementById('expModalCategory')?.value || 'other';
-    const amount = parseFloat(document.getElementById('expModalAmount')?.value) || 0;
-    const description = document.getElementById('expModalDesc')?.value?.trim() || '';
-    const paidFrom = document.getElementById('expModalPaidFrom')?.value || 'drawer';
-    const deductFromDrawer = document.getElementById('expModalDeductDrawer')?.checked ?? true;
-
-    if (amount <= 0) {
-      this.showToast(I18N.t('exp_err_amount') || 'Please enter a valid amount', 'error');
-      return;
-    }
-
-    const expenseData = {
-      shopId,
-      category,
-      amount,
-      description: description || (I18N.t('exp_cat_' + category) || category),
-      paidFrom,
-      deductFromDrawer
-    };
-
-    DB.addExpense(expenseData);
-    this.closeModal();
-    this.showToast(`✅ ${I18N.t('exp_saved_success') || 'Expense recorded successfully!'}`, 'success');
-
-    if (this.currentPage === 'shifts') {
-      this.renderShiftsPage();
-    }
-    this.renderDashboard();
-  },
-
-  promptDeleteExpense(expenseId) {
-    const pin = prompt(I18N.t('admin_prompt') || 'Enter Admin PIN to delete (Default: 1234):');
-    if (pin !== '1234') {
-      this.showToast(I18N.t('admin_incorrect') || 'Incorrect PIN', 'error');
-      return;
-    }
-    DB.deleteExpense(expenseId);
-    this.showToast('✅ Expense record deleted', 'info');
-    this.renderShiftsPage();
-    this.renderDashboard();
-  },
-
-  // ================================================================
-  // V14 DASHBOARD INTERACTIVE ANALYTICS CHART
-  // ================================================================
-  setDashChartTimeframe(tf) {
-    this.dashChartTimeframe = tf;
-    document.querySelectorAll('#chartTimeframeGroup .timeframe-btn').forEach(btn => {
-      if (btn.dataset.timeframe === tf) {
-        btn.className = 'btn btn-xs btn-primary timeframe-btn active';
-      } else {
-        btn.className = 'btn btn-xs btn-ghost timeframe-btn';
-      }
-    });
-    this.renderDashboardAnalyticsChart();
-  },
-
-  renderDashboardAnalyticsChart() {
-    const chartCanvas = document.getElementById('dashAnalyticsChart');
-    if (!chartCanvas || !window.Chart) return;
-
-    if (this.dashChartInstance) {
-      this.dashChartInstance.destroy();
-      this.dashChartInstance = null;
-    }
-
-    const shopId = DB.getActiveShopId();
-    const timeframe = this.dashChartTimeframe || 'week';
-
-    let labels = [];
-    let dataValues = [];
-    let backgroundColors = [];
-    let borderColors = [];
-
-    if (timeframe === 'week') {
-      const days = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        days.push(d.toISOString().slice(0, 10));
-      }
-
-      labels = days.map(d => {
-        const dateObj = new Date(d);
-        return dateObj.toLocaleDateString(I18N.currentLang === 'si' ? 'si-LK' : 'en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
-      });
-
-      days.forEach(dayStr => {
-        const updates = shopId ? DB.getUpdatesForShopByDate(shopId, dayStr) : DB.getUpdatesByDate(dayStr);
-        let net = 0;
-        updates.forEach(u => {
-          if (u.comparison && !u.comparison.isFirst) {
-            net += (u.comparison.overall?.diff || 0);
-          }
-        });
-        const shifts = shopId ? DB.getShiftsForShopByDate(shopId, dayStr) : DB.getShiftsByDate(dayStr);
-        shifts.forEach(s => {
-          net += (s.difference || 0);
-        });
-        dataValues.push(net);
-        backgroundColors.push(net >= 0 ? 'rgba(22, 163, 74, 0.75)' : 'rgba(228, 0, 43, 0.75)');
-        borderColors.push(net >= 0 ? '#16a34a' : '#e4002b');
-      });
-    } else if (timeframe === 'month') {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const monthNamesEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      labels = monthNamesEn;
-
-      for (let m = 0; m < 12; m++) {
-        const monthPrefix = `${currentYear}-${String(m + 1).padStart(2, '0')}`;
-        const allUpdates = shopId ? DB.getUpdatesForShop(shopId) : DB.getUpdates();
-        const monthUpdates = allUpdates.filter(u => u.date && u.date.startsWith(monthPrefix));
-        let net = 0;
-        monthUpdates.forEach(u => {
-          if (u.comparison && !u.comparison.isFirst) {
-            net += (u.comparison.overall?.diff || 0);
-          }
-        });
-        const allShifts = shopId ? DB.getShiftsForShop(shopId) : DB.getShifts();
-        const monthShifts = allShifts.filter(s => s.date && s.date.startsWith(monthPrefix));
-        monthShifts.forEach(s => {
-          net += (s.difference || 0);
-        });
-        dataValues.push(net);
-        backgroundColors.push(net >= 0 ? 'rgba(22, 163, 74, 0.75)' : 'rgba(228, 0, 43, 0.75)');
-        borderColors.push(net >= 0 ? '#16a34a' : '#e4002b');
-      }
-    } else if (timeframe === 'year') {
-      const allUpdates = shopId ? DB.getUpdatesForShop(shopId) : DB.getUpdates();
-      const yearsSet = new Set();
-      allUpdates.forEach(u => {
-        if (u.date) yearsSet.add(u.date.slice(0, 4));
-      });
-      const nowYear = new Date().getFullYear().toString();
-      yearsSet.add(nowYear);
-      const sortedYears = Array.from(yearsSet).sort();
-      labels = sortedYears;
-
-      sortedYears.forEach(yr => {
-        let net = 0;
-        allUpdates.filter(u => u.date && u.date.startsWith(yr)).forEach(u => {
-          if (u.comparison && !u.comparison.isFirst) {
-            net += (u.comparison.overall?.diff || 0);
-          }
-        });
-        const allShifts = shopId ? DB.getShiftsForShop(shopId) : DB.getShifts();
-        allShifts.filter(s => s.date && s.date.startsWith(yr)).forEach(s => {
-          net += (s.difference || 0);
-        });
-        dataValues.push(net);
-        backgroundColors.push(net >= 0 ? 'rgba(22, 163, 74, 0.75)' : 'rgba(228, 0, 43, 0.75)');
-        borderColors.push(net >= 0 ? '#16a34a' : '#e4002b');
-      });
-    }
-
-    const ctx = chartCanvas.getContext('2d');
-    this.dashChartInstance = new window.Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          label: I18N.t('chart_profit_loss') || 'Net Profit / Loss (Rs.)',
-          data: dataValues,
-          backgroundColor: backgroundColors,
-          borderColor: borderColors,
-          borderWidth: 1.5,
-          borderRadius: 4
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (context) => {
-                const val = context.parsed.y;
-                return `${val >= 0 ? '▲ Profit: +' : '▼ Loss: '}${DB.formatCurrency(val)}`;
-              }
-            }
-          }
-        },
-        scales: {
-          y: {
-            grid: { color: 'rgba(0, 0, 0, 0.05)' },
-            ticks: {
-              callback: (val) => `${val >= 0 ? '+' : ''}${Math.round(val / 1000)}k`
-            }
-          },
-          x: {
-            grid: { display: false }
-          }
-        }
-      }
-    });
-  },
-
-  // ================================================================
-  // V14 1-CLICK WHATSAPP SUMMARY & PRINT/PDF STATEMENT
-  // ================================================================
-  shareDailyWhatsAppSummary() {
-    const shopId = DB.getActiveShopId();
-    const shop = shopId ? DB.getShop(shopId) : null;
-    const shopName = shop ? shop.name : (I18N.t('all_shops') || 'All Shops');
-    const today = DB.getTodayDate();
-    const nowTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-    // Latest Update totals
-    const lastUpdate = shopId ? DB.getLastUpdate(shopId) : null;
-    const vals = lastUpdate ? DB.extractValues(lastUpdate) : { totalCapital: 0, totalCash: 0, reloadTotal: 0, bankTotal: 0 };
-
-    // Today's shift closings
-    const todayShifts = shopId ? DB.getShiftsForShopByDate(shopId, today) : DB.getShiftsByDate(today);
-    const latestShift = todayShifts.length > 0 ? todayShifts[0] : null;
-
-    // Today's expenses
-    const todayExpenses = shopId ? DB.getExpensesForShopByDate(shopId, today) : DB.getExpensesByDate(today);
-    const totalExpenses = todayExpenses.reduce((s, ex) => s + (parseFloat(ex.amount) || 0), 0);
-
-    const ownerDrawings = todayExpenses.filter(e => (e.category || '').includes('owner')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-    const shopPurchases = todayExpenses.filter(e => (e.category || '').includes('shop')).reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-
-    // Pending credits
-    const creditStats = DB.getCreditsStats(shopId);
-
-    let shiftText = '';
-    if (latestShift) {
-      const vEmoji = latestShift.status === 'balanced' ? '✅ BALANCED' : latestShift.status === 'excess' ? `🟢 EXCESS (+${DB.formatCurrency(latestShift.difference)})` : `🔴 SHORTAGE (-${DB.formatCurrency(Math.abs(latestShift.difference))})`;
-      shiftText = `
-🌙 *Evening Shift & POS Tally:*
-• Opening Float: ${DB.formatCurrency(latestShift.openingFloat || 0)}
-• POS Gross Sales: ${DB.formatCurrency(latestShift.posGrossSales || 0)}
-• Drawer Expenses: ${DB.formatCurrency(latestShift.drawerExpenses || 0)}
-• Expected Drawer Cash: ${DB.formatCurrency(latestShift.expectedCash || 0)}
-• Counted Drawer Cash: ${DB.formatCurrency(latestShift.countedCash || 0)}
-• Verdict: ${vEmoji}`;
+    const printWin = window.open('', '_blank', 'width=700,height=800');
+    if (printWin) {
+      printWin.document.open();
+      printWin.document.write(printHtml);
+      printWin.document.close();
+      printWin.focus();
+      setTimeout(() => {
+        printWin.print();
+      }, 500);
     } else {
-      shiftText = `
-🌙 *Evening Shift:* Not yet recorded today.`;
+      this.showToast('Please allow popups to print statement', 'error');
     }
-
-    let expText = '';
-    if (totalExpenses > 0) {
-      expText = `
-💸 *Day's Expenses & Drawings:*
-• Total: ${DB.formatCurrency(totalExpenses)}
-  - Owner Drawings: ${DB.formatCurrency(ownerDrawings)}
-  - Shop Outside Purchases: ${DB.formatCurrency(shopPurchases)}`;
-    }
-
-    const message = `🏪 *${shopName}* - Daily Business Summary 📊
-📅 Date: ${DB.formatDate(today)} | ⏰ ${nowTime}
-━━━━━━━━━━━━━━━━━━━━
-💰 *Capital & Drawer Balances:*
-• Total Balance: ${DB.formatCurrency(vals.totalCapital)}
-• Cash in Drawer: ${DB.formatCurrency(vals.totalCash)}
-• Reload SIMs: ${DB.formatCurrency(vals.reloadTotal)}
-• Bank Total: ${DB.formatCurrency(vals.bankTotal)}
-${shiftText}
-${expText}
-📒 *Customer Credits:*
-• Unsettled: ${DB.formatCurrency(creditStats.totalPending)} (${creditStats.countPending} Customers)
-━━━━━━━━━━━━━━━━━━━━
-Generated via Shop Payment Tracker v14`;
-
-    const encoded = encodeURIComponent(message.trim());
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(message.trim());
-    }
-    window.open(`https://wa.me/?text=${encoded}`, '_blank');
-    this.showToast('📲 WhatsApp summary opened & copied to clipboard!', 'success');
   },
 
-  printDailyStatement() {
-    window.print();
-  },
   setupExportImport() {
     document.getElementById('exportBtn').addEventListener('click', () => {
       DB.forceBackup();
