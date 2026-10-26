@@ -4674,6 +4674,92 @@ Thank you! - ${shopName}`;
   // ================================================================
   // SUPER ADMIN WHATSAPP DAILY SUMMARY EXPORT
   // ================================================================
+  // ================================================================
+  // EXPENSE MODAL
+  // ================================================================
+  showAddExpenseModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) { this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error'); return; }
+    const categories = ['Staff Salary', 'Electricity', 'Rent', 'Internet', 'Supplies', 'Owner Drawing', 'Maintenance', 'Other'];
+    const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+    this.showModal(
+      '💸 Add Expense / Drawing',
+      `<div class="form-group"><label class="form-label">Category</label>
+        <select class="form-select" id="expCatInput">${catOptions}</select></div>
+      <div class="form-group"><label class="form-label">Description</label>
+        <input type="text" class="form-input" id="expDescInput" placeholder="e.g. Electricity bill"></div>
+      <div class="form-group"><label class="form-label">Amount (Rs.)</label>
+        <input type="number" class="form-input" id="expAmtInput" placeholder="0.00" min="0" step="0.01"></div>`,
+      [
+        { text: 'Cancel', class: 'btn-ghost', onclick: () => this.closeModal() },
+        { text: '💾 Save Expense', class: 'btn-primary', onclick: () => {
+          const amount = parseFloat(document.getElementById('expAmtInput')?.value) || 0;
+          const desc = document.getElementById('expDescInput')?.value?.trim() || '';
+          const category = document.getElementById('expCatInput')?.value || 'Other';
+          if (amount <= 0) { this.showToast('Enter a valid amount', 'error'); return; }
+          DB.addExpense({ shopId, amount, description: desc || category, category, date: new Date().toISOString().split('T')[0], createdAt: new Date().toISOString() });
+          this.closeModal();
+          this.renderDashboard(shopId);
+          this.showToast('Expense saved ✅', 'success');
+        }}
+      ]
+    );
+    setTimeout(() => document.getElementById('expAmtInput')?.focus(), 100);
+  },
+
+  // ================================================================
+  // DASHBOARD CHART TIMEFRAME
+  // ================================================================
+  setDashChartTimeframe(timeframe) {
+    this.dashChartTimeframe = timeframe;
+    document.querySelectorAll('.timeframe-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.timeframe === timeframe);
+      b.classList.toggle('btn-primary', b.dataset.timeframe === timeframe);
+      b.classList.toggle('btn-ghost', b.dataset.timeframe !== timeframe);
+    });
+    const shopId = DB.getActiveShopId();
+    if (shopId) this.renderDashboardChart(shopId, timeframe);
+  },
+
+  // ================================================================
+  // WHATSAPP DAILY SUMMARY
+  // ================================================================
+  shareDailyWhatsAppSummary() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) { this.showToast('Select a shop first', 'error'); return; }
+    const today = new Date().toISOString().split('T')[0];
+    const shop = DB.getShops().find(s => s.id === shopId);
+    const todayUpdates = DB.getUpdates(shopId).filter(u => u.date === today);
+    const todayExpenses = DB.getExpensesForShopByDate ? DB.getExpensesForShopByDate(shopId, today) : [];
+    const totalExp = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+    let reloadTotal = 0, bankTotal = 0;
+    todayUpdates.forEach(u => {
+      reloadTotal += (u.dialog || 0) + (u.mobitel || 0) + (u.airtel || 0) + (u.hutch || 0);
+      bankTotal += u.bankTotal || 0;
+    });
+    let msg = `📊 *METHMI MOBILE - DAILY SUMMARY*\n`;
+    msg += `📅 Date: ${today}\n`;
+    msg += `🏪 Shop: ${shop ? shop.name : ''}\n`;
+    msg += `=================================\n`;
+    msg += `📱 Reload Total: Rs. ${DB.formatCurrency(reloadTotal)}\n`;
+    msg += `🏦 Bank Total: Rs. ${DB.formatCurrency(bankTotal)}\n`;
+    msg += `💸 Expenses: Rs. ${DB.formatCurrency(totalExp)}\n`;
+    msg += `📝 Updates: ${todayUpdates.length}\n`;
+    msg += `=================================\n`;
+    msg += `Generated via Methmi Shop Tracker`;
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
+  // ================================================================
+  // PRINT DAILY STATEMENT
+  // ================================================================
+  printDailyStatement() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) { this.showToast('Select a shop first', 'error'); return; }
+    window.print();
+  },
+
   sendShiftReportWhatsAppToSuperAdmin() {
     const shopId = DB.getActiveShopId();
     if (!shopId) {
