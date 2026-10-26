@@ -2138,34 +2138,38 @@ const App = {
     this.showModal(
       I18N.currentLang === 'si' ? '🏪 නව සාප්පුවක් එකතු කරන්න' : '🏪 Add New Shop',
       `
-      <div class="form-group">
-        <label class="form-label">${I18N.currentLang === 'si' ? 'සාප්පුවේ නම' : 'Shop Name'}</label>
-        <input type="text" class="form-input" id="newShopName" placeholder="${I18N.currentLang === 'si' ? 'උදා: My Mobile Shop' : 'e.g. My Mobile Shop'}" autofocus>
-      </div>
+      <form id="addShopQuickForm" onsubmit="event.preventDefault(); App.confirmAddShopModal();">
+        <div class="form-group">
+          <label class="form-label">${I18N.currentLang === 'si' ? 'සාප්පුවේ නම' : 'Shop Name'}</label>
+          <input type="text" class="form-input" id="newShopName" placeholder="${I18N.currentLang === 'si' ? 'උදා: My Mobile Shop' : 'e.g. My Mobile Shop'}" required autofocus>
+        </div>
+      </form>
       `,
       [
         { text: I18N.currentLang === 'si' ? 'අවලංගු' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        {
-          text: I18N.currentLang === 'si' ? '➕ එකතු කරන්න' : '➕ Add Shop', class: 'btn-primary', onClick: () => {
-            const name = document.getElementById('newShopName').value.trim();
-            if (!name) {
-              this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නමක් ඇතුළත් කරන්න' : 'Please enter a shop name', 'error');
-              return;
-            }
-            DB.addShop(name);
-            this.closeModal();
-            this.refreshShopSelector();
-            this.renderShops();
-            this.showToast(I18N.currentLang === 'si' ? `🏪 "${name}" එකතු කරා!` : `🏪 "${name}" added!`, 'success');
-          }
-        }
+        { text: I18N.currentLang === 'si' ? '➕ එකතු කරන්න' : '➕ Add Shop', class: 'btn-primary', onClick: () => this.confirmAddShopModal() }
       ]
     );
-    // Focus input after modal opens
     setTimeout(() => {
       const input = document.getElementById('newShopName');
       if (input) input.focus();
     }, 100);
+  },
+
+  confirmAddShopModal() {
+    const input = document.getElementById('newShopName');
+    const name = input ? input.value.trim() : '';
+    if (!name) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නමක් ඇතුළත් කරන්න' : 'Please enter a shop name', 'error');
+      return;
+    }
+    const newShop = DB.addShop(name);
+    DB.setActiveShop(newShop.id);
+    this.closeModal();
+    this.refreshShopSelector();
+    this.renderShops();
+    this.showToast(I18N.currentLang === 'si' ? `🏪 "${name}" සාර්ථකව එකතු කරා!` : `🏪 "${name}" added successfully!`, 'success');
+    this.showMainDashboard();
   },
 
   renderShops() {
@@ -4408,7 +4412,7 @@ Thank you! - ${shopName}`;
       reader.readAsText(file);
       e.target.value = '';
     });
-  }
+  },
 
   // ================================================================
   // QUICK ACTIONS: BANK DEPOSIT & CASH OUT

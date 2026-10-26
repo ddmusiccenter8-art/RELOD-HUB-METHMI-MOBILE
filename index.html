@@ -51,18 +51,18 @@
         <select id="shopSelector" class="form-select" title="Select Shop" style="flex: 1;" data-i18n="select_shop">
           <option value="" data-i18n="select_shop">-- Select Shop --</option>
         </select>
-        <button id="quickAddShopBtn" class="btn btn-primary" style="padding: 0 12px; font-size: 1.2rem; font-weight: bold;" title="Add Shop">+</button>
+        <button id="quickAddShopBtn" class="btn btn-primary" onclick="App.showAddShopModal()" style="padding: 0 12px; font-size: 1.2rem; font-weight: bold;" title="Add Shop">+</button>
       </div>
 
       <!-- Navigation -->
       <ul class="nav-links">
         <li><a href="#" data-page="dashboard" class="active" onclick="App.showMainDashboard()"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
-        <li><a href="#" data-page="update"><span class="nav-icon">📱</span> <span data-i18n="nav_update">Reload & Payments</span></a></li>
-        <li><a href="#" data-page="shifts"><span class="nav-icon">🏪</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
-        <li><a href="#" data-page="history"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
-        <li><a href="#" data-page="credits"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
-        <li><a href="#" data-page="shops"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops</span></a></li>
-        <li><a href="#" data-page="reports"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">Reports</span></a></li>
+        <li><a href="#" data-page="update" onclick="App.navigateTo('update')"><span class="nav-icon">📱</span> <span data-i18n="nav_update">Reload & Payments</span></a></li>
+        <li><a href="#" data-page="shifts" onclick="App.navigateTo('shifts')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
+        <li><a href="#" data-page="history" onclick="App.navigateTo('history')"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
+        <li><a href="#" data-page="credits" onclick="App.navigateTo('credits')"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
+        <li><a href="#" data-page="shops" onclick="App.navigateTo('shops')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops</span></a></li>
+        <li><a href="#" data-page="reports" onclick="App.navigateTo('reports')"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">Reports</span></a></li>
       </ul>
 
       <!-- Backup Status -->

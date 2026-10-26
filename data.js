@@ -1846,7 +1846,7 @@ const DB = {
       console.error('Import failed:', e);
       return false;
     }
-  }
+  },
 
   // ---- Bank Deposits & Cash Outs ----
   getBankTransactions(shopId = null, date = null) {
