@@ -411,6 +411,11 @@ const DB = {
     return this.getShops().find(s => s.id === id) || null;
   },
 
+  getShop(id) {
+    if (!id) return null;
+    return this.getShops(true).find(s => s.id === id) || null;
+  },
+
   // ---- Updates CRUD ----
   getUpdates(includeDeleted = false) {
     const allUpdates = JSON.parse(localStorage.getItem(this.UPDATES_KEY) || '[]');

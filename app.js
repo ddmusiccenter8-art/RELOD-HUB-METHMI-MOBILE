@@ -4677,6 +4677,13 @@ Thank you! - ${shopName}`;
   // ================================================================
   // EXPENSE MODAL
   // ================================================================
+  promptDeleteExpense(id) {
+    if (!confirm(I18N.currentLang === 'si' ? 'මෙම වියදම මකා දැමීමට අවශ්‍යද?' : 'Are you sure you want to delete this expense?')) return;
+    DB.deleteExpense(id);
+    this.renderShiftsPage();
+    this.showToast(I18N.currentLang === 'si' ? 'වියදම මකා දමන ලදී' : 'Expense deleted', 'success');
+  },
+
   showAddExpenseModal() {
     const shopId = DB.getActiveShopId();
     if (!shopId) { this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error'); return; }
