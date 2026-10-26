@@ -3845,13 +3845,12 @@ Thank you! - ${shopName}`;
               <th style="text-align:right;">${I18N.t('shift_opening_float') || 'Opening Float'}</th>
               <th style="text-align:right;">${I18N.t('shift_pos_cash') || 'POS Cash'}</th>
               <th style="text-align:right;">${I18N.t('shift_pos_card') || 'POS Cards'}</th>
-              <th style="text-align:right;">${I18N.t('shift_pos_cheque') || 'POS Cheques'}</th>
-              <th style="text-align:right; font-weight:800;">${I18N.t('shift_pos_sales') || 'POS Total'}</th>
-              <th style="text-align:right;">${I18N.t('shift_reload_cash') || 'Reload Cash'}</th>
+              <th style="text-align:right; font-weight:800;">${I18N.t('shift_pos_sales') || 'POS Gross Total'}</th>
               <th style="text-align:right;">${I18N.t('stat_daily_expenses') || 'Expenses'}</th>
               <th style="text-align:right;">${I18N.t('shift_expected_cash') || 'Expected Cash'}</th>
               <th style="text-align:right; font-weight:800;">${I18N.t('shift_counted_cash') || 'Counted Cash'}</th>
               <th style="text-align:center;">${I18N.t('shift_status_verdict') || 'Status'}</th>
+              <th>Special Notes</th>
               <th style="text-align:center;">Actions</th>
             </tr>
           </thead>
@@ -3884,15 +3883,17 @@ Thank you! - ${shopName}`;
             <td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td>
             <td style="text-align:right; color:var(--accent-blue);">${DB.formatCurrency(posCash)}</td>
             <td style="text-align:right; color:var(--accent-purple);">${DB.formatCurrency(posCard)}</td>
-            <td style="text-align:right; color:var(--accent-gold);">${DB.formatCurrency(posCheque)}</td>
             <td style="text-align:right; font-weight:800; color:var(--text-primary);">${DB.formatCurrency(posTotal)}</td>
-            <td style="text-align:right;">${DB.formatCurrency(s.reloadCashInDrawer || s.reloadCashCollected || 0)}</td>
             <td style="text-align:right; color:var(--accent-red);">${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td>
             <td style="text-align:right; font-weight:600;">${DB.formatCurrency(s.expectedCash || 0)}</td>
             <td style="text-align:right; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td>
             <td style="text-align:center;">${badgeHtml}</td>
+            <td>
+              ${(s.specialNotes || s.cashNote) ? `<span style="color:var(--accent-purple); font-weight:600; font-size:0.8rem;" title="${s.specialNotes || s.cashNote}">📝 ${(s.specialNotes || s.cashNote).length > 25 ? (s.specialNotes || s.cashNote).substring(0, 25) + '...' : (s.specialNotes || s.cashNote)}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">--</span>'}
+            </td>
             <td style="text-align:center; white-space:nowrap;">
-              <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Print Settlement Slip / PDF" style="padding:3px 7px; margin-right:4px;">🖨️</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:3px 8px; margin-right:4px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">📄 PDF</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:3px 8px; margin-right:4px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.3);">📲 WhatsApp</button>
               <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:3px 7px;">🗑️</button>
             </td>
           </tr>
@@ -3971,15 +3972,7 @@ Thank you! - ${shopName}`;
     const lastShift = shopShifts.length > 0 ? shopShifts[0] : null;
     const defaultFloat = morningShift ? (morningShift.openingFloat || morningShift.actualCountedCash || 0) : (lastShift ? (lastShift.countedCash || lastShift.actualCountedCash || 0) : 0);
 
-    // Default reload cash from latest update today
-    const todayUpdates = DB.getUpdatesForShopByDate(shopId, today);
-    let defaultReloadCash = 0;
-    if (todayUpdates.length > 0) {
-      const latestUpd = todayUpdates[0];
-      defaultReloadCash = latestUpd.reload?.cashInDrawer || latestUpd.sim?.cashInDrawer || 0;
-    }
-
-    // Default drawer expenses today
+    // Default drawer expenses today (Shop expenses only - NO reload)
     const todayExpenses = DB.getExpensesForShopByDate(shopId, today).filter(e => e.deductFromDrawer !== false && e.deductFromBalance !== false);
     const defaultExpenses = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
@@ -4005,18 +3998,18 @@ Thank you! - ${shopName}`;
           </div>
         </div>
 
-        <!-- Section: Opening Float & POS Sales Breakdown -->
+        <!-- Section 1: Opening Float & POS Sales Breakdown -->
         <div style="background:var(--bg-card); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
           <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-            <span>🛒</span> <span>POS Machine Breakdown & Opening Float</span>
+            <span>🛒</span> <span>Shop POS Sales & Opening Float</span>
           </div>
           <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
             <div class="form-group">
-              <label class="form-label" style="font-size:0.75rem;">1. ${I18N.t('shift_opening_float') || 'Opening Float'}</label>
+              <label class="form-label" style="font-size:0.75rem;">1. ${I18N.t('shift_opening_float') || 'Opening Cash Float'}</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}">
             </div>
             <div class="form-group">
-              <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue); font-weight:700;">2. ${I18N.t('shift_pos_cash') || 'POS Cash Sales'}</label>
+              <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue); font-weight:700;">2. ${I18N.t('shift_pos_cash') || 'POS Cash Sales (Counter)'}</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCash" placeholder="0.00" value="0">
             </div>
             <div class="form-group">
@@ -4034,23 +4027,19 @@ Thank you! - ${shopName}`;
           </div>
         </div>
 
-        <!-- Section: Reload Cash & Expenses -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:var(--bg-glass); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
-          <div class="form-group">
-            <label class="form-label" style="font-size:0.75rem;">5. ${I18N.t('shift_reload_cash') || 'Reload Cash in Drawer'}</label>
-            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalReloadCash" value="${defaultReloadCash}">
-          </div>
-          <div class="form-group">
-            <label class="form-label" style="font-size:0.75rem; color:var(--accent-red);">6. ${I18N.t('stat_daily_expenses') || 'Daily Expenses Deducted'}</label>
+        <!-- Section 2: Shop Expenses Deducted from Drawer (NO Reload) -->
+        <div style="background:var(--bg-glass); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:0.78rem; color:var(--accent-red); font-weight:700;">5. ${I18N.t('stat_daily_expenses') || 'Daily Shop Expenses / Drawings Deducted'}</label>
             <input type="number" step="0.01" min="0" class="form-input" id="shiftModalExpenses" value="${defaultExpenses}">
           </div>
         </div>
 
-        <!-- Expected Cash Badge -->
+        <!-- Expected Cash Badge (Pure Shop: Float + POS Cash - Expenses) -->
         <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:10px 14px;">
           <div>
             <div style="font-weight:700; font-size:0.88rem; color:var(--text-secondary);">${I18N.t('shift_expected_cash') || 'Expected Cash in Drawer'}:</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">(Float + POS Cash + Reload Cash - Expenses)</div>
+            <div style="font-size:0.75rem; color:var(--text-muted);">(Opening Float + POS Cash Sales - Expenses)</div>
           </div>
           <div style="font-size:1.3rem; font-weight:800; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
         </div>
@@ -4058,7 +4047,7 @@ Thank you! - ${shopName}`;
         <!-- Actual Counted Cash & Note Counter Trigger -->
         <div class="form-group" style="margin-top:4px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 7. ${I18N.t('shift_counted_cash') || 'Actual Physical Counted Cash'}</label>
+            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 6. ${I18N.t('shift_counted_cash') || 'Actual Physical Counted Cash'}</label>
             <button type="button" class="btn btn-xs btn-primary" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 10px; font-weight:700;">🧮 Count Notes (5000, 2000...)</button>
           </div>
           <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.2rem; font-weight:800;">
@@ -4070,8 +4059,14 @@ Thank you! - ${shopName}`;
           <div id="shiftModalVerdictBadge"><span class="tally-badge balanced">✅ Balanced (Rs. 0.00)</span></div>
         </div>
 
+        <!-- Special Cash Notes / Remarks -->
         <div class="form-group">
-          <label class="form-label" style="font-size:0.8rem;">${I18N.t('exp_col_description') || 'Shift Notes / Remarks'}</label>
+          <label class="form-label" style="font-size:0.82rem; font-weight:700; color:var(--accent-purple);">📝 විශේෂ මුදල් සටහන් (Special Cash Notes / Remarks)</label>
+          <textarea class="form-input" id="shiftModalSpecialNotes" rows="2" placeholder="උදා: රු. 2,000 ක් මාරු කර දුන්නා / අමතර මුදලක් හෝ විශේෂ හේතු මෙතැන සටහන් කරන්න..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.8rem;">${I18N.t('exp_col_description') || 'General Remarks'}</label>
           <input type="text" class="form-input" id="shiftModalNotes" placeholder="e.g. Evening closing ok, all notes tallied, float kept for tomorrow">
         </div>
       </form>
@@ -4091,7 +4086,6 @@ Thank you! - ${shopName}`;
     const posCashInp = document.getElementById('shiftModalPosCash');
     const posCardInp = document.getElementById('shiftModalPosCard');
     const posChequeInp = document.getElementById('shiftModalPosCheque');
-    const relInp = document.getElementById('shiftModalReloadCash');
     const expInp = document.getElementById('shiftModalExpenses');
     const cntInp = document.getElementById('shiftModalCounted');
 
@@ -4101,15 +4095,14 @@ Thank you! - ${shopName}`;
       const posCard = parseFloat(posCardInp.value) || 0;
       const posCheque = parseFloat(posChequeInp.value) || 0;
       const posTotal = posCash + posCard + posCheque;
-      const rel = parseFloat(relInp.value) || 0;
       const exp = parseFloat(expInp.value) || 0;
       const cnt = parseFloat(cntInp.value) || 0;
 
       const posTotEl = document.getElementById('shiftModalPosTotal');
       if (posTotEl) posTotEl.textContent = DB.formatCurrency(posTotal);
 
-      // Expected Drawer Cash = Float + POS Cash + Reload Cash - Expenses
-      const expected = flt + posCash + rel - exp;
+      // Expected Drawer Cash = Float + POS Cash - Expenses (NO RELOAD)
+      const expected = flt + posCash - exp;
       const diff = cnt - expected;
 
       const expEl = document.getElementById('shiftModalExpectedVal');
@@ -4127,7 +4120,7 @@ Thank you! - ${shopName}`;
       }
     };
 
-    [fltInp, posCashInp, posCardInp, posChequeInp, relInp, expInp, cntInp].forEach(inp => {
+    [fltInp, posCashInp, posCardInp, posChequeInp, expInp, cntInp].forEach(inp => {
       if (inp) inp.addEventListener('input', updateCalc);
     });
 
@@ -4157,12 +4150,13 @@ Thank you! - ${shopName}`;
     const posChequeSales = parseFloat(document.getElementById('shiftModalPosCheque')?.value) || 0;
     const posGrossSales = posCashSales + posCardSales + posChequeSales;
 
-    const reloadCashInDrawer = parseFloat(document.getElementById('shiftModalReloadCash')?.value) || 0;
     const drawerExpenses = parseFloat(document.getElementById('shiftModalExpenses')?.value) || 0;
     const countedCash = parseFloat(document.getElementById('shiftModalCounted')?.value) || 0;
-    const notes = document.getElementById('shiftModalNotes')?.value || '';
+    const specialNotes = document.getElementById('shiftModalSpecialNotes')?.value?.trim() || '';
+    const notes = document.getElementById('shiftModalNotes')?.value?.trim() || '';
 
-    const expectedCash = openingFloat + posCashSales + reloadCashInDrawer - drawerExpenses;
+    // Pure Shop Cashier Tally: Float + POS Cash - Drawer Expenses (NO RELOAD)
+    const expectedCash = openingFloat + posCashSales - drawerExpenses;
     const difference = countedCash - expectedCash;
     let status = 'balanced';
     if (difference > 0.01) status = 'excess';
@@ -4179,8 +4173,8 @@ Thank you! - ${shopName}`;
       posCashSales,
       posCardSales,
       posChequeSales,
-      reloadCashInDrawer,
-      reloadCashCollected: reloadCashInDrawer,
+      reloadCashInDrawer: 0,
+      reloadCashCollected: 0,
       drawerExpenses,
       totalExpenses: drawerExpenses,
       expectedCash,
@@ -4188,6 +4182,8 @@ Thank you! - ${shopName}`;
       actualCountedCash: countedCash,
       difference,
       status,
+      specialNotes,
+      cashNote: specialNotes,
       notes,
       note: notes,
       denominations: this.lastShiftDenominations || null
@@ -4221,6 +4217,81 @@ Thank you! - ${shopName}`;
     this.showToast('✅ Shift record deleted', 'info');
     this.renderShiftsPage();
     this.renderDashboard();
+  },
+
+  shareShiftViaWhatsApp(shiftId) {
+    const shifts = DB.getShifts();
+    const s = shifts.find(x => x.id === shiftId);
+    if (!s) {
+      this.showToast('Shift not found', 'error');
+      return;
+    }
+    const shop = DB.getShop(s.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+
+    const posCash = s.posCashSales || 0;
+    const posCard = s.posCardSales || 0;
+    const posCheque = s.posChequeSales || 0;
+    const posTotal = s.posGrossSales || s.posSales || (posCash + posCard + posCheque);
+
+    let msg = `🏪 *${shopName.toUpperCase()} - DAILY CASHIER SHIFT TALLY*\n`;
+    msg += `📅 Date: ${DB.formatDate(s.date)}\n`;
+    msg += `⏰ Time: ${DB.formatTime(s.timestamp)}\n`;
+    msg += `🧑‍💼 Cashier: ${s.cashier || s.cashierName || 'Staff'}\n`;
+    msg += `🔖 Shift: ${s.shiftType ? s.shiftType.toUpperCase() : 'EVENING'}\n`;
+    msg += `=================================\n\n`;
+
+    msg += `🛒 *POS MACHINE SALES:*\n`;
+    msg += `• Cash Sales: Rs. ${DB.formatCurrency(posCash)}\n`;
+    msg += `• Card Sales: Rs. ${DB.formatCurrency(posCard)}\n`;
+    if (posCheque > 0) msg += `• Cheque/QR: Rs. ${DB.formatCurrency(posCheque)}\n`;
+    msg += `• *Gross Total Sales: Rs. ${DB.formatCurrency(posTotal)}*\n\n`;
+
+    msg += `💵 *DRAWER CASH FLOW:*\n`;
+    msg += `• 1. Opening Float: Rs. ${DB.formatCurrency(s.openingFloat || 0)}\n`;
+    msg += `• 2. (+) POS Cash: Rs. ${DB.formatCurrency(posCash)}\n`;
+    msg += `• 3. (-) Day Expenses: Rs. ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}\n`;
+    msg += `• *Expected Cash: Rs. ${DB.formatCurrency(s.expectedCash || 0)}*\n`;
+    msg += `• *Actual Counted: Rs. ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n`;
+
+    const diff = s.difference || 0;
+    if (Math.abs(diff) < 0.01) {
+      msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED (Rs. 0.00)*\n`;
+    } else if (diff > 0) {
+      msg += `• *VERDICT: 🟢 CASH EXCESS (+Rs. ${DB.formatCurrency(diff)})*\n`;
+    } else {
+      msg += `• *VERDICT: 🔴 CASH SHORTAGE (-Rs. ${DB.formatCurrency(Math.abs(diff))})*\n`;
+    }
+
+    if (s.denominations) {
+      const d = s.denominations;
+      let parts = [];
+      if (d.n5000) parts.push(`5000x${d.n5000}`);
+      if (d.n2000) parts.push(`2000x${d.n2000}`);
+      if (d.n1000) parts.push(`1000x${d.n1000}`);
+      if (d.n500) parts.push(`500x${d.n500}`);
+      if (d.n100) parts.push(`100x${d.n100}`);
+      if (d.n50) parts.push(`50x${d.n50}`);
+      if (d.n20) parts.push(`20x${d.n20}`);
+      if (d.coins) parts.push(`Coins: ${d.coins}`);
+      if (parts.length > 0) {
+        msg += `\n🧮 *Notes Counted:* ${parts.join(', ')}\n`;
+      }
+    }
+
+    if (s.specialNotes || s.cashNote) {
+      msg += `\n📝 *SPECIAL CASH NOTE:*\n${s.specialNotes || s.cashNote}\n`;
+    }
+
+    if (s.notes || s.note) {
+      msg += `\n📌 *Remarks:* ${s.notes || s.note}\n`;
+    }
+
+    msg += `\n=================================\n`;
+    msg += `Generated via Methmi Shop Tracker`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   },
 
   printTodayShiftSlip() {
@@ -4306,11 +4377,22 @@ Thank you! - ${shopName}`;
           .sig-row { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 10px; font-size: 0.85rem; }
           .sig-line { width: 42%; border-top: 1px solid #444; text-align: center; padding-top: 4px; }
           @media print {
-            body { padding: 0; }
+            .no-print { display: none !important; }
+            body { padding: 0 !important; }
           }
         </style>
       </head>
       <body>
+        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:12px 18px; margin-bottom:20px; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
+          <div style="font-weight:700; font-size:1rem; display:flex; align-items:center; gap:8px;">
+            <span>📄</span> <span>Shop Cashier Settlement Slip</span>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button onclick="window.print()" style="background:#2563eb; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:700; cursor:pointer;">🖨️ Print / Save as PDF</button>
+            <button onclick="window.opener ? window.opener.App.shareShiftViaWhatsApp('${s.id}') : null" style="background:#16a34a; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:700; cursor:pointer;">📲 WhatsApp Share</button>
+            <button onclick="window.close()" style="background:#475569; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:700; cursor:pointer;">✖ Close</button>
+          </div>
+        </div>
         <div class="header">
           <div class="shop-title">🏪 ${shopName}</div>
           <div class="sub-title">Daily Evening Shift Reconciliation & Cash Flow Settlement</div>
@@ -4331,14 +4413,20 @@ Thank you! - ${shopName}`;
           <tr style="background:#f3f4f6; font-weight:800;"><td>Total POS Machine Gross Sales</td><td style="text-align:right;">${DB.formatCurrency(posTotal)}</td></tr>
         </table>
 
-        <div class="section-head">💵 Cash Drawer Flow Reconciliation</div>
+        <div class="section-head">💵 Shop Cash Drawer Flow Reconciliation</div>
         <table>
           <tr><td>1. Opening Cash Float</td><td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td></tr>
           <tr><td>2. Add: POS Cash Sales</td><td style="text-align:right;">+ ${DB.formatCurrency(posCash)}</td></tr>
-          <tr><td>3. Add: Reload & Bill Drawer Cash</td><td style="text-align:right;">+ ${DB.formatCurrency(s.reloadCashInDrawer || s.reloadCashCollected || 0)}</td></tr>
-          <tr><td>4. Less: Daily Drawer Expenses</td><td style="text-align:right; color:#e4002b;">- ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td></tr>
+          <tr><td>3. Less: Daily Drawer Expenses</td><td style="text-align:right; color:#e4002b;">- ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td></tr>
           <tr style="background:#f0f9ff; font-weight:800;"><td>Expected Cash in Drawer</td><td style="text-align:right; color:#0284c7;">${DB.formatCurrency(s.expectedCash || 0)}</td></tr>
         </table>
+
+        ${(s.specialNotes || s.cashNote) ? `
+        <div style="background:#fffbeb; border:1px solid #f59e0b; padding:12px; border-radius:6px; margin:14px 0;">
+          <div style="font-weight:700; color:#b45309; font-size:0.85rem; margin-bottom:4px;">📝 විශේෂ මුදල් සටහන් (Special Cash Notes / Remarks):</div>
+          <div style="font-size:0.95rem; color:#1c1917; white-space:pre-wrap; font-weight:600;">${s.specialNotes || s.cashNote}</div>
+        </div>
+        ` : ''}
 
         <div class="section-head">🧮 Physical Cash Denominations Counted</div>
         <table>
@@ -4867,6 +4955,9 @@ Thank you! - ${shopName}`;
         msg += `• Evening Notes: ${parts.join(', ')}\n`;
       }
       msg += `• Discrepancy (Diff): Rs. ${DB.formatCurrency(eveningShift.difference)}\n`;
+      if (eveningShift.specialNotes || eveningShift.cashNote) {
+        msg += `• 📝 Special Cash Note: ${eveningShift.specialNotes || eveningShift.cashNote}\n`;
+      }
       if (Math.abs(eveningShift.difference) < 0.01) {
         msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED*\n`;
       } else if (eveningShift.difference > 0) {

@@ -245,7 +245,7 @@ const I18N = {
       // Daily Evening Shift & POS Reconciliation
       'nav_shifts': '🏪 Shop Drawer & Shift Tally',
       'shift_title': 'Evening Shift Closing & POS Reconciliation',
-      'shift_subtitle': 'Tally daily cash against POS machine sales, reload collections, and expenses',
+      'shift_subtitle': 'Tally daily shop cash against POS machine sales, opening float, and day expenses (Cashier Sales Tally)',
       'top_btn_shift': '🌙 Evening Shift Tally',
       'top_btn_expense': '💸 + Add Expense',
       'shift_opening_float': 'Opening Cash / Float',
