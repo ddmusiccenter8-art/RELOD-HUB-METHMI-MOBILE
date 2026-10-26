@@ -3977,107 +3977,94 @@ Thank you! - ${shopName}`;
     const defaultExpenses = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
     const bodyHtml = `
-      <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px; display:flex; justify-content:space-between; align-items:center;">
+      <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:0.82rem; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center; padding-bottom:6px; border-bottom:1px solid var(--border-glass);">
           <div>🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}</div>
-          <button type="button" class="btn btn-xs btn-ghost" onclick="App.showAddExpenseModal()" style="font-size:0.75rem; color:var(--accent-red); border:1px solid rgba(228,0,43,0.3);">+ Add Expense</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.showAddExpenseModal()" style="font-size:0.75rem; color:var(--accent-red); border:1px solid rgba(228,0,43,0.3); padding:2px 8px;">+ Add Expense</button>
         </div>
 
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <div class="form-group">
-            <label class="form-label" style="font-size:0.8rem;">${I18N.t('shift_type') || 'Shift Type'}</label>
-            <select class="form-select" id="shiftModalType" style="padding:8px;">
+        <!-- Shift Type & Cashier Name -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-size:0.75rem; margin-bottom:2px;">${I18N.t('shift_type') || 'Shift Type'}</label>
+            <select class="form-select" id="shiftModalType" style="padding:6px 8px; font-size:0.85rem; height:34px;">
               <option value="evening" selected>🌙 ${I18N.t('shift_evening') || 'Evening Closing'}</option>
               <option value="morning">🌅 ${I18N.t('shift_morning') || 'Morning Shift'}</option>
               <option value="fullday">☀️ ${I18N.t('shift_fullday') || 'Full Day Closing'}</option>
             </select>
           </div>
-          <div class="form-group">
-            <label class="form-label" style="font-size:0.8rem;">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
-            <input type="text" class="form-input" id="shiftModalCashier" placeholder="Cashier Name" style="padding:8px;" required>
-          </div>
-        </div>
-
-        <!-- Section 1: Opening Float & POS Sales Breakdown -->
-        <div style="background:var(--bg-card); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
-          <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
-            <span>🛒</span> <span>Shop POS Sales & Opening Float</span>
-          </div>
-          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
-            <div class="form-group">
-              <label class="form-label" style="font-size:0.75rem;">1. ${I18N.t('shift_opening_float') || 'Opening Cash Float'}</label>
-              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}">
-            </div>
-            <div class="form-group">
-              <label class="form-label" style="font-size:0.75rem; color:var(--accent-blue); font-weight:700;">2. ${I18N.t('shift_pos_cash') || 'POS Cash Sales (Counter)'}</label>
-              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCash" placeholder="0.00" value="0">
-            </div>
-            <div class="form-group">
-              <label class="form-label" style="font-size:0.75rem; color:var(--accent-purple); font-weight:700;">3. ${I18N.t('shift_pos_card') || 'POS Card Sales'}</label>
-              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCard" placeholder="0.00" value="0">
-            </div>
-            <div class="form-group">
-              <label class="form-label" style="font-size:0.75rem; color:var(--accent-gold); font-weight:700;">4. ${I18N.t('shift_pos_cheque') || 'POS Cheques/QR'}</label>
-              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCheque" placeholder="0.00" value="0">
-            </div>
-          </div>
-          <div style="margin-top:8px; padding-top:8px; border-top:1px dashed var(--border-glass); display:flex; justify-content:space-between; align-items:center; font-size:0.85rem;">
-            <span style="color:var(--text-secondary); font-weight:600;">Total POS Gross Sales:</span>
-            <span id="shiftModalPosTotal" style="font-weight:800; color:var(--accent-blue); font-size:1.05rem;">Rs.0.00</span>
-          </div>
-        </div>
-
-        <!-- Section 2: Shop Expenses Deducted from Drawer (NO Reload) -->
-        <div style="background:var(--bg-glass); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label" style="font-size:0.78rem; color:var(--accent-red); font-weight:700;">5. ${I18N.t('stat_daily_expenses') || 'Daily Shop Expenses / Drawings Deducted'}</label>
-            <input type="number" step="0.01" min="0" class="form-input" id="shiftModalExpenses" value="${defaultExpenses}">
+            <label class="form-label" style="font-size:0.75rem; margin-bottom:2px;">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
+            <input type="text" class="form-input" id="shiftModalCashier" placeholder="Cashier Name" style="padding:6px 8px; font-size:0.85rem; height:34px;" required>
           </div>
         </div>
 
-        <!-- Expected Cash Badge (Pure Shop: Float + POS Cash - Expenses) -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:10px 14px;">
+        <!-- Core Grid: Float, POS Sales, Card, Expenses -->
+        <div style="background:var(--bg-card); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--text-secondary);">1. Opening Cash Float</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}" style="padding:6px 8px; font-size:0.95rem; font-weight:700; height:34px;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--accent-blue); font-weight:800;">2. 🛒 Total POS Machine Sales</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCash" placeholder="0.00" value="0" style="padding:6px 8px; font-size:1.05rem; font-weight:800; color:var(--accent-blue); height:34px; border:1px solid rgba(59,130,246,0.4);">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-purple);">3. Less: POS Card / Non-Cash</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCard" placeholder="0.00" value="0" style="padding:6px 8px; font-size:0.85rem; height:34px;">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-red); font-weight:700;">4. Less: Daily Drawer Expenses</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="shiftModalExpenses" value="${defaultExpenses}" style="padding:6px 8px; font-size:0.85rem; color:var(--accent-red); font-weight:700; height:34px;">
+            </div>
+          </div>
+        </div>
+
+        <!-- Expected Cash Badge -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:8px 12px;">
           <div>
-            <div style="font-weight:700; font-size:0.88rem; color:var(--text-secondary);">${I18N.t('shift_expected_cash') || 'Expected Cash in Drawer'}:</div>
-            <div style="font-size:0.75rem; color:var(--text-muted);">(Opening Float + POS Cash Sales - Expenses)</div>
+            <div style="font-weight:700; font-size:0.82rem; color:var(--text-secondary);">Expected Cash in Drawer:</div>
+            <div style="font-size:0.7rem; color:var(--text-muted);">(Float + POS Sales - Card - Expenses)</div>
           </div>
-          <div style="font-size:1.3rem; font-weight:800; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
+          <div style="font-size:1.2rem; font-weight:900; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
         </div>
 
-        <!-- Actual Counted Cash & Note Counter Trigger -->
-        <div class="form-group" style="margin-top:4px;">
+        <!-- Actual Counted Cash in Drawer -->
+        <div class="form-group" style="margin-bottom:0; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius-sm); padding:8px 12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 6. ${I18N.t('shift_counted_cash') || 'Actual Physical Counted Cash'}</label>
-            <button type="button" class="btn btn-xs btn-primary" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 10px; font-weight:700;">🧮 Count Notes (5000, 2000...)</button>
+            <label class="form-label" style="font-weight:800; color:var(--accent-gold); font-size:0.82rem; margin-bottom:0;">💵 5. Actual Counted Cash in Drawer</label>
+            <button type="button" class="btn btn-xs btn-primary" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 10px; font-weight:700; background:#f59e0b; border:none; color:#000;">🧮 Count Notes (5000, 2000...)</button>
           </div>
-          <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.2rem; font-weight:800;">
+          <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.25rem; font-weight:900; padding:6px 10px; text-align:right;">
         </div>
 
         <!-- Tally Verdict Live Badge -->
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:var(--radius-sm); background:var(--bg-glass); border:1px solid var(--border-glass);" id="shiftModalVerdictBar">
-          <div style="font-weight:700; font-size:0.88rem;">${I18N.t('shift_status_verdict') || 'Reconciliation Verdict'}:</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-radius:var(--radius-sm); background:var(--bg-glass); border:1px solid var(--border-glass);" id="shiftModalVerdictBar">
+          <div style="font-weight:700; font-size:0.82rem;">POS vs Cash Tally Verdict:</div>
           <div id="shiftModalVerdictBadge"><span class="tally-badge balanced">✅ Balanced (Rs. 0.00)</span></div>
         </div>
 
         <!-- Special Cash Notes / Remarks -->
-        <div class="form-group">
-          <label class="form-label" style="font-size:0.82rem; font-weight:700; color:var(--accent-purple);">📝 විශේෂ මුදල් සටහන් (Special Cash Notes / Remarks)</label>
-          <textarea class="form-input" id="shiftModalSpecialNotes" rows="2" placeholder="උදා: රු. 2,000 ක් මාරු කර දුන්නා / අමතර මුදලක් හෝ විශේෂ හේතු මෙතැන සටහන් කරන්න..."></textarea>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-size:0.78rem; font-weight:700; color:var(--accent-purple); margin-bottom:2px;">📝 විශේෂ මුදල් සටහන් (Special Cash Notes / Remarks)</label>
+          <textarea class="form-input" id="shiftModalSpecialNotes" rows="2" style="font-size:0.85rem; padding:6px 8px; resize:none;" placeholder="උදා: රු. 2,000 ක් මාරු කර දුන්නා / අමතර මුදලක් හෝ විශේෂ හේතු මෙතැන සටහන් කරන්න..."></textarea>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" style="font-size:0.8rem;">${I18N.t('exp_col_description') || 'General Remarks'}</label>
-          <input type="text" class="form-input" id="shiftModalNotes" placeholder="e.g. Evening closing ok, all notes tallied, float kept for tomorrow">
+        <div class="form-group" style="margin-bottom:0;">
+          <input type="text" class="form-input" id="shiftModalNotes" placeholder="Optional general note / cashier remarks" style="font-size:0.8rem; padding:4px 8px;">
         </div>
       </form>
     `;
 
     this.showModal(
-      `🌙 ${I18N.t('shift_modal_title') || 'Evening Shift Summary & POS Tally'}`,
+      `🌙 ${I18N.t('shift_modal_title') || 'Shop Cashier Shift Closing & POS Reconciliation'}`,
       bodyHtml,
       `
-        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
-        <button type="button" class="btn btn-primary" onclick="App.saveShiftSummaryModal()">${I18N.t('shift_btn_save') || '💾 Save Shift Closing'}</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="App.closeModal()">Cancel</button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="App.saveShiftSummaryModal('save_only')" style="font-weight:700;">💾 Save Only</button>
+        <button type="button" class="btn btn-success btn-sm" onclick="App.saveShiftSummaryModal('whatsapp')" style="background:#16a34a; font-weight:800;">📲 💾 Save & WhatsApp</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="App.saveShiftSummaryModal('pdf')" style="background:linear-gradient(135deg, #2563eb, #1d4ed8); font-weight:800;">📄 💾 Save & Get PDF Slip</button>
       `
     );
 
@@ -4085,23 +4072,18 @@ Thank you! - ${shopName}`;
     const fltInp = document.getElementById('shiftModalFloat');
     const posCashInp = document.getElementById('shiftModalPosCash');
     const posCardInp = document.getElementById('shiftModalPosCard');
-    const posChequeInp = document.getElementById('shiftModalPosCheque');
     const expInp = document.getElementById('shiftModalExpenses');
     const cntInp = document.getElementById('shiftModalCounted');
 
     const updateCalc = () => {
       const flt = parseFloat(fltInp.value) || 0;
-      const posCash = parseFloat(posCashInp.value) || 0;
+      const posTotal = parseFloat(posCashInp.value) || 0;
       const posCard = parseFloat(posCardInp.value) || 0;
-      const posCheque = parseFloat(posChequeInp.value) || 0;
-      const posTotal = posCash + posCard + posCheque;
       const exp = parseFloat(expInp.value) || 0;
       const cnt = parseFloat(cntInp.value) || 0;
 
-      const posTotEl = document.getElementById('shiftModalPosTotal');
-      if (posTotEl) posTotEl.textContent = DB.formatCurrency(posTotal);
-
-      // Expected Drawer Cash = Float + POS Cash - Expenses (NO RELOAD)
+      // Net expected cash in drawer = Opening Float + (POS Sales - Card Sales) - Expenses
+      const posCash = Math.max(0, posTotal - posCard);
       const expected = flt + posCash - exp;
       const diff = cnt - expected;
 
@@ -4111,23 +4093,23 @@ Thank you! - ${shopName}`;
       const vBadge = document.getElementById('shiftModalVerdictBadge');
       if (vBadge) {
         if (Math.abs(diff) < 0.01) {
-          vBadge.innerHTML = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'} (Rs. 0.00)</span>`;
+          vBadge.innerHTML = `<span class="tally-badge balanced" style="font-size:0.85rem; font-weight:800;">✅ 100% Balanced (Rs. 0.00)</span>`;
         } else if (diff > 0) {
-          vBadge.innerHTML = `<span class="tally-badge excess">🟢 ${I18N.t('shift_excess') || 'Cash Excess'} (+${DB.formatCurrency(diff)})</span>`;
+          vBadge.innerHTML = `<span class="tally-badge excess" style="font-size:0.85rem; font-weight:800;">🟢 Excess (+Rs. ${DB.formatCurrency(diff)})</span>`;
         } else {
-          vBadge.innerHTML = `<span class="tally-badge shortage">🔴 ${I18N.t('shift_shortage') || 'Cash Shortage'} (-${DB.formatCurrency(Math.abs(diff))})</span>`;
+          vBadge.innerHTML = `<span class="tally-badge shortage" style="font-size:0.85rem; font-weight:800;">🔴 Shortage (-Rs. ${DB.formatCurrency(Math.abs(diff))})</span>`;
         }
       }
     };
 
-    [fltInp, posCashInp, posCardInp, posChequeInp, expInp, cntInp].forEach(inp => {
+    [fltInp, posCashInp, posCardInp, expInp, cntInp].forEach(inp => {
       if (inp) inp.addEventListener('input', updateCalc);
     });
 
     updateCalc();
   },
 
-  openDenominationModalForShiftModal() {
+    openDenominationModalForShiftModal() {
     this.openDenominationModal((total, denoms) => {
       const cntInp = document.getElementById('shiftModalCounted');
       if (cntInp) {
@@ -4138,17 +4120,17 @@ Thank you! - ${shopName}`;
     });
   },
 
-  saveShiftSummaryModal() {
+  saveShiftSummaryModal(action = 'pdf') {
     const shopId = DB.getActiveShopId();
     if (!shopId) return;
 
     const shiftType = document.getElementById('shiftModalType')?.value || 'evening';
-    const cashier = document.getElementById('shiftModalCashier')?.value?.trim() || '';
+    const cashier = document.getElementById('shiftModalCashier')?.value?.trim() || 'Cashier';
     const openingFloat = parseFloat(document.getElementById('shiftModalFloat')?.value) || 0;
-    const posCashSales = parseFloat(document.getElementById('shiftModalPosCash')?.value) || 0;
+    const posGrossSales = parseFloat(document.getElementById('shiftModalPosCash')?.value) || 0;
     const posCardSales = parseFloat(document.getElementById('shiftModalPosCard')?.value) || 0;
-    const posChequeSales = parseFloat(document.getElementById('shiftModalPosCheque')?.value) || 0;
-    const posGrossSales = posCashSales + posCardSales + posChequeSales;
+    const posCashSales = Math.max(0, posGrossSales - posCardSales);
+    const posChequeSales = 0;
 
     const drawerExpenses = parseFloat(document.getElementById('shiftModalExpenses')?.value) || 0;
     const countedCash = parseFloat(document.getElementById('shiftModalCounted')?.value) || 0;
@@ -4192,22 +4174,48 @@ Thank you! - ${shopName}`;
     const savedShift = DB.addShift(shiftData);
     this.lastShiftDenominations = null;
     this.closeModal();
-    this.showToast(`✅ ${I18N.t('shift_saved_success') || 'Shift closing saved successfully!'}`, 'success');
 
     if (this.currentPage === 'shifts') {
       this.renderShiftsPage();
     }
     this.renderDashboard();
 
-    // Prompt user to print or view settlement slip
-    setTimeout(() => {
-      if (confirm(I18N.currentLang === 'si' ? 'හවස් සාරාංශ පත්‍රිකාව (Settlement Slip / PDF) Print කිරීමට අවශ්‍යද?' : 'Would you like to print/download the Daily Settlement Slip now?')) {
-        this.printShiftSlip(savedShift.id);
-      }
-    }, 400);
+    if (action === 'pdf') {
+      this.showToast('✅ Shift Saved! Opening PDF Slip...', 'success');
+      setTimeout(() => this.printShiftSlip(savedShift.id), 300);
+    } else if (action === 'whatsapp') {
+      this.showToast('✅ Shift Saved! Opening WhatsApp...', 'success');
+      setTimeout(() => this.shareShiftViaWhatsApp(savedShift.id), 300);
+    } else {
+      // Show confirmation dialog with direct Download PDF and WhatsApp buttons
+      this.showModal(
+        '✅ Shift Closing Saved Successfully!',
+        `
+          <div style="text-align:center; padding:10px 0;">
+            <div style="font-size:2.2rem; margin-bottom:8px;">📄</div>
+            <h3 style="font-size:1.15rem; font-weight:800; color:var(--accent-green); margin-bottom:6px;">Daily Shift Record Saved!</h3>
+            <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:16px;">
+              සාප්පුවේ දෛනික ගිණුම සාර්ථකව සුරැකිණි. දැන් ඔබට PDF Slip එක බාගත කිරීමට හෝ WhatsApp මඟින් යැවීමට හැක:
+            </p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn btn-primary" onclick="App.printShiftSlip('${savedShift.id}'); App.closeModal();" style="font-size:0.95rem; font-weight:800; padding:10px; background:#2563eb;">
+                📄 Download / Print PDF Slip
+              </button>
+              <button class="btn btn-success" onclick="App.shareShiftViaWhatsApp('${savedShift.id}'); App.closeModal();" style="font-size:0.95rem; font-weight:800; padding:10px; background:#16a34a;">
+                📲 Share Shift on WhatsApp
+              </button>
+              <button class="btn btn-ghost btn-sm" onclick="App.closeModal();" style="margin-top:4px;">
+                Close
+              </button>
+            </div>
+          </div>
+        `,
+        ''
+      );
+    }
   },
 
-  promptDeleteShift(shiftId) {
+    promptDeleteShift(shiftId) {
     const pin = prompt(I18N.t('admin_prompt') || 'Enter Admin PIN to delete (Default: 1234):');
     if (pin !== '1234') {
       this.showToast(I18N.t('admin_incorrect') || 'Incorrect PIN', 'error');

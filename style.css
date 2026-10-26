@@ -923,8 +923,8 @@ select option {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -932,6 +932,8 @@ select option {
   opacity: 0;
   visibility: hidden;
   transition: var(--transition);
+  padding: 16px;
+  overflow-y: auto;
 }
 
 .modal-overlay.active {
@@ -943,12 +945,16 @@ select option {
   background: var(--bg-secondary);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-xl);
-  padding: 24px;
-  width: 90%;
-  max-width: 420px;
+  padding: 18px 22px;
+  width: 96%;
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
   transform: scale(0.95);
   transition: var(--transition);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+  margin: auto;
 }
 
 .modal-overlay.active .modal {
@@ -956,19 +962,32 @@ select option {
 }
 
 .modal-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  margin-bottom: 16px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 10px;
+}
+
+#modalBody {
+  overflow-y: auto;
+  max-height: calc(88vh - 125px);
+  padding-right: 4px;
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 20px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-glass);
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 /* ---- Toast ---- */
