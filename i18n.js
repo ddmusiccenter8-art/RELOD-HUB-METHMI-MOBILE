@@ -10,7 +10,17 @@ const I18N = {
       // Sidebar
       'app_title': 'Shop Tracker',
       'nav_dashboard': 'Dashboard',
-      'nav_update': 'Add Update',
+      'nav_update': '📱 Reload & Payments',
+      'nav_reload_payments': '📱 Reload & Payments',
+      'top_btn_reload': '📱 Reload & Payments',
+      'top_btn_bank_deposit': '🏦 + Bank Deposit',
+      'top_btn_cash_out': '💵 + Cash Out',
+      'top_btn_morning_shift': '🌅 Morning Shift Open',
+      'top_btn_evening_shift': '🌇 Evening Shift Close',
+      'upd_reload_hub_cash': '📶 Hub / Floating Cash',
+      'upd_reload_drawer_total_badge': '💵 Reload Cash Drawer Total',
+      'shift_morning_open_title': '🌅 Morning Shift Open (Cash Drawer Float)',
+      'shift_super_admin_btn': '📲 WhatsApp Report to Super Admin',
       'nav_history': 'Update History',
       'nav_credits': 'Credits & Ledger',
       'nav_shops': 'Shops',
@@ -47,7 +57,7 @@ const I18N = {
       'view_shop': 'Open Shop ➔',
       
       // Update Form
-      'upd_title': 'Add New Update',
+      'upd_title': '📱 Reload & Bank Payments',
       'upd_prev_title': '📌 Previous Update',
       'upd_emp_details': 'Employee Details',
       'upd_emp_name': 'Employee Name',
@@ -66,7 +76,7 @@ const I18N = {
       'upd_reload_total_badge': '🔄 Reload Total (SIMs + Reload Cash)',
       
       // Section 2: Shop Cash in Drawer (Dedicated)
-      'upd_cash_sec_title': '💵 Section 2: Shop Cash in Drawer (සාප්පුවේ මුදල් ලාච්චුව)',
+      'upd_cash_sec_title': '💵 Section 2: Reload Cash Drawer (රීලෝඩ් මුදල් ලාච්චුව)',
       'upd_cash_drawer_lbl': '💵 Physical Cash in Drawer (සාප්පුවේ ලාච්චුවේ මුදල්)',
       'upd_cash_drawer_desc': 'Enter physical cash in drawer or click "Count Notes" to calculate note denominations',
       'upd_prev_cash_hint': 'Previous Cash Drawer',
@@ -192,7 +202,7 @@ const I18N = {
       'denom_coins_lbl': 'Coins / Small Change (LKR)',
       
       // Daily Evening Shift & POS Reconciliation
-      'nav_shifts': 'Shift & Sales Tally',
+      'nav_shifts': '🏪 Shop Drawer & Shift Tally',
       'shift_title': 'Evening Shift Closing & POS Reconciliation',
       'shift_subtitle': 'Tally daily cash against POS machine sales, reload collections, and expenses',
       'top_btn_shift': '🌙 Evening Shift Tally',
@@ -255,7 +265,17 @@ const I18N = {
       // Sidebar
       'app_title': 'Shop Tracker',
       'nav_dashboard': 'Dashboard',
-      'nav_update': 'Update කරන්න',
+      'nav_update': '📱 රීලෝඩ් සහ ගෙවීම්',
+      'nav_reload_payments': '📱 රීලෝඩ් සහ ගෙවීම්',
+      'top_btn_reload': '📱 රීලෝඩ් සහ ගෙවීම්',
+      'top_btn_bank_deposit': '🏦 + බැංකුවට තැන්පත්',
+      'top_btn_cash_out': '💵 + කැෂ් අවුට්',
+      'top_btn_morning_shift': '🌅 උදේ ෂිෆ්ට් ආරම්භය',
+      'top_btn_evening_shift': '🌇 සවස ෂිෆ්ට් අවසානය',
+      'upd_reload_hub_cash': '📶 හබ් / ෆ්ලෝටින් මුදල්',
+      'upd_reload_drawer_total_badge': '💵 රීලෝඩ් ලාච්චුවේ මුළු මුදල',
+      'shift_morning_open_title': '🌅 උදෑසන ෂිෆ්ට් ආරම්භය (ලාච්චුවේ නෝට්ටු)',
+      'shift_super_admin_btn': '📲 සුපර් ඇඩ්මින්ට WhatsApp යවන්න',
       'nav_history': 'Update ඉතිහාසය',
       'nav_credits': 'ණය සහ ලෙජරය',
       'nav_shops': 'සාප්පු',
@@ -292,7 +312,7 @@ const I18N = {
       'view_shop': 'සාප්පුව බලන්න ➔',
       
       // Update Form
-      'upd_title': 'අලුත් Update එකක් දාන්න',
+      'upd_title': '📱 රීලෝඩ් සහ බැංකු ගෙවීම්',
       'upd_prev_title': '📌 පෙර දින Update එක',
       'upd_emp_details': 'සේවක තොරතුරු',
       'upd_emp_name': 'සේවකයාගේ නම',
@@ -311,7 +331,7 @@ const I18N = {
       'upd_reload_total_badge': '🔄 රීලෝඩ් මුළු එකතුව (සිම් + ලාච්චුවේ මුදල්)',
       
       // Section 2: Shop Cash in Drawer (Dedicated)
-      'upd_cash_sec_title': '💵 කොටස 2: සාප්පුවේ මුදල් ලාච්චුව (Cash in Drawer)',
+      'upd_cash_sec_title': '💵 කොටස 2: රීලෝඩ් මුදල් ලාච්චුව (Reload Cash Drawer)',
       'upd_cash_drawer_lbl': '💵 සාප්පුවේ ලාච්චුවේ ඇති මුදල් (Cash in Drawer)',
       'upd_cash_drawer_desc': 'ලාච්චුවේ ඇති මුළු මුදල් ප්‍රමාණය ඇතුළත් කරන්න හෝ "නෝට්ටු ගණන් කරන්න" ක්ලික් කරන්න',
       'upd_prev_cash_hint': 'කලින් ලාච්චුවේ මුදල',

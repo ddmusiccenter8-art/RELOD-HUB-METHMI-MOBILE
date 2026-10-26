@@ -1561,8 +1561,10 @@ const App = {
         mobitel,
         airtel,
         hutch,
-        ezcash,
+        ezcash: 0,
         cashInDrawer: reloadCash,
+        hubCash: reloadHubCash,
+        drawerTotal: reloadCash + reloadHubCash,
         denominations: this.lastReloadDenominations || null
       },
       mobileRental: {
@@ -3958,10 +3960,12 @@ Thank you! - ${shopName}`;
     const shop = DB.getShop(shopId);
     const today = DB.getTodayDate();
 
-    // Default opening float: fetch latest shift for this shop
+    // Default opening float: check today's morning shift first, else previous shift
+    const todayShifts = DB.getShiftsForShopByDate(shopId, today);
+    const morningShift = todayShifts.find(s => s.shiftType === 'morning');
     const shopShifts = DB.getShiftsForShop(shopId);
     const lastShift = shopShifts.length > 0 ? shopShifts[0] : null;
-    const defaultFloat = lastShift ? (lastShift.countedCash || lastShift.actualCountedCash || 0) : 0;
+    const defaultFloat = morningShift ? (morningShift.openingFloat || morningShift.actualCountedCash || 0) : (lastShift ? (lastShift.countedCash || lastShift.actualCountedCash || 0) : 0);
 
     // Default reload cash from latest update today
     const todayUpdates = DB.getUpdatesForShopByDate(shopId, today);
@@ -4405,6 +4409,385 @@ Thank you! - ${shopName}`;
       e.target.value = '';
     });
   }
+
+  // ================================================================
+  // QUICK ACTIONS: BANK DEPOSIT & CASH OUT
+  // ================================================================
+  showQuickAddBankDepositModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+      return;
+    }
+    const shop = DB.getShop(shopId);
+    const today = DB.getTodayDate();
+
+    const bodyHtml = `
+      <form id="bankDepositForm" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
+          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+        </div>
+        <div style="background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-purple);">
+          💡 ලාච්චුවේ මුදල් බැංකුවට තැන්පත් කළ විට (Deposit) මෙහි සටහන් කරන්න.
+        </div>
+        <div class="form-group">
+          <label class="form-label">🏦 ${I18N.t('upd_bank_name_lbl') || 'Select Bank'}</label>
+          <select class="form-select" id="quickDepositBank">
+            <option value="HNB Bank" selected>HNB Bank</option>
+            <option value="Commercial Bank">Commercial Bank</option>
+            <option value="Sampath Bank">Sampath Bank</option>
+            <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
+            <option value="People's Bank">People's Bank</option>
+            <option value="Seylan Bank">Seylan Bank</option>
+            <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700; color:var(--accent-purple);">💰 Deposit Amount (Rs.)</label>
+          <input type="number" step="0.01" min="1" class="form-input" id="quickDepositAmount" placeholder="0.00" style="font-size:1.3rem; font-weight:800; color:var(--accent-purple);" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">📝 Remarks / Reference</label>
+          <input type="text" class="form-input" id="quickDepositNote" placeholder="e.g. CDM Deposit, Cashier slip ref">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      `🏦 ${I18N.t('top_btn_bank_deposit') || '+ Bank Deposit'}`,
+      bodyHtml,
+      `
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.saveQuickBankDeposit()" style="background:var(--accent-purple); border-color:var(--accent-purple);">💾 Save Deposit</button>
+      `
+    );
+  },
+
+  saveQuickBankDeposit() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) return;
+    const bank = document.getElementById('quickDepositBank')?.value || 'HNB Bank';
+    const amount = parseFloat(document.getElementById('quickDepositAmount')?.value) || 0;
+    const note = document.getElementById('quickDepositNote')?.value || '';
+
+    if (amount <= 0) {
+      this.showToast('කරුණාකර නිවැරදි මුදලක් ඇතුළත් කරන්න (Please enter a valid amount)', 'error');
+      return;
+    }
+
+    DB.addBankTransaction({
+      shopId,
+      type: 'deposit',
+      bank,
+      amount,
+      note
+    });
+
+    this.closeModal();
+    this.showToast(`✅ Rs. ${DB.formatCurrency(amount)} බැංකුවට තැන්පත් කිරීම සාර්ථකයි!`, 'success');
+    this.refreshPage(this.currentPage);
+  },
+
+  showQuickAddCashOutModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+      return;
+    }
+    const shop = DB.getShop(shopId);
+    const today = DB.getTodayDate();
+
+    const bodyHtml = `
+      <form id="cashOutForm" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
+          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+        </div>
+        <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-green);">
+          💡 පාරිභෝගිකයින්ට මුදල් ලබාදීම හෝ බැංකුවෙන් කැෂ් අවුට් ලබාගත් විට මෙහි සටහන් කරන්න.
+        </div>
+        <div class="form-group">
+          <label class="form-label">🏦 ${I18N.t('upd_bank_name_lbl') || 'Select Bank / Account'}</label>
+          <select class="form-select" id="quickCashOutBank">
+            <option value="HNB Bank" selected>HNB Bank</option>
+            <option value="Commercial Bank">Commercial Bank</option>
+            <option value="Sampath Bank">Sampath Bank</option>
+            <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
+            <option value="People's Bank">People's Bank</option>
+            <option value="Seylan Bank">Seylan Bank</option>
+            <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700; color:var(--accent-green);">💵 Cash Out Amount (Rs.)</label>
+          <input type="number" step="0.01" min="1" class="form-input" id="quickCashOutAmount" placeholder="0.00" style="font-size:1.3rem; font-weight:800; color:var(--accent-green);" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">📝 Remarks / Customer Ref</label>
+          <input type="text" class="form-input" id="quickCashOutNote" placeholder="e.g. Customer withdrawal, Counter cashout">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      `💵 ${I18N.t('top_btn_cash_out') || '+ Cash Out'}`,
+      bodyHtml,
+      `
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
+        <button type="button" class="btn btn-success" onclick="App.saveQuickCashOut()">💾 Save Cash Out</button>
+      `
+    );
+  },
+
+  saveQuickCashOut() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) return;
+    const bank = document.getElementById('quickCashOutBank')?.value || 'HNB Bank';
+    const amount = parseFloat(document.getElementById('quickCashOutAmount')?.value) || 0;
+    const note = document.getElementById('quickCashOutNote')?.value || '';
+
+    if (amount <= 0) {
+      this.showToast('කරුණාකර නිවැරදි මුදලක් ඇතුළත් කරන්න (Please enter a valid amount)', 'error');
+      return;
+    }
+
+    DB.addBankTransaction({
+      shopId,
+      type: 'cashout',
+      bank,
+      amount,
+      note
+    });
+
+    this.closeModal();
+    this.showToast(`✅ Rs. ${DB.formatCurrency(amount)} කැෂ් අවුට් සටහන් කිරීම සාර්ථකයි!`, 'success');
+    this.refreshPage(this.currentPage);
+  },
+
+  // ================================================================
+  // MORNING SHIFT OPEN (CASH DRAWER FLOAT & NOTE COUNTER)
+  // ================================================================
+  showMorningShiftModal() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+      return;
+    }
+    const shop = DB.getShop(shopId);
+    const today = DB.getTodayDate();
+
+    const bodyHtml = `
+      <form id="morningShiftForm" style="display:flex; flex-direction:column; gap:12px;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
+          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+        </div>
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-gold);">
+          🌅 උදෑසන සාප්පුව විවෘත කිරීමේදී ලාච්චුවේ ඇති ආරම්භක මුදල් (Float) නෝට්ටු කවුන්ටරය මගින් ඇතුළත් කරන්න.
+        </div>
+        <div class="form-group">
+          <label class="form-label">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
+          <input type="text" class="form-input" id="morningCashierName" placeholder="e.g. Kasun (Morning Shift)" required>
+        </div>
+        <div class="form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label class="form-label" style="font-weight:800; color:var(--accent-gold); margin-bottom:0;">💵 Opening Cash Float (ආරම්භක මුදල)</label>
+            <button type="button" class="btn btn-xs btn-warning" onclick="App.openDenominationModalForMorningModal()" style="font-size:0.78rem; font-weight:700;">🧮 Count Notes (5000, 2000...)</button>
+          </div>
+          <input type="number" step="0.01" min="0" class="form-input" id="morningFloatInput" placeholder="0.00" style="font-size:1.35rem; font-weight:800; color:var(--accent-gold);" required>
+          <div id="morningDenomsSummary" style="font-size:0.8rem; color:var(--accent-gold); font-weight:700; margin-top:6px;"></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">📝 Shift Remarks / Notes</label>
+          <input type="text" class="form-input" id="morningShiftNotes" placeholder="e.g. Morning opening float checked and verified">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      `🌅 ${I18N.t('shift_morning_open_title') || 'Morning Shift Open (Cash Drawer Float)'}`,
+      bodyHtml,
+      `
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.saveMorningShift()" style="background:var(--accent-gold); border-color:var(--accent-gold); color:#000; font-weight:800;">💾 Save Morning Shift</button>
+      `
+    );
+  },
+
+  openDenominationModalForMorningModal() {
+    this.openDenominationModal((total, denoms) => {
+      const inp = document.getElementById('morningFloatInput');
+      if (inp) {
+        inp.value = total;
+        inp.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      this.lastMorningDenominations = denoms;
+      const sumEl = document.getElementById('morningDenomsSummary');
+      if (sumEl && denoms) {
+        let parts = [];
+        if (denoms.n5000) parts.push(`5000x${denoms.n5000}`);
+        if (denoms.n2000) parts.push(`2000x${denoms.n2000}`);
+        if (denoms.n1000) parts.push(`1000x${denoms.n1000}`);
+        if (denoms.n500) parts.push(`500x${denoms.n500}`);
+        if (denoms.n100) parts.push(`100x${denoms.n100}`);
+        if (denoms.n50) parts.push(`50x${denoms.n50}`);
+        if (denoms.n20) parts.push(`20x${denoms.n20}`);
+        if (denoms.coins) parts.push(`Coins: ${denoms.coins}`);
+        sumEl.textContent = `📋 ` + parts.join(', ');
+      }
+    });
+  },
+
+  saveMorningShift() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) return;
+
+    const cashier = document.getElementById('morningCashierName')?.value?.trim() || '';
+    const openingFloat = parseFloat(document.getElementById('morningFloatInput')?.value) || 0;
+    const note = document.getElementById('morningShiftNotes')?.value?.trim() || '';
+
+    if (!cashier) {
+      this.showToast('කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න (Please enter Cashier Name)', 'error');
+      return;
+    }
+
+    DB.addShift({
+      shopId,
+      shiftName: 'Morning Shift Open',
+      shiftType: 'morning',
+      cashierName: cashier,
+      cashier,
+      openingFloat,
+      actualCountedCash: openingFloat,
+      countedCash: openingFloat,
+      denominations: this.lastMorningDenominations || null,
+      note
+    });
+
+    this.closeModal();
+    this.showToast(`🌅 උදෑසන ආරම්භක මුදල (Rs. ${DB.formatCurrency(openingFloat)}) සාර්ථකව සටහන් විය!`, 'success');
+    this.refreshPage(this.currentPage);
+  },
+
+  // ================================================================
+  // SUPER ADMIN WHATSAPP DAILY SUMMARY EXPORT
+  // ================================================================
+  sendShiftReportWhatsAppToSuperAdmin() {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+      return;
+    }
+    const shop = DB.getShop(shopId);
+    const today = DB.getTodayDate();
+
+    // Fetch today's shifts
+    const todayShifts = DB.getShiftsForShopByDate(shopId, today);
+    const morningShift = todayShifts.find(s => s.shiftType === 'morning');
+    const eveningShift = todayShifts.find(s => s.shiftType === 'evening') || todayShifts[0];
+
+    // Today's POS & Expenses
+    const todayExpenses = DB.getExpensesForShopByDate(shopId, today);
+    const totalExp = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+
+    // Bank Txs
+    const btxs = DB.getBankTransactions ? DB.getBankTransactions(shopId, today) : [];
+    const bDeposits = btxs.filter(t => t.type === 'deposit').reduce((s, t) => s + t.amount, 0);
+    const bCashOuts = btxs.filter(t => t.type === 'cashout').reduce((s, t) => s + t.amount, 0);
+
+    let msg = `🏪 *METHMI MOBILE - DAILY CASH & POS RECONCILIATION*\n`;
+    msg += `📅 Date: ${DB.formatDate(today)}\n`;
+    msg += `📍 Shop: ${shop ? shop.name : ''}\n`;
+    msg += `🧑‍💼 Staff: ${eveningShift ? eveningShift.cashierName : (morningShift ? morningShift.cashierName : 'Cashier')}\n`;
+    msg += `=================================\n\n`;
+
+    // Morning Float
+    msg += `🌅 *1. MORNING OPENING FLOAT:*\n`;
+    if (morningShift) {
+      msg += `• Float Amount: Rs. ${DB.formatCurrency(morningShift.openingFloat)}\n`;
+      if (morningShift.denominations) {
+        const d = morningShift.denominations;
+        let parts = [];
+        if (d.n5000) parts.push(`5000x${d.n5000}`);
+        if (d.n2000) parts.push(`2000x${d.n2000}`);
+        if (d.n1000) parts.push(`1000x${d.n1000}`);
+        if (d.n500) parts.push(`500x${d.n500}`);
+        if (d.n100) parts.push(`100x${d.n100}`);
+        if (d.n50) parts.push(`50x${d.n50}`);
+        if (d.n20) parts.push(`20x${d.n20}`);
+        if (d.coins) parts.push(`Coins: ${d.coins}`);
+        msg += `• Notes: ${parts.join(', ')}\n`;
+      }
+    } else {
+      msg += `• Float Amount: Rs. 0.00 (Not recorded)\n`;
+    }
+    msg += `\n`;
+
+    // POS Sales
+    msg += `🛒 *2. TODAY POS SALES:*\n`;
+    if (eveningShift) {
+      msg += `• Cash Sales: Rs. ${DB.formatCurrency(eveningShift.posCashSales || 0)}\n`;
+      msg += `• Card Sales: Rs. ${DB.formatCurrency(eveningShift.posCardSales || 0)}\n`;
+      msg += `• Cheque/QR: Rs. ${DB.formatCurrency(eveningShift.posChequeSales || 0)}\n`;
+      msg += `• *POS Gross Total: Rs. ${DB.formatCurrency(eveningShift.posSales || 0)}*\n`;
+    } else {
+      msg += `• POS Sales: Pending evening close\n`;
+    }
+    msg += `\n`;
+
+    // Expenses
+    msg += `💸 *3. DAY EXPENSES & DRAWINGS:*\n`;
+    msg += `• Total Expenses Deducted: Rs. ${DB.formatCurrency(totalExp)}\n`;
+    if (todayExpenses.length > 0) {
+      todayExpenses.forEach(e => {
+        msg += `  - ${e.description || e.category}: Rs. ${DB.formatCurrency(e.amount)}\n`;
+      });
+    }
+    msg += `\n`;
+
+    // Bank Deposits & Cashouts
+    if (bDeposits > 0 || bCashOuts > 0) {
+      msg += `🏦 *4. BANK TRANSFERS:*\n`;
+      if (bDeposits > 0) msg += `• Bank Deposits (+): Rs. ${DB.formatCurrency(bDeposits)}\n`;
+      if (bCashOuts > 0) msg += `• Cash Outs (-): Rs. ${DB.formatCurrency(bCashOuts)}\n`;
+      msg += `\n`;
+    }
+
+    // Evening Reconciliation
+    msg += `🌇 *5. EVENING DRAWER RECONCILIATION:*\n`;
+    if (eveningShift) {
+      msg += `• Expected Cash: Rs. ${DB.formatCurrency(eveningShift.expectedCash)}\n`;
+      msg += `• Actual Counted Cash: Rs. ${DB.formatCurrency(eveningShift.actualCountedCash)}\n`;
+      if (eveningShift.denominations) {
+        const d = eveningShift.denominations;
+        let parts = [];
+        if (d.n5000) parts.push(`5000x${d.n5000}`);
+        if (d.n2000) parts.push(`2000x${d.n2000}`);
+        if (d.n1000) parts.push(`1000x${d.n1000}`);
+        if (d.n500) parts.push(`500x${d.n500}`);
+        if (d.n100) parts.push(`100x${d.n100}`);
+        if (d.n50) parts.push(`50x${d.n50}`);
+        if (d.n20) parts.push(`20x${d.n20}`);
+        if (d.coins) parts.push(`Coins: ${d.coins}`);
+        msg += `• Evening Notes: ${parts.join(', ')}\n`;
+      }
+      msg += `• Discrepancy (Diff): Rs. ${DB.formatCurrency(eveningShift.difference)}\n`;
+      if (Math.abs(eveningShift.difference) < 0.01) {
+        msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED*\n`;
+      } else if (eveningShift.difference > 0) {
+        msg += `• *VERDICT: 🟢 CASH EXCESS (+Rs. ${DB.formatCurrency(eveningShift.difference)})*\n`;
+      } else {
+        msg += `• *VERDICT: 🔴 CASH SHORTAGE (-Rs. ${DB.formatCurrency(Math.abs(eveningShift.difference))})*\n`;
+      }
+    } else {
+      msg += `• Evening Shift closing not completed yet.\n`;
+    }
+    msg += `\n=================================\n`;
+    msg += `Generated via Methmi Shop Tracker`;
+
+    // Open WhatsApp
+    const url = `https://wa.me/?text=${encodeURIComponent(msg.replace(/\\n/g, '\n'))}`;
+    window.open(url, '_blank');
+  },
+
 };
 
 // ---- Initialize on DOM ready ----

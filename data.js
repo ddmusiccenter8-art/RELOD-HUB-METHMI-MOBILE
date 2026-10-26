@@ -94,6 +94,7 @@ const DB = {
   DISTRIBUTOR_TOPUPS_KEY: 'spt_distributor_topups',
   SHIFTS_KEY: 'spt_shifts',
   EXPENSES_KEY: 'spt_expenses',
+  BANK_TRANSACTIONS_KEY: 'spt_bank_transactions',
 
   _initialized: false,
 
@@ -255,6 +256,35 @@ const DB = {
         if (window.App && window.App.refreshPage) window.App.refreshPage(window.App.currentPage);
       }
       isFirstUpdatesLoad = false;
+    });
+
+    // Shifts sync listener
+    window.FS.collection('payment_tracker_shifts').onSnapshot(snapshot => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const list = [];
+      snapshot.forEach(doc => list.push(doc.data()));
+      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      this._dualSave(this.SHIFTS_KEY, list);
+      if (window.App && window.App.currentPage === 'shifts') window.App.renderShiftsPage();
+    });
+
+    // Expenses sync listener
+    window.FS.collection('payment_tracker_expenses').onSnapshot(snapshot => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const list = [];
+      snapshot.forEach(doc => list.push(doc.data()));
+      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      this._dualSave(this.EXPENSES_KEY, list);
+      if (window.App && window.App.currentPage === 'shifts') window.App.renderShiftsPage();
+    });
+
+    // Bank transactions sync listener
+    window.FS.collection('payment_tracker_bank_transactions').onSnapshot(snapshot => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const list = [];
+      snapshot.forEach(doc => list.push(doc.data()));
+      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      this._dualSave(this.BANK_TRANSACTIONS_KEY, list);
     });
   },
 
@@ -562,8 +592,10 @@ const DB = {
     const reloadHutch = parseFloat(updateData.reload?.hutch) || 0;
     const reloadEzcash = parseFloat(updateData.reload?.ezcash) || 0;
     const reloadCash = parseFloat(updateData.reload?.cashInDrawer) || 0;
+    const reloadHubCash = parseFloat(updateData.reload?.hubCash) || 0;
     const reloadSimTotal = reloadDialog + reloadMobitel + reloadAirtel + reloadHutch + reloadEzcash;
-    let reloadTotal = reloadSimTotal + reloadCash;
+    const reloadDrawerTotal = reloadCash + reloadHubCash;
+    let reloadTotal = reloadSimTotal + reloadDrawerTotal;
     if (reloadTotal === 0 && updateData.simTotal !== undefined) {
       reloadTotal = parseFloat(updateData.simTotal) || 0;
     }
@@ -657,6 +689,8 @@ const DB = {
         ezcash: reloadEzcash,
         simTotal: reloadSimTotal,
         cashInDrawer: reloadCash,
+        hubCash: reloadHubCash,
+        drawerTotal: reloadDrawerTotal,
         total: reloadTotal
       },
       mobileRental: {
@@ -723,8 +757,10 @@ const DB = {
     const reloadHutch = parseFloat(updateData.reload?.hutch) || 0;
     const reloadEzcash = parseFloat(updateData.reload?.ezcash) || 0;
     const reloadCash = parseFloat(updateData.reload?.cashInDrawer) || 0;
+    const reloadHubCash = parseFloat(updateData.reload?.hubCash) || 0;
     const reloadSimTotal = reloadDialog + reloadMobitel + reloadAirtel + reloadHutch + reloadEzcash;
-    let reloadTotal = reloadSimTotal + reloadCash;
+    const reloadDrawerTotal = reloadCash + reloadHubCash;
+    let reloadTotal = reloadSimTotal + reloadDrawerTotal;
     if (reloadTotal === 0 && updateData.simTotal !== undefined) {
       reloadTotal = parseFloat(updateData.simTotal) || 0;
     }
@@ -1262,6 +1298,7 @@ const DB = {
     };
     list.unshift(item);
     this.saveShifts(list);
+    this._syncToFirebase('payment_tracker_shifts', item.id, item);
     return item;
   },
 
@@ -1269,6 +1306,7 @@ const DB = {
     let list = this.getShifts(null);
     list = list.filter(s => s.id !== id);
     this.saveShifts(list);
+    this._deleteFromFirebase('payment_tracker_shifts', id);
     return true;
   },
 
@@ -1342,6 +1380,7 @@ const DB = {
     let list = this.getExpenses(null);
     list = list.filter(e => e.id !== id);
     this.saveExpenses(list);
+    this._deleteFromFirebase('payment_tracker_expenses', id);
     return true;
   },
 
@@ -1808,4 +1847,44 @@ const DB = {
       return false;
     }
   }
+
+  // ---- Bank Deposits & Cash Outs ----
+  getBankTransactions(shopId = null, date = null) {
+    let list = JSON.parse(localStorage.getItem(this.BANK_TRANSACTIONS_KEY) || '[]');
+    if (shopId) list = list.filter(t => t.shopId === shopId);
+    if (date) list = list.filter(t => t.date === date);
+    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  },
+
+  saveBankTransactions(list) {
+    this._dualSave(this.BANK_TRANSACTIONS_KEY, list);
+  },
+
+  addBankTransaction(data) {
+    const list = this.getBankTransactions(null);
+    const now = new Date();
+    const item = {
+      id: 'btx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: data.shopId,
+      type: data.type || 'deposit', // 'deposit' or 'cashout'
+      bank: data.bank || 'Commercial Bank',
+      amount: parseFloat(data.amount) || 0,
+      note: (data.note || '').trim(),
+      date: data.date || now.toISOString().split('T')[0],
+      timestamp: now.toISOString()
+    };
+    list.unshift(item);
+    this.saveBankTransactions(list);
+    this._syncToFirebase('payment_tracker_bank_transactions', item.id, item);
+    return item;
+  },
+
+  deleteBankTransaction(id) {
+    let list = this.getBankTransactions(null);
+    list = list.filter(t => t.id !== id);
+    this.saveBankTransactions(list);
+    this._deleteFromFirebase('payment_tracker_bank_transactions', id);
+    return true;
+  },
+
 };
