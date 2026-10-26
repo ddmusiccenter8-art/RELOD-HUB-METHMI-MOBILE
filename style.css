@@ -1693,9 +1693,9 @@ select option {
 }
 .denom-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 8px;
-  max-height: 52vh;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px;
+  max-height: 55vh;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1703,7 +1703,7 @@ select option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);

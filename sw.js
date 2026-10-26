@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shop-tracker-v18.0';
+const CACHE_NAME = 'shop-tracker-v19.0';
 const ASSETS = [
   './',
   './index.html',

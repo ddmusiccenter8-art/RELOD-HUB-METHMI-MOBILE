@@ -900,7 +900,7 @@ const App = {
   // ================================================================
   setupUpdateForm() {
     // Inputs in Section 1 (Individual SIMs + Cash Drawer)
-    const simInputs = ['simDialog', 'simMobitel', 'simAirtel', 'simHutch', 'simEzcash', 'reloadCashInput'];
+    const simInputs = ['simDialog', 'simMobitel', 'simAirtel', 'simHutch', 'reloadCashInput', 'reloadHubCashInput'];
     simInputs.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
@@ -1313,17 +1313,27 @@ const App = {
     const mobitel = parseFloat(document.getElementById('simMobitel')?.value) || 0;
     const airtel = parseFloat(document.getElementById('simAirtel')?.value) || 0;
     const hutch = parseFloat(document.getElementById('simHutch')?.value) || 0;
-    const ezcash = parseFloat(document.getElementById('simEzcash')?.value) || 0;
     const reloadCash = parseFloat(document.getElementById('reloadCashInput')?.value) || 0;
+    const reloadHubCash = parseFloat(document.getElementById('reloadHubCashInput')?.value) || 0;
 
-    const reloadSimTotal = dialog + mobitel + airtel + hutch + ezcash;
-    const reloadTotal = reloadSimTotal + reloadCash;
+    const reloadSimTotal = dialog + mobitel + airtel + hutch;
+    const reloadDrawerTotal = reloadCash + reloadHubCash;
+    const reloadFullTotal = reloadSimTotal + reloadDrawerTotal;
 
     const liveReloadSimTotalEl = document.getElementById('liveReloadSimTotal');
     if (liveReloadSimTotalEl) liveReloadSimTotalEl.textContent = DB.formatCurrency(reloadSimTotal);
 
-    const liveReloadTotalEl = document.getElementById('liveReloadTotal');
-    if (liveReloadTotalEl) liveReloadTotalEl.textContent = DB.formatCurrency(reloadTotal);
+    const liveReloadDrawerTotalEl = document.getElementById('liveReloadDrawerTotal');
+    if (liveReloadDrawerTotalEl) liveReloadDrawerTotalEl.textContent = DB.formatCurrency(reloadDrawerTotal);
+
+    const liveReloadFullTotalEl = document.getElementById('liveReloadFullTotal');
+    if (liveReloadFullTotalEl) liveReloadFullTotalEl.textContent = DB.formatCurrency(reloadFullTotal);
+
+    const liveSimsSubVal = document.getElementById('liveSimsSubVal');
+    if (liveSimsSubVal) liveSimsSubVal.textContent = DB.formatCurrency(reloadSimTotal);
+
+    const liveDrawerCashSubVal = document.getElementById('liveDrawerCashSubVal');
+    if (liveDrawerCashSubVal) liveDrawerCashSubVal.textContent = DB.formatCurrency(reloadDrawerTotal);
 
     // 2. Bank Track
     let totalBankAcct = 0;
@@ -1345,8 +1355,14 @@ const App = {
     const liveBankTotalEl = document.getElementById('liveBankTotal');
     if (liveBankTotalEl) liveBankTotalEl.textContent = DB.formatCurrency(bankGrandTotal);
 
+    const liveBankAcctSubVal = document.getElementById('liveBankAcctSubVal');
+    if (liveBankAcctSubVal) liveBankAcctSubVal.textContent = DB.formatCurrency(totalBankAcct);
+
+    const liveBankCashSubVal = document.getElementById('liveBankCashSubVal');
+    if (liveBankCashSubVal) liveBankCashSubVal.textContent = DB.formatCurrency(totalBankCash);
+
     // Live Breakdown values in Section 4
-    const totalCashInDrawer = reloadCash + totalBankCash;
+    const totalCashInDrawer = reloadDrawerTotal + totalBankCash;
     const liveSimsBreakdownVal = document.getElementById('liveSimsBreakdownVal');
     if (liveSimsBreakdownVal) liveSimsBreakdownVal.textContent = DB.formatCurrency(reloadSimTotal);
 
@@ -1356,7 +1372,7 @@ const App = {
     const liveBankBreakdownVal = document.getElementById('liveBankBreakdownVal');
     if (liveBankBreakdownVal) liveBankBreakdownVal.textContent = DB.formatCurrency(totalBankAcct);
 
-    // 2.5 Section 2.5: Shift Adjustments
+    // Section 2.5: Shift Adjustments
     let creditsTotal = 0;
     document.querySelectorAll('#creditRowsContainer .credit-amount').forEach(inp => {
       creditsTotal += parseFloat(inp.value) || 0;
@@ -1385,7 +1401,7 @@ const App = {
     }
 
     // 3. Grand Total Capital
-    const physicalCapital = reloadTotal + bankGrandTotal;
+    const physicalCapital = reloadFullTotal + bankGrandTotal;
     const totalCapitalEl = document.getElementById('updateTotalCapital');
     if (totalCapitalEl) totalCapitalEl.textContent = DB.formatCurrency(physicalCapital);
 
@@ -1394,7 +1410,7 @@ const App = {
     const prevUpdate = shopId ? DB.getLastUpdate(shopId) : null;
     const simsDiffBadge = document.getElementById('liveSimsDiffBadge');
     const cashDrawerDiffBadge = document.getElementById('liveCashDrawerDiffBadge');
-    const reloadDiffBadge = document.getElementById('liveReloadDiffBadge');
+    const reloadFullDiffBadge = document.getElementById('liveReloadFullDiffBadge');
     const bankDiffBadge = document.getElementById('liveBankDiffBadge');
     const overallDiffBadge = document.getElementById('updateOverallDiffBadge');
     const container = document.getElementById('overallSummaryPreview');
@@ -1402,7 +1418,7 @@ const App = {
     if (!prevUpdate) {
       if (simsDiffBadge) simsDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (cashDrawerDiffBadge) cashDrawerDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
-      if (reloadDiffBadge) reloadDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
+      if (reloadFullDiffBadge) reloadFullDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (bankDiffBadge) bankDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (overallDiffBadge) overallDiffBadge.innerHTML = '<span style="font-size:0.8rem; color:var(--text-muted);">First Update</span>';
       if (container) container.style.display = 'none';
@@ -1411,11 +1427,10 @@ const App = {
 
     const prevVals = DB.extractValues(prevUpdate);
     const simsDiff = reloadSimTotal - prevVals.simTotal;
-    const cashDiff = totalCashInDrawer - prevVals.totalCash;
-    const reloadDiff = reloadTotal - prevVals.reloadTotal;
+    const drawerCashDiff = reloadDrawerTotal - (prevVals.totalCash || 0);
+    const reloadFullDiff = reloadFullTotal - (prevVals.reloadTotal || (prevVals.simTotal + prevVals.totalCash));
     const bankDiff = bankGrandTotal - prevVals.bankTotal;
     const physicalDiff = physicalCapital - prevVals.totalCapital;
-    // Adjusted true operating difference:
     const adjustedDiff = (physicalCapital + creditsTotal + routersTotal) - (prevVals.totalCapital + topupsTotal);
 
     const formatBadge = (diff) => {
@@ -1426,8 +1441,8 @@ const App = {
     };
 
     if (simsDiffBadge) simsDiffBadge.innerHTML = formatBadge(simsDiff);
-    if (cashDrawerDiffBadge) cashDrawerDiffBadge.innerHTML = formatBadge(cashDiff);
-    if (reloadDiffBadge) reloadDiffBadge.innerHTML = formatBadge(reloadDiff);
+    if (cashDrawerDiffBadge) cashDrawerDiffBadge.innerHTML = formatBadge(drawerCashDiff);
+    if (reloadFullDiffBadge) reloadFullDiffBadge.innerHTML = formatBadge(reloadFullDiff);
     if (bankDiffBadge) bankDiffBadge.innerHTML = formatBadge(bankDiff);
     if (overallDiffBadge) overallDiffBadge.innerHTML = formatBadge(adjustedDiff);
 
@@ -1437,33 +1452,17 @@ const App = {
     if (container) {
       container.style.display = 'block';
       container.innerHTML = `
-        <div style="padding:18px 20px; background:${overallType === 'profit' ? 'rgba(16,185,129,0.08)' : overallType === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${overallType === 'profit' ? 'rgba(16,185,129,0.2)' : overallType === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
-          <div style="text-align:center;">
-            <div style="font-size:0.85rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">
-              ${I18N.t('comp_operating_pl') || 'True Operating Profit / Loss'}
+        <div style="padding:16px 20px; background:${overallType === 'profit' ? 'rgba(16,185,129,0.08)' : overallType === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${overallType === 'profit' ? 'rgba(16,185,129,0.2)' : overallType === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:0.82rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">PROFIT / LOSS PREVIEW</div>
+              <div style="font-size:1.4rem; font-weight:900; color:${overallColor}; margin-top:2px;">
+                ${adjustedDiff >= 0 ? '+' : ''}${DB.formatCurrency(adjustedDiff)}
+              </div>
             </div>
-            <div style="font-size:2.2rem;font-weight:900;color:${overallColor};">
-              ${adjustedDiff >= 0 ? '+' : ''}${DB.formatCurrency(adjustedDiff)}
-            </div>
-            <div style="font-size:1rem;font-weight:700;color:${overallColor};margin-top:2px;">
-              ${overallType === 'profit' ? (I18N.currentLang === 'si' ? '✅ TRUE PROFIT (සත්‍ය ලාභය)' : '✅ TRUE PROFIT') : overallType === 'loss' ? (I18N.currentLang === 'si' ? '❌ TRUE LOSS (සත්‍ය අලාභය)' : '❌ TRUE LOSS') : '➖ NO CHANGE'}
-            </div>
-            <div style="margin-top:14px; display:flex; justify-content:center; gap:16px; flex-wrap:wrap; font-size:0.85rem; font-weight:700;">
-              <span style="color:${reloadDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
-                🔄 Reload: ${reloadDiff >= 0 ? '+' : ''}${DB.formatCurrency(reloadDiff)}
-              </span>
-              <span style="color:${bankDiff >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};">
-                🏦 Bank: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}
-              </span>
-              <span style="color:var(--accent-gold);">
-                👤 Credits: +${DB.formatCurrency(creditsTotal)}
-              </span>
-              <span style="color:var(--accent-purple);">
-                📶 Routers: +${DB.formatCurrency(routersTotal)}
-              </span>
-              <span style="color:var(--accent-blue);">
-                📥 Top-ups: -${DB.formatCurrency(topupsTotal)}
-              </span>
+            <div style="text-align:right; font-size:0.85rem; font-weight:700;">
+              <span style="color:var(--accent-blue);">Reload: ${reloadFullDiff >= 0 ? '+' : ''}${DB.formatCurrency(reloadFullDiff)}</span><br>
+              <span style="color:var(--accent-purple);">Bank: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}</span>
             </div>
           </div>
         </div>
@@ -1491,8 +1490,9 @@ const App = {
     const mobitel = parseFloat(document.getElementById('simMobitel')?.value) || 0;
     const airtel = parseFloat(document.getElementById('simAirtel')?.value) || 0;
     const hutch = parseFloat(document.getElementById('simHutch')?.value) || 0;
-    const ezcash = parseFloat(document.getElementById('simEzcash')?.value) || 0;
+    const ezcash = 0;
     const reloadCash = parseFloat(document.getElementById('reloadCashInput')?.value) || 0;
+    const reloadHubCash = parseFloat(document.getElementById('reloadHubCashInput')?.value) || 0;
 
     // Section 2: Bank inputs
     const bankRows = document.querySelectorAll('#bankRowsContainer .bank-row');
@@ -1543,7 +1543,7 @@ const App = {
       }
     });
 
-    const hasReloadData = (dialog + mobitel + airtel + hutch + ezcash + reloadCash) > 0;
+    const hasReloadData = (dialog + mobitel + airtel + hutch + reloadCash + reloadHubCash) > 0;
     const hasBankData = banks.some(b => (b.accountAmount + b.cashInDrawer) > 0);
     const hasAdjData = credits.length > 0 || routers.length > 0 || topups.length > 0;
 
@@ -4005,6 +4005,7 @@ Thank you! - ${shopName}`;
             <div class="form-group" style="margin-bottom:0;">
               <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--text-secondary);">1. Opening Cash Float</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}" style="padding:6px 8px; font-size:0.95rem; font-weight:700; height:34px;">
+              ${(morningShift && morningShift.denominations) ? `<div style="font-size:0.72rem; color:var(--accent-gold); font-weight:700; margin-top:2px;">🌅 Morning Notes: ${Object.entries(morningShift.denominations).filter(([k,v]) => v > 0).map(([k,v]) => `${k.replace('n','')}:${v}`).join(', ')}</div>` : ''}
             </div>
             <div class="form-group" style="margin-bottom:0;">
               <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--accent-blue); font-weight:800;">2. 🛒 Total POS Machine Sales</label>
