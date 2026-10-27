@@ -730,6 +730,7 @@ const DB = {
         topupsTotal
       },
       totalCapital,
+      notes: updateData.notes || '',
       // Canonical helpers for backwards compatibility:
       simTotal: reloadSimTotal,
       bankTotal: bankGrandTotal,
@@ -823,7 +824,10 @@ const DB = {
       ezcash: reloadEzcash,
       simTotal: reloadSimTotal,
       cashInDrawer: reloadCash,
-      total: reloadTotal
+      hubCash: parseFloat(updateData.reload?.hubCash) || 0,
+      drawerTotal: reloadCash + (parseFloat(updateData.reload?.hubCash) || 0),
+      total: reloadTotal,
+      denominations: updateData.reload?.denominations || existingUpdate.reload?.denominations || null
     };
     existingUpdate.mobileRental = {
       banks,
@@ -831,6 +835,7 @@ const DB = {
       totalCashInDrawer: totalBankCash,
       grandTotal: bankGrandTotal
     };
+    existingUpdate.notes = updateData.notes !== undefined ? updateData.notes : (existingUpdate.notes || '');
     existingUpdate.totalCapital = totalCapital;
     existingUpdate.simTotal = reloadSimTotal;
     existingUpdate.bankTotal = bankGrandTotal;

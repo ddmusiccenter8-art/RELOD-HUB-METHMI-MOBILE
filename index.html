@@ -538,12 +538,23 @@
           <!-- OVERALL SUMMARY PREVIEW -->
           <div id="overallSummaryPreview" style="display:none; margin-bottom:20px;"></div>
 
-          <div style="margin-top:24px; display:flex; gap:12px;">
-            <button type="submit" class="btn btn-success btn-lg" style="flex:1;" data-i18n="btn_save_update">
-              💾 Save Update
+          <!-- OPTIONAL SPECIAL NOTES / REMARKS -->
+          <div class="form-group" style="margin-top:16px; margin-bottom:20px;">
+            <label class="form-label" style="font-size:0.88rem; font-weight:700; color:var(--text-secondary);">
+              📝 <span data-i18n="upd_note_label">Notes / Remarks (Optional)</span>
+            </label>
+            <input type="text" class="form-input" id="updateNoteInput" placeholder="e.g. Morning opening float Rs. 5,000, or cash remarks...">
+          </div>
+
+          <div style="margin-top:24px; display:flex; gap:12px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-lg" id="saveAndShareWhatsAppBtn" onclick="App.submitUpdate('whatsapp')" style="flex:1.4; min-width:240px; background:#16a34a; color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; gap:8px; border:none; border-radius:var(--radius-sm); box-shadow:0 4px 14px rgba(22,163,74,0.35); cursor:pointer;">
+              <span style="font-size:1.25rem;">📲</span> <span data-i18n="btn_save_and_whatsapp">Save & Share WhatsApp</span>
             </button>
-            <button type="button" class="btn btn-ghost btn-lg" id="clearFormBtn" data-i18n="btn_cancel">
-              🔄 Clear
+            <button type="submit" class="btn btn-primary btn-lg" id="saveUpdateOnlyBtn" style="flex:1; min-width:160px; font-weight:700; cursor:pointer;">
+              <span>💾</span> <span data-i18n="btn_save_only">Save Only</span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-lg" id="clearFormBtn" data-i18n="btn_cancel" style="min-width:110px;">
+              <span>🔄</span> <span>Clear</span>
             </button>
           </div>
         </form>

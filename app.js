@@ -777,8 +777,11 @@ const App = {
               ${!shopId && shop ? `<span class="badge" style="margin-left:8px; background:rgba(59,130,246,0.15); color:var(--accent-blue); padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:700;">🏪 ${shop.name}</span>` : ''}
               ${u.empName ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? `(${u.jobRole})` : ''}</div>` : ''}
             </div>
-            <div style="font-size:1.1rem; font-weight:900; color:var(--accent-blue); text-align:right;">
-              ${DB.formatCurrency(vals.totalCapital)}
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn btn-xs" onclick="event.stopPropagation(); App.shareUpdateViaWhatsApp('${u.id}');" style="background:#16a34a; color:#fff; font-weight:700; padding:3px 7px; font-size:0.75rem; border:none; border-radius:6px; cursor:pointer;" title="Share this update to WhatsApp">📲</button>
+              <div style="font-size:1.1rem; font-weight:900; color:var(--accent-blue); text-align:right;">
+                ${DB.formatCurrency(vals.totalCapital)}
+              </div>
             </div>
           </div>
           <div class="update-totals">
@@ -964,7 +967,7 @@ const App = {
     if (updateForm) {
       updateForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        this.submitUpdate();
+        this.submitUpdate('save_only');
       });
     }
 
@@ -973,11 +976,13 @@ const App = {
     if (clearBtn) {
       clearBtn.addEventListener('click', () => {
         updateForm.reset();
+        const noteEl = document.getElementById('updateNoteInput');
+        if (noteEl) noteEl.value = '';
         this.editingUpdateId = null;
         this.lastReloadDenominations = null;
         this.renderDenomsSummaryChip(null);
         const btn = updateForm.querySelector('button[type="submit"]');
-        if (btn) btn.innerHTML = '💾 Save Update';
+        if (btn) btn.innerHTML = '💾 Save Only';
         const bankContainer = document.getElementById('bankRowsContainer');
         if (bankContainer) bankContainer.innerHTML = '';
         const creditContainer = document.getElementById('creditRowsContainer');
@@ -1473,7 +1478,7 @@ const App = {
     }
   },
 
-  submitUpdate() {
+  submitUpdate(action = 'save_only') {
     const shopId = DB.getActiveShopId();
     if (!shopId) {
       this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න (Please select a shop)' : 'Please select a shop first', 'error');
@@ -1487,6 +1492,8 @@ const App = {
       this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න' : 'Please enter Employee Name', 'error');
       return;
     }
+
+    const notes = document.getElementById('updateNoteInput')?.value.trim() || '';
 
     // Section 1: Reload inputs
     const dialog = parseFloat(document.getElementById('simDialog')?.value) || 0;
@@ -1573,6 +1580,7 @@ const App = {
       mobileRental: {
         banks
       },
+      notes,
       adjustments: {
         credits,
         routers,
@@ -1591,6 +1599,12 @@ const App = {
     } else {
       update = DB.addUpdate(updatePayload);
       this.lastReloadDenominations = null;
+    }
+
+    // If Save & WhatsApp requested, immediately open WhatsApp
+    if (action === 'whatsapp') {
+      this.showToast(I18N.currentLang === 'si' ? '✅ Update එක Save විය! WhatsApp විවෘත වේ...' : '✅ Update Saved! Opening WhatsApp...', 'success');
+      setTimeout(() => this.shareUpdateViaWhatsApp(update.id), 300);
     }
 
     // Modal result
@@ -1630,16 +1644,55 @@ const App = {
             </div>
           </div>
           ${adjText}
+          ${update.notes ? `<div style="font-size:0.85rem; color:var(--text-secondary); margin-top:12px; font-style:italic;">📝 "${update.notes}"</div>` : ''}
         </div>
         `,
-        [{ text: I18N.currentLang === 'si' ? 'හරි (OK)' : 'OK', class: 'btn-success', onClick: () => this.closeModal() }]
+        [
+          {
+            text: '📲 Share on WhatsApp',
+            class: 'btn-success',
+            style: 'background:#16a34a; font-weight:800; padding:10px 18px;',
+            onClick: () => {
+              this.closeModal();
+              this.shareUpdateViaWhatsApp(update.id);
+            }
+          },
+          { text: I18N.currentLang === 'si' ? 'හරි (OK)' : 'OK', class: 'btn-ghost', onClick: () => this.closeModal() }
+        ]
       );
     } else {
-      this.showToast(I18N.currentLang === 'si' ? '✅ පළමු Update එක සටහන් විය!' : '✅ First Update recorded!', 'success');
+      this.showModal(
+        '📌 First Opening Capital Recorded',
+        `
+        <div style="text-align:center; padding:16px 0;">
+          <div style="font-size:2.2rem; font-weight:900; color:var(--accent-green);">
+            ${DB.formatCurrency(update.totalCapital)}
+          </div>
+          <div style="font-size:1rem; font-weight:700; color:var(--text-secondary); margin-top:4px;">
+            ${I18N.currentLang === 'si' ? 'ආරම්භක මුදල් සාර්ථකව සටහන් විය' : 'Opening Capital recorded successfully'}
+          </div>
+          ${update.notes ? `<div style="font-size:0.85rem; color:var(--text-secondary); margin-top:12px; font-style:italic;">📝 "${update.notes}"</div>` : ''}
+        </div>
+        `,
+        [
+          {
+            text: '📲 Share on WhatsApp',
+            class: 'btn-success',
+            style: 'background:#16a34a; font-weight:800; padding:10px 18px;',
+            onClick: () => {
+              this.closeModal();
+              this.shareUpdateViaWhatsApp(update.id);
+            }
+          },
+          { text: I18N.currentLang === 'si' ? 'හරි (OK)' : 'OK', class: 'btn-ghost', onClick: () => this.closeModal() }
+        ]
+      );
     }
 
     // Reset Form
     document.getElementById('updateForm').reset();
+    const noteEl = document.getElementById('updateNoteInput');
+    if (noteEl) noteEl.value = '';
     const bankContainer = document.getElementById('bankRowsContainer');
     if (bankContainer) bankContainer.innerHTML = '';
     const creditContainer = document.getElementById('creditRowsContainer');
@@ -1650,6 +1703,120 @@ const App = {
     if (topupContainer) topupContainer.innerHTML = '';
     this.addBankRow();
     this.renderUpdateForm();
+  },
+
+  // ================================================================
+  // SHARE RELOAD & CASH UPDATE VIA WHATSAPP
+  // ================================================================
+  shareUpdateViaWhatsApp(updateId) {
+    const updates = DB.getUpdates(true);
+    const u = updates.find(x => x.id === updateId);
+    if (!u) {
+      this.showToast(I18N.currentLang === 'si' ? 'Update එක සොයාගත නොහැක' : 'Update record not found', 'error');
+      return;
+    }
+
+    const shop = DB.getShop(u.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+    const vals = DB.extractValues(u);
+    const comp = u.comparison;
+
+    let msg = `📱 *${shopName.toUpperCase()} - RELOAD & CASH UPDATE*\n`;
+    msg += `📅 Date: ${DB.formatDate(u.date)}\n`;
+    msg += `⏰ Time: ${DB.formatTime(u.timestamp)}\n`;
+    if (u.empName) {
+      msg += `🧑‍💼 Staff: ${u.empName} ${u.jobRole ? '(' + u.jobRole + ')' : ''}\n`;
+    }
+    msg += `=================================\n\n`;
+
+    // 1. Reload SIMs Track
+    msg += `🔄 *RELOAD SIMS BALANCE:*\n`;
+    msg += `• Dialog SIM: Rs. ${DB.formatCurrency(vals.dialog)}\n`;
+    msg += `• Mobitel SIM: Rs. ${DB.formatCurrency(vals.mobitel)}\n`;
+    msg += `• Airtel SIM: Rs. ${DB.formatCurrency(vals.airtel)}\n`;
+    msg += `• Hutch SIM: Rs. ${DB.formatCurrency(vals.hutch)}\n`;
+    msg += `👉 *Total SIMs Balance:* *Rs. ${DB.formatCurrency(vals.simTotal)}*\n\n`;
+
+    // 2. Cash in Drawer
+    msg += `💵 *CASH IN DRAWER:*\n`;
+    msg += `• Reload Physical Cash: Rs. ${DB.formatCurrency(vals.reloadCash)}\n`;
+    if (u.reload && u.reload.hubCash > 0) {
+      msg += `• Hub / Floating Cash: Rs. ${DB.formatCurrency(u.reload.hubCash)}\n`;
+    }
+    if (vals.totalBankCash > 0) {
+      msg += `• Bank Drawer Cash: Rs. ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    }
+    msg += `👉 *Total Cash in Drawer:* *Rs. ${DB.formatCurrency(vals.totalCash)}*\n`;
+
+    // Note denomination breakdown if present
+    const denoms = u.reload?.denominations;
+    if (denoms) {
+      let parts = [];
+      if (denoms.n5000) parts.push(`5000x${denoms.n5000}`);
+      if (denoms.n2000) parts.push(`2000x${denoms.n2000}`);
+      if (denoms.n1000) parts.push(`1000x${denoms.n1000}`);
+      if (denoms.n500) parts.push(`500x${denoms.n500}`);
+      if (denoms.n100) parts.push(`100x${denoms.n100}`);
+      if (denoms.n50) parts.push(`50x${denoms.n50}`);
+      if (denoms.n20) parts.push(`20x${denoms.n20}`);
+      if (denoms.n10) parts.push(`10x${denoms.n10}`);
+      if (denoms.coins) parts.push(`Coins: ${denoms.coins}`);
+      if (parts.length > 0) {
+        msg += `🧮 *Notes Breakdown:* ${parts.join(', ')}\n`;
+      }
+    }
+    msg += `👉 *Combined Reload Track (SIMs + Cash):* *Rs. ${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
+
+    // 3. Bank Track
+    msg += `🏦 *BANK PAYMENTS & ACCOUNTS:*\n`;
+    if (vals.banks && vals.banks.length > 0) {
+      vals.banks.forEach(b => {
+        msg += `• ${b.bank}: Acct Rs. ${DB.formatCurrency(b.accountAmount)} | Cash Rs. ${DB.formatCurrency(b.cashInDrawer)}\n`;
+      });
+    }
+    msg += `👉 *Total Bank Track:* *Rs. ${DB.formatCurrency(vals.bankTotal)}*\n\n`;
+
+    // 4. Grand Total Capital
+    msg += `=================================\n`;
+    msg += `💰 *GRAND TOTAL CAPITAL:* *Rs. ${DB.formatCurrency(vals.totalCapital)}*\n`;
+    msg += `=================================\n\n`;
+
+    // 5. Comparison / Profit & Loss vs Previous / Morning Update
+    if (comp && !comp.isFirst) {
+      const oDiff = comp.overall?.diff ?? 0;
+      const oType = comp.overall?.type ?? 'neutral';
+      const rDiff = comp.reload?.diff ?? 0;
+      const bDiff = comp.bank?.diff ?? 0;
+      const prevTime = comp.previousUpdateTime ? DB.formatTime(comp.previousUpdateTime) : 'Previous';
+
+      msg += `📊 *P&L COMPARISON (VS ${prevTime.toUpperCase()}):*\n`;
+      msg += `• Reload Track Change: ${rDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(rDiff)}\n`;
+      msg += `• Bank Track Change: ${bDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(bDiff)}\n`;
+
+      if (oType === 'profit') {
+        msg += `• *NET OPERATING PROFIT: +Rs. ${DB.formatCurrency(oDiff)}* ✅\n`;
+      } else if (oType === 'loss') {
+        msg += `• *NET OPERATING LOSS: -Rs. ${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
+      } else {
+        msg += `• *NET OPERATING BALANCE: Rs. 0.00* ➖\n`;
+      }
+
+      if (u.adjustments && (u.adjustments.creditsTotal > 0 || u.adjustments.routersTotal > 0 || u.adjustments.topupsTotal > 0)) {
+        msg += `⚖️ *Adjustments:* Credits +Rs. ${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +Rs. ${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -Rs. ${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
+      }
+    } else {
+      msg += `📌 *Status:* First Opening Capital Recorded\n`;
+    }
+
+    if (u.notes) {
+      msg += `\n📝 *Notes / Remarks:*\n${u.notes}\n`;
+    }
+
+    msg += `\n=================================\n`;
+    msg += `Generated via Methmi Shop Tracker`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   },
 
   // ================================================================
@@ -1729,7 +1896,10 @@ const App = {
               <div class="update-time">🕐 ${DB.formatTime(u.timestamp)}</div>
               ${u.empName ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? `(${u.jobRole})` : ''}</div>` : ''}
             </div>
-            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); App.confirmDeleteUpdate('${u.id}');" style="padding:4px 10px;font-size:0.75rem;">🗑️</button>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="btn btn-xs" onclick="event.stopPropagation(); App.shareUpdateViaWhatsApp('${u.id}');" style="background:#16a34a; color:#fff; font-weight:700; padding:4px 9px; font-size:0.75rem; border:none; border-radius:6px; cursor:pointer;" title="Share this update to WhatsApp">📲 WhatsApp</button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="event.stopPropagation(); App.confirmDeleteUpdate('${u.id}');" style="padding:4px 10px;font-size:0.75rem;">🗑️</button>
+            </div>
           </div>
           <div class="update-totals">
             <div class="update-total-item">
@@ -1973,11 +2143,18 @@ const App = {
         <span style="color:var(--accent-green); font-size:1.25rem;">${DB.formatCurrency(vals.totalCapital)}</span>
       </div>
 
+      ${u.notes ? `
+      <div style="margin-top:12px; padding:10px 14px; background:rgba(245,158,11,0.08); border-left:3px solid var(--accent-gold); border-radius:var(--radius-sm); font-size:0.85rem;">
+        <strong>📝 Notes / Remarks:</strong> ${u.notes}
+      </div>
+      ` : ''}
+
       ${compSummary}
       `,
       [
-        { text: I18N.currentLang === 'si' ? 'වසන්න (Close)' : 'Close', class: 'btn-ghost', onClick: () => this.closeModal() },
-        { text: '✏️ Edit', class: 'btn-primary', onClick: () => { this.closeModal(); this.promptEditUpdate(u.id); } }
+        { text: '📲 Share on WhatsApp', class: 'btn-success', style: 'background:#16a34a; font-weight:800; padding:8px 16px;', onClick: () => this.shareUpdateViaWhatsApp(u.id) },
+        { text: '✏️ Edit', class: 'btn-primary', onClick: () => { this.closeModal(); this.promptEditUpdate(u.id); } },
+        { text: I18N.currentLang === 'si' ? 'වසන්න (Close)' : 'Close', class: 'btn-ghost', onClick: () => this.closeModal() }
       ]
     );
   },
@@ -2017,6 +2194,8 @@ const App = {
 
     document.getElementById('empName').value = update.empName || '';
     document.getElementById('jobRole').value = update.jobRole || '';
+    const noteEl = document.getElementById('updateNoteInput');
+    if (noteEl) noteEl.value = update.notes || '';
 
     // Section 1: SIMs
     const setVal = (id, val) => {

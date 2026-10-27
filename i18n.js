@@ -147,6 +147,10 @@ const I18N = {
       'upd_grand_sec_title': '💰 Section 4: Grand Total Capital',
       'upd_grand_total': 'Grand Total Capital (SIMs + Bank + Cash Drawer)',
       'btn_save_update': '💾 Save Update',
+      'btn_save_and_whatsapp': 'Save & Share WhatsApp',
+      'btn_save_only': 'Save Only',
+      'btn_share_whatsapp_update': 'Share on WhatsApp',
+      'upd_note_label': 'Notes / Remarks (Optional)',
       'btn_cancel': 'Cancel',
       
       // Comparison Table
@@ -497,6 +501,10 @@ const I18N = {
       'upd_grand_sec_title': '💰 කොටස 4: සම්පූර්ණ ප්‍රාග්ධනය',
       'upd_grand_total': 'සම්පූර්ණ ප්‍රාග්ධනය (සිම් + බැංකු + ලාච්චුවේ මුදල්)',
       'btn_save_update': '💾 Save කරන්න',
+      'btn_save_and_whatsapp': 'Save කර WhatsApp යවන්න',
+      'btn_save_only': 'Save පමණක් කරන්න',
+      'btn_share_whatsapp_update': 'WhatsApp වෙත යවන්න',
+      'upd_note_label': 'විශේෂ සටහන් (විකල්ප)',
       'btn_cancel': 'අවලංගු කරන්න',
       
       // Comparison Table
@@ -796,6 +804,10 @@ const I18N = {
       'upd_grand_sec_title': '💰 பிரிவு 4: மொத்த மூலதனம்',
       'upd_grand_total': 'மொத்த மூலதனம் (சிம்கள் + வங்கி + ரொக்கம்)',
       'btn_save_update': '💾 சேமி',
+      'btn_save_and_whatsapp': 'Save செய்து WhatsApp-ல் பகிரவும்',
+      'btn_save_only': 'Save மட்டும் செய்யவும்',
+      'btn_share_whatsapp_update': 'WhatsApp-ல் பகிரவும்',
+      'upd_note_label': 'குறிப்புகள் (விருப்பத்தேர்வு)',
       'btn_cancel': 'ரத்து செய்',
       
       // Comparison Table
