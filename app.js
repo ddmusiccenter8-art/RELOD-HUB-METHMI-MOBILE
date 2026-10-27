@@ -39,6 +39,7 @@ const App = {
     this.setupUpdateForm();
     this.setupCreditsPage();
     this.setupShiftsPage();
+    this.setupDeviceCreditsPage();
     this.setupShopsPage();
     this.setupHistoryPage();
     this.setupReportsPage();
@@ -198,6 +199,7 @@ const App = {
       case 'update': this.renderUpdateForm(); break;
       case 'shifts': this.renderShiftsPage(); break;
       case 'credits': this.renderCreditsPage(); break;
+      case 'device-credits': this.renderDeviceCreditsPage(); break;
       case 'history': this.renderHistory(); break;
       case 'shops': this.renderShops(); break;
       case 'reports': break;
@@ -290,6 +292,7 @@ const App = {
     }
 
     this.updatePeriodSummary(shopId);
+    this.renderDevCreditReminderBanner();
 
     const lastUpdate = DB.getLastUpdate(shopId);
     const today = DB.getTodayDate();
@@ -3164,6 +3167,18 @@ Thank you! - ${shopName}`;
         badge.style.display = 'none';
       }
     }
+
+    const devBadge = document.getElementById('topBarDevCreditBadge');
+    if (devBadge) {
+      const devStats = DB.getDeviceCreditStats(shopId);
+      const dueCount = (devStats.dueTodayCount || 0) + (devStats.overdueCount || 0);
+      if (dueCount > 0) {
+        devBadge.textContent = dueCount;
+        devBadge.style.display = 'inline-flex';
+      } else {
+        devBadge.style.display = 'none';
+      }
+    }
   },
 
   promptDeleteCredit(creditId) {
@@ -4985,6 +5000,1146 @@ Thank you! - ${shopName}`;
     window.open(url, '_blank');
   },
 
+  // ================================================================
+  // SHORT-TERM DEVICE CREDITS (PHONE LOANS & REPAYMENTS)
+  // ================================================================
+  devCreditActiveFilter: 'all',
+  tempDevCreditPhotos: {},
+
+  compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.65) {
+    return new Promise((resolve, reject) => {
+      if (!file || !file.type.startsWith('image/')) {
+        return reject(new Error('Invalid image file'));
+      }
+      const originalSize = file.size;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const head = 'data:image/jpeg;base64,';
+          const compressedSize = Math.round((dataUrl.length - head.length) * 3 / 4);
+          const savedPercent = Math.max(0, Math.round(((originalSize - compressedSize) / originalSize) * 100));
+
+          resolve({
+            dataUrl,
+            originalSize,
+            compressedSize,
+            savedPercent
+          });
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  },
+
+  setupDeviceCreditsPage() {
+    const searchInp = document.getElementById('devCreditSearchInput');
+    if (searchInp) {
+      searchInp.addEventListener('input', () => {
+        this.renderDeviceCreditsPage();
+      });
+    }
+  },
+
+  setDevCreditFilter(filter) {
+    this.devCreditActiveFilter = filter;
+    const tabs = document.querySelectorAll('#devCreditFilterTabs .tab-pill');
+    tabs.forEach(btn => {
+      if (btn.getAttribute('data-filter') === filter) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    this.renderDeviceCreditsPage();
+  },
+
+  renderDeviceCreditsPage() {
+    const shopId = DB.getActiveShopId();
+    const stats = DB.getDeviceCreditStats(shopId);
+
+    // Update KPI cards
+    const loanedEl = document.getElementById('kpiDevCreditLoaned');
+    if (loanedEl) loanedEl.textContent = DB.formatCurrency(stats.totalLoanValue);
+
+    const agreementsCountEl = document.getElementById('kpiDevCreditAgreementsCount');
+    if (agreementsCountEl) agreementsCountEl.textContent = `${stats.totalAgreements} ${I18N.currentLang === 'si' ? 'ගිවිසුම්' : 'Agreements'}`;
+
+    const collectedEl = document.getElementById('kpiDevCreditCollected');
+    if (collectedEl) collectedEl.textContent = DB.formatCurrency(stats.totalCollected);
+
+    const settledCountEl = document.getElementById('kpiDevCreditSettledCount');
+    if (settledCountEl) settledCountEl.textContent = `${stats.settledCount} ${I18N.currentLang === 'si' ? 'පියවා අවසන්' : 'Settled'}`;
+
+    const outstandingEl = document.getElementById('kpiDevCreditOutstanding');
+    if (outstandingEl) outstandingEl.textContent = DB.formatCurrency(stats.totalOutstanding);
+
+    const activeCountEl = document.getElementById('kpiDevCreditActiveCount');
+    if (activeCountEl) activeCountEl.textContent = `${stats.activeCount} ${I18N.currentLang === 'si' ? 'ක්‍රියාකාරී ණය' : 'Active Loans'}`;
+
+    const overdueCount = stats.dueTodayCount + stats.overdueCount;
+    const overdueEl = document.getElementById('kpiDevCreditOverdue');
+    if (overdueEl) overdueEl.textContent = overdueCount;
+
+    const dueSubtitleEl = document.getElementById('kpiDevCreditDueSubtitle');
+    if (dueSubtitleEl) {
+      dueSubtitleEl.textContent = overdueCount > 0
+        ? (I18N.currentLang === 'si' ? `${overdueCount} ක් අද / කල් ඉකුත් වී ඇත` : `${overdueCount} Needs Attention`)
+        : (I18N.currentLang === 'si' ? 'සියල්ල යාවත්කාලීනයි' : 'All Clear');
+    }
+
+    // Update tab count badges
+    const countAll = document.getElementById('countDevAll');
+    if (countAll) countAll.textContent = stats.totalAgreements;
+
+    const countDue = document.getElementById('countDevDue');
+    if (countDue) countDue.textContent = overdueCount;
+
+    const countActive = document.getElementById('countDevActive');
+    if (countActive) countActive.textContent = stats.activeCount;
+
+    const countSettled = document.getElementById('countDevSettled');
+    if (countSettled) countSettled.textContent = stats.settledCount;
+
+    // Filter and search
+    let credits = DB.getDeviceCredits(shopId);
+    const today = DB.getTodayDate();
+
+    // 1. Status Filter
+    if (this.devCreditActiveFilter === 'due') {
+      credits = credits.filter(c => (c.balanceDue > 0.01 && c.status !== 'settled') && (c.dueDate && c.dueDate <= today));
+    } else if (this.devCreditActiveFilter === 'active') {
+      credits = credits.filter(c => (c.balanceDue > 0.01 && c.status !== 'settled') && (!c.dueDate || c.dueDate > today));
+    } else if (this.devCreditActiveFilter === 'settled') {
+      credits = credits.filter(c => c.balanceDue <= 0.01 || c.status === 'settled');
+    }
+
+    // 2. Search Query
+    const searchVal = document.getElementById('devCreditSearchInput')?.value?.trim().toLowerCase();
+    if (searchVal) {
+      credits = credits.filter(c => {
+        return (c.customerName && c.customerName.toLowerCase().includes(searchVal)) ||
+               (c.primaryPhone && c.primaryPhone.toLowerCase().includes(searchVal)) ||
+               (c.secondaryPhone && c.secondaryPhone.toLowerCase().includes(searchVal)) ||
+               (c.nicNumber && c.nicNumber.toLowerCase().includes(searchVal)) ||
+               (c.phoneModel && c.phoneModel.toLowerCase().includes(searchVal)) ||
+               (c.imeiNumber && c.imeiNumber.toLowerCase().includes(searchVal)) ||
+               (c.imeiNumber2 && c.imeiNumber2.toLowerCase().includes(searchVal));
+      });
+    }
+
+    const container = document.getElementById('devCreditListContainer');
+    if (!container) return;
+
+    if (credits.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state card" style="padding:40px 20px; text-align:center;">
+          <div style="font-size:3rem; margin-bottom:12px;">📱</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">
+            ${searchVal ? (I18N.currentLang === 'si' ? 'ගැලපෙන ණය ගිවිසුම් හමුනොවීය' : 'No matching device agreements found') : (I18N.currentLang === 'si' ? 'තවම කෙටි කාලීන දුරකථන ණය ගිවිසුම් නොමැත' : 'No device credit agreements recorded yet')}
+          </div>
+          <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:18px;">
+            ${I18N.currentLang === 'si' ? 'පාරිභෝගිකයින්ට කෙටි කාලීන ණයට දුන් දුරකථන සටහන් කිරීමට පහත බොත්තම ඔබන්න' : 'Click the button below to record an in-house mobile loan agreement'}
+          </div>
+          <button type="button" class="btn btn-primary" onclick="App.showAddDeviceCreditModal()">
+            <span>📱</span> <span>${I18N.t('btn_add_device_credit') || '+ New Device Credit Agreement'}</span>
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    let cardsHtml = '';
+    credits.forEach(c => {
+      const isSettled = c.balanceDue <= 0.01 || c.status === 'settled';
+      const isDueToday = !isSettled && c.dueDate === today;
+      const isOverdue = !isSettled && c.dueDate && c.dueDate < today;
+
+      let statusBadgeHtml = '';
+      let cardClass = 'dev-credit-card';
+
+      if (isSettled) {
+        cardClass += ' settled';
+        statusBadgeHtml = `<span class="tally-badge balanced">✅ ${I18N.t('status_settled') || 'Settled'}</span>`;
+      } else if (isOverdue) {
+        cardClass += ' overdue';
+        const daysLate = Math.round((new Date(today) - new Date(c.dueDate)) / (1000 * 60 * 60 * 24));
+        statusBadgeHtml = `<span class="tally-badge shortage">❌ ${I18N.t('status_overdue') || 'Overdue'} (${daysLate} ${I18N.currentLang === 'si' ? 'දිනක් පමායි' : 'days late'})</span>`;
+      } else if (isDueToday) {
+        cardClass += ' due-today';
+        statusBadgeHtml = `<span class="tally-badge excess" style="background:rgba(245,158,11,0.15); color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4);">⚠️ ${I18N.t('status_due_today') || 'Due Today'}</span>`;
+      } else {
+        cardClass += ' active';
+        statusBadgeHtml = `<span class="tally-badge" style="background:rgba(59,130,246,0.12); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">⏳ ${c.dueDate ? (I18N.currentLang === 'si' ? `පියවිය යුතු: ${c.dueDate}` : `Due: ${c.dueDate}`) : (I18N.t('status_active') || 'Active')}</span>`;
+      }
+
+      // Progress percentage
+      const totalPaid = (c.totalPrice - c.balanceDue);
+      const paidPct = c.totalPrice > 0 ? Math.min(100, Math.round((totalPaid / c.totalPrice) * 100)) : 100;
+
+      // Attached Docs Count
+      let docsCount = 0;
+      if (c.customerPhoto) docsCount++;
+      if (c.devicePhoto) docsCount++;
+      if (c.nicFrontPhoto) docsCount++;
+      if (c.nicBackPhoto) docsCount++;
+
+      const avatarHtml = c.customerPhoto
+        ? `<img src="${c.customerPhoto}" alt="${c.customerName}" style="width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid var(--accent-gold); cursor:pointer;" onclick="App.openImageZoomModal('${c.customerPhoto}', '${c.customerName}')">`
+        : `<div style="width:48px; height:48px; border-radius:50%; background:rgba(245,158,11,0.15); border:2px solid rgba(245,158,11,0.4); display:flex; align-items:center; justify-content:center; font-weight:800; color:var(--accent-gold); font-size:1.1rem;">${(c.customerName || 'C').charAt(0).toUpperCase()}</div>`;
+
+      cardsHtml += `
+        <div class="${cardClass}" style="margin-bottom:14px;">
+          <!-- Top Row: Customer Info & Status -->
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              ${avatarHtml}
+              <div>
+                <div style="font-size:1.05rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                  <span>${c.customerName}</span>
+                  ${docsCount > 0 ? `<span style="font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:10px; background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">📷 ${docsCount} Docs</span>` : ''}
+                </div>
+                <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <span>📞 <a href="tel:${c.primaryPhone}" style="color:var(--text-primary); font-weight:700; text-decoration:none;">${c.primaryPhone}</a></span>
+                  ${c.secondaryPhone ? `<span>/ ☎️ <a href="tel:${c.secondaryPhone}" style="color:var(--text-secondary); text-decoration:none;">${c.secondaryPhone}</a></span>` : ''}
+                  ${c.nicNumber ? `<span>| 🪪 NIC: <strong style="color:var(--text-primary);">${c.nicNumber}</strong></span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div>
+              ${statusBadgeHtml}
+            </div>
+          </div>
+
+          <!-- Middle Row: Device Info & Financials -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; background:var(--bg-glass); padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">📱 Phone Model & IMEI</div>
+              <div style="font-size:0.95rem; font-weight:800; color:var(--text-primary); margin-top:2px;">
+                ${c.phoneModel || 'Mobile Device'}
+              </div>
+              <div style="font-size:0.82rem; font-family:monospace; color:var(--accent-gold); margin-top:3px; display:flex; align-items:center; gap:6px;">
+                <span>IMEI: <strong>${c.imeiNumber || 'N/A'}</strong></span>
+                ${c.imeiNumber ? `<button type="button" class="btn btn-xs btn-ghost" onclick="navigator.clipboard.writeText('${c.imeiNumber}'); App.showToast('IMEI Copied', 'info');" title="Copy IMEI" style="padding:1px 5px; font-size:0.7rem;">📋</button>` : ''}
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">💰 Payment Progress</div>
+              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:2px;">
+                <span style="font-size:0.8rem; color:var(--text-secondary);">Paid: <strong>${DB.formatCurrency(totalPaid)}</strong> / ${DB.formatCurrency(c.totalPrice)}</span>
+                <span style="font-size:0.8rem; font-weight:800; color:${isSettled ? 'var(--accent-green)' : 'var(--accent-gold)'};">${paidPct}%</span>
+              </div>
+              <div style="width:100%; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin-top:4px;">
+                <div style="width:${paidPct}%; height:100%; background:${isSettled ? 'var(--accent-green)' : 'var(--accent-gold)'};"></div>
+              </div>
+            </div>
+
+            <div style="text-align:right;">
+              <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">⚖️ Balance Due</div>
+              <div style="font-size:1.3rem; font-weight:900; color:${isSettled ? 'var(--accent-green)' : 'var(--accent-red)'}; margin-top:1px;">
+                ${DB.formatCurrency(c.balanceDue)}
+              </div>
+              <div style="font-size:0.78rem; color:var(--text-secondary);">
+                ${c.dueDate ? (I18N.currentLang === 'si' ? `අවසන් දිනය: ${c.dueDate}` : `Due Date: ${c.dueDate}`) : ''}
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Action Buttons -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding-top:6px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              ${!isSettled ? `
+                <button type="button" class="btn btn-sm btn-success" onclick="App.showAddDevicePaymentModal('${c.id}')" style="font-weight:700; padding:6px 12px;">
+                  <span>💵</span> <span>${I18N.t('btn_add_payment') || '+ Add Payment'}</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="App.sendWhatsAppReminder('${c.id}')" style="border:1px solid rgba(16,185,129,0.4); color:var(--accent-green); font-weight:700; padding:6px 12px;">
+                  <span>💬</span> <span>${I18N.t('btn_whatsapp_remind') || 'WhatsApp Reminder'}</span>
+                </button>
+              ` : `
+                <span style="font-size:0.85rem; font-weight:700; color:var(--accent-green); display:flex; align-items:center; gap:4px;">
+                  <span>🎉</span> <span>${I18N.currentLang === 'si' ? 'සම්පූර්ණ මුදල පියවා ඇත' : 'Fully Settled Agreement'}</span>
+                </span>
+              `}
+              <a href="tel:${c.primaryPhone}" class="btn btn-sm btn-ghost" style="border:1px solid rgba(255,255,255,0.15); padding:6px 12px; font-weight:600; text-decoration:none;">
+                <span>📞</span> <span>${I18N.t('btn_call_cust') || 'Call'}</span>
+              </a>
+            </div>
+
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-sm btn-ghost" onclick="App.showDeviceCreditDetailsModal('${c.id}')" style="border:1px solid rgba(59,130,246,0.3); color:var(--accent-blue); font-weight:700; padding:6px 12px;">
+                <span>🔍</span> <span>${I18N.t('btn_view_agreement') || 'Profile & Docs'}</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" onclick="App.showAddDeviceCreditModal('${c.id}')" title="Edit Agreement" style="border:1px solid rgba(255,255,255,0.15); padding:6px 10px;">
+                <span>✏️</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" onclick="App.promptDeleteDeviceCredit('${c.id}')" title="Delete Agreement" style="border:1px solid rgba(239,68,68,0.3); color:var(--accent-red); padding:6px 10px;">
+                <span>🗑️</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = cardsHtml;
+  },
+
+  renderDevCreditReminderBanner() {
+    const banner = document.getElementById('dashDevCreditReminderBanner');
+    if (!banner) return;
+
+    const shopId = DB.getActiveShopId();
+    const dueCredits = DB.getDueDeviceCredits(shopId);
+
+    if (!dueCredits || dueCredits.length === 0) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    banner.style.display = 'block';
+    const subtitle = document.getElementById('dashDevCreditReminderSubtitle');
+    if (subtitle) {
+      subtitle.textContent = I18N.currentLang === 'si'
+        ? `අද දිනට හෝ කල් ඉකුත් වූ දුරකථන ණය ${dueCredits.length} ක් ඇත. පාරිභෝගිකයින්ට WhatsApp මඟින් මතක් කරන්න.`
+        : `${dueCredits.length} customer device credit payment(s) due today or overdue.`;
+    }
+
+    const listEl = document.getElementById('dashDevCreditReminderList');
+    if (!listEl) return;
+
+    const today = DB.getTodayDate();
+    let rowsHtml = '';
+    dueCredits.slice(0, 4).forEach(c => {
+      const isDueToday = c.dueDate === today;
+      const daysLate = Math.max(0, Math.round((new Date(today) - new Date(c.dueDate)) / (1000 * 60 * 60 * 24)));
+      const badgeText = isDueToday
+        ? (I18N.currentLang === 'si' ? 'අද දින' : 'Due Today')
+        : (I18N.currentLang === 'si' ? `දින ${daysLate} ක් පමායි` : `${daysLate}d Overdue`);
+
+      rowsHtml += `
+        <div style="background:var(--bg-glass-card); padding:10px 12px; border-radius:var(--radius-sm); border:1px solid rgba(239,68,68,0.25); display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div>
+            <div style="font-weight:800; font-size:0.92rem; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+              <span>${c.customerName}</span>
+              <span class="tally-badge shortage" style="font-size:0.7rem; padding:1px 5px;">${badgeText}</span>
+            </div>
+            <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">
+              ${c.phoneModel || 'Mobile'} | Balance: <strong style="color:var(--accent-red); font-size:0.85rem;">${DB.formatCurrency(c.balanceDue)}</strong>
+            </div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-xs btn-success" onclick="App.sendWhatsAppReminder('${c.id}')" title="Send WhatsApp Reminder" style="padding:4px 8px; font-weight:700;">
+              <span>💬</span>
+            </button>
+            <a href="tel:${c.primaryPhone}" class="btn btn-xs btn-ghost" title="Call" style="border:1px solid rgba(255,255,255,0.2); padding:4px 8px; text-decoration:none;">
+              <span>📞</span>
+            </a>
+            <button type="button" class="btn btn-xs btn-primary" onclick="App.showAddDevicePaymentModal('${c.id}')" title="Settle" style="padding:4px 8px; font-weight:700;">
+              <span>💵</span>
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    listEl.innerHTML = rowsHtml;
+  },
+
+  showAddDeviceCreditModal(editCreditId = null) {
+    const shopId = DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර පළමුව Shop එකක් තෝරන්න' : 'Please select a shop first', 'error');
+      return;
+    }
+
+    let existing = null;
+    if (editCreditId) {
+      existing = DB.getDeviceCredits(shopId).find(c => c.id === editCreditId);
+    }
+
+    this.tempDevCreditPhotos = {
+      customerPhoto: existing?.customerPhoto || '',
+      devicePhoto: existing?.devicePhoto || '',
+      nicFrontPhoto: existing?.nicFrontPhoto || '',
+      nicBackPhoto: existing?.nicBackPhoto || ''
+    };
+
+    const today = DB.getTodayDate();
+    const agreedDate = existing?.agreementDate || today;
+    const initialPeriod = existing?.creditPeriodDays || 14;
+
+    const calcDefaultDue = (baseDate, days) => {
+      const d = new Date(baseDate);
+      d.setDate(d.getDate() + parseInt(days, 10));
+      return d.toISOString().split('T')[0];
+    };
+
+    const initialDue = existing?.dueDate || calcDefaultDue(agreedDate, initialPeriod);
+
+    const title = editCreditId
+      ? (I18N.currentLang === 'si' ? '✏️ දුරකථන ණය ගිවිසුම සංස්කරණය' : '✏️ Edit Device Credit Agreement')
+      : (I18N.currentLang === 'si' ? '📱 නව කෙටි කාලීන දුරකථන ණය ගිවිසුමක්' : '📱 New Short-Term Device Credit Agreement');
+
+    const bodyHtml = `
+      <form id="devCreditForm" style="display:flex; flex-direction:column; gap:16px;">
+        <!-- 1. Customer Section -->
+        <div class="section-divider blue" style="margin-top:0;">
+          <div class="divider-icon">👤</div>
+          <div class="divider-text">${I18N.t('cust_info_sec') || 'Customer Information'}</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('cust_name_lbl') || 'Customer Full Name'} *</label>
+            <input type="text" class="form-input" id="devCustName" required value="${existing?.customerName || ''}" placeholder="e.g. Kasun Perera">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('cust_nic_lbl') || 'NIC Number'} *</label>
+            <input type="text" class="form-input" id="devCustNic" required value="${existing?.nicNumber || ''}" placeholder="e.g. 199212345678 / 921234567V">
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('cust_phone_primary') || 'Primary Mobile Number'} *</label>
+            <input type="tel" class="form-input" id="devCustPhone1" required value="${existing?.primaryPhone || ''}" placeholder="e.g. 0771234567">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('cust_phone_sec') || 'Secondary / Home Phone'}</label>
+            <input type="tel" class="form-input" id="devCustPhone2" value="${existing?.secondaryPhone || ''}" placeholder="e.g. 0719876543 (Relative/Home)">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${I18N.t('cust_address_lbl') || 'Customer Address / Area'}</label>
+          <input type="text" class="form-input" id="devCustAddress" value="${existing?.address || ''}" placeholder="e.g. No. 45, Kandy Road, Kegalle">
+        </div>
+
+        <!-- 2. Device & IMEI Section -->
+        <div class="section-divider gold">
+          <div class="divider-icon">📱</div>
+          <div class="divider-text">${I18N.t('dev_info_sec') || 'Device & IMEI Details'}</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_model_lbl') || 'Phone Model'} *</label>
+            <input type="text" class="form-input" id="devModel" required value="${existing?.phoneModel || ''}" placeholder="e.g. Samsung Galaxy A15 8/128GB">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label class="form-label" style="margin-bottom:0;">${I18N.t('dev_imei_lbl') || 'IMEI 1 Number'} *</label>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.openImeiScannerModal('devImei1')" style="padding:1px 6px; font-size:0.72rem; color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4);">📷 Scan</button>
+            </div>
+            <input type="text" class="form-input" id="devImei1" required value="${existing?.imeiNumber || ''}" placeholder="15 digits (e.g. 864234051234567)">
+          </div>
+        </div>
+
+        <!-- 3. Financials & Due Terms -->
+        <div class="section-divider green">
+          <div class="divider-icon">💰</div>
+          <div class="divider-text">${I18N.t('fin_terms_sec') || 'Financials & Due Terms'}</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_total_price') || 'Total Selling Price (Rs.)'} *</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="devTotalPrice" required value="${existing?.totalPrice || ''}" placeholder="0.00" oninput="App.calcDevCreditFormBalance()">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_down_payment') || 'Down Payment / Advance (Rs.)'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="devDownPayment" value="${existing?.downPayment || ''}" placeholder="0.00" oninput="App.calcDevCreditFormBalance()">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_balance_due') || 'Balance Outstanding'}</label>
+            <div id="devBalanceDueDisplay" style="font-size:1.3rem; font-weight:900; color:var(--accent-red); padding:8px 12px; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:var(--radius-sm);">
+              ${DB.formatCurrency(existing?.balanceDue || 0)}
+            </div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_agreed_date') || 'Agreement Date'}</label>
+            <input type="date" class="form-input" id="devAgreementDate" value="${agreedDate}" onchange="App.onDevCreditDateChange()">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_credit_period') || 'Credit Period'}</label>
+            <select class="form-select" id="devPeriodSelect" onchange="App.onDevCreditPeriodSelect()">
+              <option value="7" ${initialPeriod === 7 ? 'selected' : ''}>7 Days (1 Week)</option>
+              <option value="14" ${initialPeriod === 14 ? 'selected' : ''}>14 Days (2 Weeks)</option>
+              <option value="30" ${initialPeriod === 30 ? 'selected' : ''}>30 Days (1 Month)</option>
+              <option value="custom" ${![7, 14, 30].includes(initialPeriod) ? 'selected' : ''}>Custom Date</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${I18N.t('dev_due_date') || 'Payment Due Date'} *</label>
+            <input type="date" class="form-input" id="devDueDate" required value="${initialDue}">
+          </div>
+        </div>
+
+        <!-- 4. Photos & Verification Documents (Auto-Compressed) -->
+        <div class="section-divider purple">
+          <div class="divider-icon">📸</div>
+          <div class="divider-text">${I18N.t('dev_docs_sec') || 'Photographs & Documents (Auto-Compressed)'}</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:-6px;">
+          ${I18N.currentLang === 'si' ? '⚡ ඡායාරූප තෝරන විට ඒවා ස්වයංක්‍රීයව ~40KB කුඩා ප්‍රමාණයකට සංකෝචනය (Compress) වී Database එක ආරක්ෂා කරයි.' : '⚡ Uploaded photos are automatically compressed to lightweight JPEG (~40KB) keeping text and faces crystal clear.'}
+        </div>
+
+        <div class="photo-upload-grid">
+          <!-- 1. Customer Photo -->
+          <div class="photo-upload-box" id="boxCustPhoto" onclick="document.getElementById('inputCustPhoto').click()">
+            <input type="file" id="inputCustPhoto" accept="image/*" capture="user" onchange="App.handleDevCreditPhotoUpload(this, 'customerPhoto', 'previewCustPhoto', 'badgeCustPhoto')">
+            <div id="previewCustPhotoContainer">
+              ${this.tempDevCreditPhotos.customerPhoto ? `<img src="${this.tempDevCreditPhotos.customerPhoto}" class="photo-upload-preview">` : `<div style="font-size:2rem; margin-bottom:4px;">👤</div>`}
+            </div>
+            <div style="font-size:0.75rem; font-weight:700;">${I18N.t('upload_cust_photo') || 'Customer Face'}</div>
+            <div id="badgeCustPhoto" class="compression-badge" style="display:${this.tempDevCreditPhotos.customerPhoto ? 'inline-block' : 'none'};">Attached</div>
+          </div>
+
+          <!-- 2. Phone Photo -->
+          <div class="photo-upload-box" id="boxDevPhoto" onclick="document.getElementById('inputDevPhoto').click()">
+            <input type="file" id="inputDevPhoto" accept="image/*" capture="environment" onchange="App.handleDevCreditPhotoUpload(this, 'devicePhoto', 'previewDevPhoto', 'badgeDevPhoto')">
+            <div id="previewDevPhotoContainer">
+              ${this.tempDevCreditPhotos.devicePhoto ? `<img src="${this.tempDevCreditPhotos.devicePhoto}" class="photo-upload-preview">` : `<div style="font-size:2rem; margin-bottom:4px;">📱</div>`}
+            </div>
+            <div style="font-size:0.75rem; font-weight:700;">${I18N.t('upload_dev_photo') || 'Phone & Box'}</div>
+            <div id="badgeDevPhoto" class="compression-badge" style="display:${this.tempDevCreditPhotos.devicePhoto ? 'inline-block' : 'none'};">Attached</div>
+          </div>
+
+          <!-- 3. NIC Front -->
+          <div class="photo-upload-box" id="boxNicFront" onclick="document.getElementById('inputNicFront').click()">
+            <input type="file" id="inputNicFront" accept="image/*" capture="environment" onchange="App.handleDevCreditPhotoUpload(this, 'nicFrontPhoto', 'previewNicFront', 'badgeNicFront')">
+            <div id="previewNicFrontContainer">
+              ${this.tempDevCreditPhotos.nicFrontPhoto ? `<img src="${this.tempDevCreditPhotos.nicFrontPhoto}" class="photo-upload-preview">` : `<div style="font-size:2rem; margin-bottom:4px;">🪪</div>`}
+            </div>
+            <div style="font-size:0.75rem; font-weight:700;">${I18N.t('upload_nic_front') || 'NIC Front'}</div>
+            <div id="badgeNicFront" class="compression-badge" style="display:${this.tempDevCreditPhotos.nicFrontPhoto ? 'inline-block' : 'none'};">Attached</div>
+          </div>
+
+          <!-- 4. NIC Back -->
+          <div class="photo-upload-box" id="boxNicBack" onclick="document.getElementById('inputNicBack').click()">
+            <input type="file" id="inputNicBack" accept="image/*" capture="environment" onchange="App.handleDevCreditPhotoUpload(this, 'nicBackPhoto', 'previewNicBack', 'badgeNicBack')">
+            <div id="previewNicBackContainer">
+              ${this.tempDevCreditPhotos.nicBackPhoto ? `<img src="${this.tempDevCreditPhotos.nicBackPhoto}" class="photo-upload-preview">` : `<div style="font-size:2rem; margin-bottom:4px;">🪪</div>`}
+            </div>
+            <div style="font-size:0.75rem; font-weight:700;">${I18N.t('upload_nic_back') || 'NIC Back'}</div>
+            <div id="badgeNicBack" class="compression-badge" style="display:${this.tempDevCreditPhotos.nicBackPhoto ? 'inline-block' : 'none'};">Attached</div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0; margin-top:6px;">
+          <label class="form-label">Notes & Guarantor Details (Optional)</label>
+          <textarea class="form-input" id="devNotes" rows="2" placeholder="e.g. Guarantor: Kamal (0777123456), Accessories included, warranty terms...">${existing?.notes || ''}</textarea>
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      title,
+      bodyHtml,
+      [
+        { text: I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.t('btn_save_agreement') || '💾 Save Agreement', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId) }
+      ]
+    );
+
+    this.calcDevCreditFormBalance();
+  },
+
+  calcDevCreditFormBalance() {
+    const total = parseFloat(document.getElementById('devTotalPrice')?.value) || 0;
+    const down = parseFloat(document.getElementById('devDownPayment')?.value) || 0;
+    const bal = Math.max(0, total - down);
+    const disp = document.getElementById('devBalanceDueDisplay');
+    if (disp) {
+      disp.textContent = DB.formatCurrency(bal);
+      disp.style.color = bal <= 0.01 ? 'var(--accent-green)' : 'var(--accent-red)';
+    }
+  },
+
+  onDevCreditDateChange() {
+    this.onDevCreditPeriodSelect();
+  },
+
+  onDevCreditPeriodSelect() {
+    const periodSel = document.getElementById('devPeriodSelect');
+    const agreedDateInp = document.getElementById('devAgreementDate');
+    const dueDateInp = document.getElementById('devDueDate');
+    if (!periodSel || !dueDateInp || !agreedDateInp) return;
+
+    const val = periodSel.value;
+    if (val !== 'custom') {
+      const d = new Date(agreedDateInp.value || DB.getTodayDate());
+      d.setDate(d.getDate() + parseInt(val, 10));
+      dueDateInp.value = d.toISOString().split('T')[0];
+    }
+  },
+
+  async handleDevCreditPhotoUpload(inputEl, key, containerId, badgeId) {
+    const file = inputEl.files[0];
+    if (!file) return;
+
+    try {
+      this.showToast('Compressing photo...', 'info');
+      const res = await this.compressImageFile(file, 800, 800, 0.65);
+      this.tempDevCreditPhotos[key] = res.dataUrl;
+
+      const container = document.getElementById(containerId + 'Container');
+      if (container) {
+        container.innerHTML = `<img src="${res.dataUrl}" class="photo-upload-preview" alt="Preview">`;
+      }
+
+      const badge = document.getElementById(badgeId);
+      if (badge) {
+        badge.style.display = 'inline-block';
+        badge.textContent = `✅ ${Math.round(res.compressedSize / 1024)} KB (-${res.savedPercent}%)`;
+      }
+      this.showToast(`✅ Photo compressed to ${Math.round(res.compressedSize / 1024)} KB!`, 'success');
+    } catch (err) {
+      console.error(err);
+      this.showToast('Failed to compress image', 'error');
+    }
+  },
+
+  saveDeviceCreditAgreement(editCreditId = null) {
+    const custName = document.getElementById('devCustName')?.value.trim();
+    const nicNumber = document.getElementById('devCustNic')?.value.trim();
+    const phone1 = document.getElementById('devCustPhone1')?.value.trim();
+    const phone2 = document.getElementById('devCustPhone2')?.value.trim();
+    const address = document.getElementById('devCustAddress')?.value.trim();
+    const model = document.getElementById('devModel')?.value.trim();
+    const imei1 = document.getElementById('devImei1')?.value.trim();
+    const totalPrice = parseFloat(document.getElementById('devTotalPrice')?.value) || 0;
+    const downPayment = parseFloat(document.getElementById('devDownPayment')?.value) || 0;
+    const agreementDate = document.getElementById('devAgreementDate')?.value;
+    const creditPeriodDays = parseInt(document.getElementById('devPeriodSelect')?.value, 10) || 14;
+    const dueDate = document.getElementById('devDueDate')?.value;
+    const notes = document.getElementById('devNotes')?.value.trim();
+
+    if (!custName) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර පාරිභෝගිකයාගේ නම ඇතුළත් කරන්න' : 'Please enter Customer Name', 'error');
+      return;
+    }
+    if (!phone1) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර ප්‍රධාන දුරකථන අංකය ඇතුළත් කරන්න' : 'Please enter Primary Phone Number', 'error');
+      return;
+    }
+    if (!nicNumber) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර NIC අංකය ඇතුළත් කරන්න' : 'Please enter NIC Number', 'error');
+      return;
+    }
+    if (!model) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර දුරකථන මාදිලිය ඇතුළත් කරන්න' : 'Please enter Phone Model', 'error');
+      return;
+    }
+    if (!imei1) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර IMEI අංකය ඇතුළත් කරන්න' : 'Please enter IMEI Number', 'error');
+      return;
+    }
+    if (totalPrice <= 0) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නිවැරදි විකුණුම් මිල ඇතුළත් කරන්න' : 'Please enter valid Selling Price', 'error');
+      return;
+    }
+    if (!dueDate) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර ගෙවිය යුතු අවසන් දිනය තෝරන්න' : 'Please enter Due Date', 'error');
+      return;
+    }
+
+    const payload = {
+      customerName: custName,
+      nicNumber,
+      primaryPhone: phone1,
+      secondaryPhone: phone2,
+      address,
+      phoneModel: model,
+      imeiNumber: imei1,
+      totalPrice,
+      downPayment,
+      agreementDate,
+      creditPeriodDays,
+      dueDate,
+      notes,
+      customerPhoto: this.tempDevCreditPhotos.customerPhoto || '',
+      devicePhoto: this.tempDevCreditPhotos.devicePhoto || '',
+      nicFrontPhoto: this.tempDevCreditPhotos.nicFrontPhoto || '',
+      nicBackPhoto: this.tempDevCreditPhotos.nicBackPhoto || ''
+    };
+
+    if (editCreditId) {
+      DB.updateDeviceCredit(editCreditId, payload);
+      this.showToast(I18N.currentLang === 'si' ? '✅ ගිවිසුම සාර්ථකව යාවත්කාලීන විය!' : '✅ Agreement updated successfully!', 'success');
+    } else {
+      DB.addDeviceCredit(payload);
+      this.showToast(I18N.currentLang === 'si' ? '✅ නව දුරකථන ණය ගිවිසුම සුරැකිණි!' : '✅ New device credit agreement recorded!', 'success');
+    }
+
+    this.closeModal();
+    this.updateTopBarBadges();
+    if (this.currentPage === 'device-credits') {
+      this.renderDeviceCreditsPage();
+    }
+    if (this.currentPage === 'dashboard') {
+      this.renderDashboard();
+    }
+  },
+
+  showAddDevicePaymentModal(creditId) {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    const remaining = credit.balanceDue;
+    const bodyHtml = `
+      <form id="devPaymentForm" style="display:flex; flex-direction:column; gap:14px;">
+        <div style="background:var(--bg-glass-card); padding:14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="font-weight:800; font-size:1.05rem; color:var(--text-primary);">${credit.customerName}</div>
+          <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px;">
+            📱 ${credit.phoneModel} (IMEI: ${credit.imeiNumber})
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.15);">
+            <span style="font-size:0.85rem; color:var(--text-muted); font-weight:700;">Remaining Balance:</span>
+            <span style="font-size:1.3rem; font-weight:900; color:var(--accent-red);">${DB.formatCurrency(remaining)}</span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Payment Amount (Rs.) *</label>
+          <input type="number" step="0.01" min="1" max="${remaining}" class="form-input" id="devPayAmount" required value="${remaining}" style="font-size:1.25rem; font-weight:800; color:var(--accent-green);">
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Payment Date</label>
+            <input type="date" class="form-input" id="devPayDate" value="${DB.getTodayDate()}">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Cashier / Staff</label>
+            <input type="text" class="form-input" id="devPayCashier" placeholder="Staff Name">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Payment Note / Receipt (Optional)</label>
+          <input type="text" class="form-input" id="devPayNote" placeholder="e.g. 1st Installment / Cash in shop">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      I18N.currentLang === 'si' ? '💵 ණය මුදල් ගෙවීමක් සටහන් කිරීම' : '💵 Record Device Credit Payment',
+      bodyHtml,
+      [
+        { text: I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: I18N.t('btn_save_payment') || '💾 Record Payment', class: 'btn-success', onClick: () => this.saveDevicePayment(creditId) }
+      ]
+    );
+  },
+
+  saveDevicePayment(creditId) {
+    const amt = parseFloat(document.getElementById('devPayAmount')?.value) || 0;
+    const date = document.getElementById('devPayDate')?.value || DB.getTodayDate();
+    const cashier = document.getElementById('devPayCashier')?.value.trim();
+    const note = document.getElementById('devPayNote')?.value.trim();
+
+    if (amt <= 0) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නිවැරදි ගෙවීම් මුදලක් ඇතුළත් කරන්න' : 'Please enter a valid payment amount', 'error');
+      return;
+    }
+
+    const updated = DB.addDevicePayment(creditId, { amount: amt, date, cashier, note });
+    this.closeModal();
+
+    if (updated.status === 'settled') {
+      this.showToast(I18N.currentLang === 'si' ? '🎉 මුළු ණය මුදලම පියවා අවසන් විය!' : '🎉 Loan fully settled!', 'success');
+    } else {
+      this.showToast(`✅ Payment of ${DB.formatCurrency(amt)} recorded! Balance: ${DB.formatCurrency(updated.balanceDue)}`, 'success');
+    }
+
+    this.updateTopBarBadges();
+    if (this.currentPage === 'device-credits') {
+      this.renderDeviceCreditsPage();
+    }
+    if (this.currentPage === 'dashboard') {
+      this.renderDashboard();
+    }
+  },
+
+  showDeviceCreditDetailsModal(creditId) {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    const isSettled = credit.balanceDue <= 0.01 || credit.status === 'settled';
+    const totalPaid = credit.totalPrice - credit.balanceDue;
+
+    const paymentsHtml = (credit.payments && credit.payments.length > 0)
+      ? credit.payments.map((p, idx) => `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.06); font-size:0.83rem;">
+            <td style="padding:6px 8px;">#${idx + 1}</td>
+            <td style="padding:6px 8px;">${p.date}</td>
+            <td style="padding:6px 8px; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(p.amount)}</td>
+            <td style="padding:6px 8px; color:var(--text-secondary);">${p.note || '-'}</td>
+            <td style="padding:6px 8px; color:var(--text-muted);">${p.cashier || '-'}</td>
+          </tr>
+        `).join('')
+      : `<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.8rem;">No installment payments recorded yet.</td></tr>`;
+
+    const renderDocThumbnail = (src, label) => {
+      if (!src) {
+        return `
+          <div style="border:1px dashed rgba(255,255,255,0.2); border-radius:6px; padding:12px 6px; text-align:center; color:var(--text-muted); font-size:0.75rem;">
+            <div>📁</div>
+            <div style="margin-top:4px;">No ${label}</div>
+          </div>
+        `;
+      }
+      return `
+        <div style="border:1px solid rgba(255,255,255,0.15); border-radius:6px; overflow:hidden; background:var(--bg-glass); cursor:pointer; text-align:center;" onclick="App.openImageZoomModal('${src}', '${label} - ${credit.customerName}')">
+          <img src="${src}" style="width:100%; height:90px; object-fit:cover;">
+          <div style="font-size:0.72rem; font-weight:700; padding:3px 4px; color:var(--accent-gold);">${label} 🔍</div>
+        </div>
+      `;
+    };
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <!-- Customer & Device Overview -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; background:var(--bg-glass-card); padding:16px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div>
+            <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Customer Details</div>
+            <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-top:2px;">${credit.customerName}</div>
+            <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">
+              📞 <a href="tel:${credit.primaryPhone}" style="color:var(--text-primary); font-weight:700;">${credit.primaryPhone}</a>
+              ${credit.secondaryPhone ? ` / ☎️ ${credit.secondaryPhone}` : ''}
+            </div>
+            <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
+              🪪 NIC: <strong>${credit.nicNumber || 'N/A'}</strong>
+            </div>
+            ${credit.address ? `<div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">📍 ${credit.address}</div>` : ''}
+          </div>
+
+          <div>
+            <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Device Information</div>
+            <div style="font-size:1.05rem; font-weight:800; color:var(--text-primary); margin-top:2px;">📱 ${credit.phoneModel}</div>
+            <div style="font-size:0.85rem; color:var(--accent-gold); font-family:monospace; margin-top:3px;">
+              IMEI 1: <strong>${credit.imeiNumber || 'N/A'}</strong>
+            </div>
+            ${credit.imeiNumber2 ? `<div style="font-size:0.8rem; color:var(--text-muted); font-family:monospace;">IMEI 2: ${credit.imeiNumber2}</div>` : ''}
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">
+              📅 Agreed: ${credit.agreementDate} | Due: <strong>${credit.dueDate || 'N/A'}</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Financial Summary -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px;">
+          <div style="background:var(--bg-glass); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Selling Price</div>
+            <div style="font-size:1.1rem; font-weight:800; color:var(--text-primary); margin-top:2px;">${DB.formatCurrency(credit.totalPrice)}</div>
+          </div>
+          <div style="background:var(--bg-glass); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Down Payment</div>
+            <div style="font-size:1.1rem; font-weight:800; color:var(--accent-blue); margin-top:2px;">${DB.formatCurrency(credit.downPayment)}</div>
+          </div>
+          <div style="background:var(--bg-glass); padding:10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08);">
+            <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Total Paid</div>
+            <div style="font-size:1.1rem; font-weight:800; color:var(--accent-green); margin-top:2px;">${DB.formatCurrency(totalPaid)}</div>
+          </div>
+          <div style="background:var(--bg-glass); padding:10px; border-radius:6px; border:1px solid rgba(239,68,68,0.25);">
+            <div style="font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; font-weight:700;">Balance Due</div>
+            <div style="font-size:1.2rem; font-weight:900; color:${isSettled ? 'var(--accent-green)' : 'var(--accent-red)'}; margin-top:1px;">${DB.formatCurrency(credit.balanceDue)}</div>
+          </div>
+        </div>
+
+        <!-- Documents Gallery (4 Photos) -->
+        <div>
+          <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:8px;">
+            🖼️ Verification Documents & Photos (Click to Zoom)
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:10px;">
+            ${renderDocThumbnail(credit.customerPhoto, 'Customer Photo')}
+            ${renderDocThumbnail(credit.devicePhoto, 'Phone & Box')}
+            ${renderDocThumbnail(credit.nicFrontPhoto, 'NIC Front')}
+            ${renderDocThumbnail(credit.nicBackPhoto, 'NIC Back')}
+          </div>
+        </div>
+
+        <!-- Installment History -->
+        <div>
+          <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:8px;">
+            💵 Repayment History
+          </div>
+          <div style="max-height:160px; overflow-y:auto; border:1px solid var(--border-glass); border-radius:6px;">
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+              <thead>
+                <tr style="background:rgba(255,255,255,0.04); border-bottom:1px solid rgba(255,255,255,0.1); font-size:0.75rem; text-transform:uppercase; color:var(--text-muted);">
+                  <th style="padding:6px 8px;">#</th>
+                  <th style="padding:6px 8px;">Date</th>
+                  <th style="padding:6px 8px;">Amount</th>
+                  <th style="padding:6px 8px;">Note</th>
+                  <th style="padding:6px 8px;">Staff</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${paymentsHtml}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        ${credit.notes ? `
+          <div style="font-size:0.8rem; background:rgba(255,255,255,0.03); padding:8px 12px; border-radius:6px; color:var(--text-secondary);">
+            <strong>Notes:</strong> ${credit.notes}
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    this.showModal(
+      `📱 ${credit.customerName} - Agreement Profile`,
+      bodyHtml,
+      [
+        { text: 'Close', class: 'btn-ghost', onClick: () => this.closeModal() },
+        !isSettled ? { text: '💬 WhatsApp Reminder', class: 'btn-success', onClick: () => this.sendWhatsAppReminder(credit.id) } : null,
+        !isSettled ? { text: '💵 + Add Payment', class: 'btn-primary', onClick: () => { this.closeModal(); this.showAddDevicePaymentModal(credit.id); } } : null
+      ].filter(Boolean)
+    );
+  },
+
+  openImageZoomModal(src, title = 'Document Viewer') {
+    if (!src) return;
+    const bodyHtml = `
+      <div style="text-align:center;">
+        <img src="${src}" style="max-width:100%; max-height:75vh; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.5); object-fit:contain;">
+        <div style="margin-top:12px;">
+          <a href="${src}" download="${title.replace(/\s+/g, '_')}.jpg" class="btn btn-sm btn-ghost" style="border:1px solid rgba(255,255,255,0.2);">
+            ⬇️ Download Original Image
+          </a>
+        </div>
+      </div>
+    `;
+    this.showModal(title, bodyHtml, [{ text: 'Close', class: 'btn-primary', onClick: () => this.closeModal() }]);
+  },
+
+  sendWhatsAppReminder(creditId) {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    let phone = credit.primaryPhone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '94' + phone.substring(1);
+    } else if (!phone.startsWith('94')) {
+      phone = '94' + phone;
+    }
+
+    const shop = DB.getShop(credit.shopId);
+    const shopName = shop ? shop.name : 'Shop Payment Tracker';
+
+    let msg = '';
+    if (I18N.currentLang === 'si') {
+      msg = `ආයුබෝවන් ${credit.customerName},\n\nඔබ අප ${shopName} ආයතනයෙන් ලබාගත් ${credit.phoneModel} (IMEI: ${credit.imeiNumber || 'N/A'}) සඳහා ගෙවීමට ඇති ණය ශේෂය රු. ${credit.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })} වේ.\n\nනියමිත දිනය: ${credit.dueDate || 'අද දින'}.\nකරුණාකර නියමිත පරිදි මුදල් ගෙවා අවසන් කිරීමට කාරුණික වන්න.\n\nස්තූතියි!\n${shopName}`;
+    } else {
+      msg = `Hello ${credit.customerName},\n\nThis is a friendly reminder from ${shopName} regarding your device credit agreement for ${credit.phoneModel} (IMEI: ${credit.imeiNumber || 'N/A'}).\n\nOutstanding Balance: Rs. ${credit.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}\nDue Date: ${credit.dueDate || 'Today'}\n\nPlease arrange payment at your earliest convenience.\n\nThank you,\n${shopName}`;
+    }
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
+  openImeiScannerModal(targetInputId = null) {
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:14px; text-align:center;">
+        <div style="font-size:0.85rem; color:var(--text-secondary);">
+          ${I18N.currentLang === 'si' ? 'දුරකථන පෙට්ටියේ හෝ ස්ටිකරයේ ඇති IMEI බාර්කෝඩ් එක කැමරාව ඉදිරියට පෙන්වන්න, නැතහොත් අතින් ඇතුළත් කරන්න:' : 'Point your camera at the phone box barcode / IMEI, or enter manually below:'}
+        </div>
+
+        <div class="scanner-container" id="scannerVideoContainer">
+          <video id="imeiScannerVideo" class="scanner-video" playsinline></video>
+          <div class="scanner-overlay">
+            <div class="scanner-laser"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="manualImeiInput" class="form-input" placeholder="Type or scan 15-digit IMEI directly..." autofocus style="font-size:1.05rem; font-family:monospace; text-align:center;">
+          <button type="button" class="btn btn-primary" onclick="App.applyManualImei('${targetInputId || ''}')">Apply</button>
+        </div>
+      </div>
+    `;
+
+    this.showModal(
+      '📷 IMEI Barcode Scanner',
+      bodyHtml,
+      [
+        { text: 'Cancel', class: 'btn-ghost', onClick: () => { this.stopImeiCamera(); this.closeModal(); } }
+      ]
+    );
+
+    // Enter key listener on manual input
+    setTimeout(() => {
+      const inp = document.getElementById('manualImeiInput');
+      if (inp) {
+        inp.focus();
+        inp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            this.applyManualImei(targetInputId);
+          }
+        });
+      }
+    }, 200);
+
+    this.startImeiCamera(targetInputId);
+  },
+
+  scannerStream: null,
+  scannerInterval: null,
+
+  async startImeiCamera(targetInputId) {
+    const video = document.getElementById('imeiScannerVideo');
+    if (!video || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+
+    try {
+      this.scannerStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      video.srcObject = this.scannerStream;
+      video.play();
+
+      // Check BarcodeDetector API support
+      if ('BarcodeDetector' in window) {
+        const detector = new window.BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'qr_code', 'itf'] });
+        this.scannerInterval = setInterval(async () => {
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes && barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              if (code && code.length >= 8) {
+                this.playBeepSound();
+                this.stopImeiCamera();
+                this.closeModal();
+                this.handleScannedImei(code, targetInputId);
+              }
+            }
+          } catch (e) {
+            // Frame detection error, continue loop
+          }
+        }, 200);
+      }
+    } catch (err) {
+      console.warn('Camera access denied or unavailable', err);
+      const container = document.getElementById('scannerVideoContainer');
+      if (container) {
+        container.innerHTML = `<div style="padding:30px 10px; color:var(--text-muted); font-size:0.85rem;">Camera unavailable or permission denied.<br>Please use the manual IMEI box below.</div>`;
+      }
+    }
+  },
+
+  stopImeiCamera() {
+    if (this.scannerInterval) {
+      clearInterval(this.scannerInterval);
+      this.scannerInterval = null;
+    }
+    if (this.scannerStream) {
+      this.scannerStream.getTracks().forEach(t => t.stop());
+      this.scannerStream = null;
+    }
+  },
+
+  playBeepSound() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.12);
+    } catch {
+      // Audio not permitted or supported
+    }
+  },
+
+  applyManualImei(targetInputId) {
+    const val = document.getElementById('manualImeiInput')?.value?.trim();
+    if (!val) {
+      this.showToast('Please enter an IMEI number', 'error');
+      return;
+    }
+    this.stopImeiCamera();
+    this.closeModal();
+    this.handleScannedImei(val, targetInputId);
+  },
+
+  handleScannedImei(code, targetInputId) {
+    if (targetInputId) {
+      const target = document.getElementById(targetInputId);
+      if (target) {
+        target.value = code;
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        this.showToast(`✅ IMEI applied: ${code}`, 'success');
+        return;
+      }
+    }
+
+    // Default: Apply to Search in device credits page
+    if (this.currentPage !== 'device-credits') {
+      this.navigateTo('device-credits');
+    }
+    const searchInp = document.getElementById('devCreditSearchInput');
+    if (searchInp) {
+      searchInp.value = code;
+      this.setDevCreditFilter('all');
+      this.renderDeviceCreditsPage();
+      this.showToast(`🔍 Searching for IMEI: ${code}`, 'info');
+    }
+  },
+
+  promptDeleteDeviceCredit(creditId) {
+    this.showAdminPasswordModal(() => {
+      DB.deleteDeviceCredit(creditId);
+      this.updateTopBarBadges();
+      this.showToast(I18N.currentLang === 'si' ? 'ණය ගිවිසුම මකා දමන ලදී' : 'Device credit agreement deleted', 'success');
+      this.renderDeviceCreditsPage();
+      if (this.currentPage === 'dashboard') {
+        this.renderDashboard();
+      }
+    });
+  }
 };
 
 // ---- Initialize on DOM ready ----

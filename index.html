@@ -61,6 +61,7 @@
         <li><a href="#" data-page="shifts" onclick="App.navigateTo('shifts')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
         <li><a href="#" data-page="history" onclick="App.navigateTo('history')"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
         <li><a href="#" data-page="credits" onclick="App.navigateTo('credits')"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
+        <li><a href="#" data-page="device-credits" onclick="App.navigateTo('device-credits')"><span class="nav-icon">📱</span> <span data-i18n="nav_dev_credits">Device Credits</span></a></li>
         <li><a href="#" data-page="shops" onclick="App.navigateTo('shops')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops</span></a></li>
         <li><a href="#" data-page="reports" onclick="App.navigateTo('reports')"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">Reports</span></a></li>
       </ul>
@@ -117,6 +118,11 @@
             <span class="btn-text" data-i18n="top_btn_credit">+ Credit</span>
             <span class="top-bar-badge" id="topBarCreditBadge" style="display:none;">0</span>
           </button>
+          <button type="button" class="top-bar-btn dev-credit-btn" id="topBarDevCreditBtn" onclick="App.showAddDeviceCreditModal()" title="Add Short-Term Device Credit Agreement">
+            <span class="btn-icon">📱</span>
+            <span class="btn-text" data-i18n="top_btn_dev_credit">+ Device Credit</span>
+            <span class="top-bar-badge" id="topBarDevCreditBadge" style="display:none; background:var(--accent-red); color:#fff;">0</span>
+          </button>
         </div>
         <div class="top-bar-right">
           <button type="button" class="top-bar-btn ledger-btn" onclick="App.navigateTo('credits')" title="Open Credits & Expenses Ledger">
@@ -171,6 +177,23 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- Today's Due & Overdue Device Credits Reminder Banner -->
+        <div id="dashDevCreditReminderBanner" class="card" style="display:none; margin-bottom: 24px; padding: 16px 20px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.06)); border: 1px solid rgba(239, 68, 68, 0.35);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:44px; height:44px; border-radius:var(--radius-sm); background:rgba(239,68,68,0.15); display:flex; align-items:center; justify-content:center; font-size:1.4rem;">🔔</div>
+              <div>
+                <div style="font-weight:800; font-size:1rem; color:var(--accent-red);" data-i18n="dash_dev_credit_alert_title">🔔 Short-Term Device Credit Reminders</div>
+                <div id="dashDevCreditReminderSubtitle" style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">Customers with device credit payments due today or overdue</div>
+              </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="App.navigateTo('device-credits')" style="font-weight:700; border:1px solid rgba(239,68,68,0.4); color:var(--accent-red);">
+              <span>📱</span> <span data-i18n="nav_dev_credits">View All Device Credits</span>
+            </button>
+          </div>
+          <div id="dashDevCreditReminderList" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px;"></div>
         </div>
 
         <!-- Overall Card -->
@@ -753,6 +776,93 @@
             <div class="empty-text" data-i18n="dash_no_data">Select a date range to generate report</div>
           </div>
         </div>
+      </div>
+
+      <!-- ===== SHORT-TERM DEVICE CREDITS PAGE ===== -->
+      <div class="page" id="page-device-credits">
+        <div class="page-header">
+          <div>
+            <h1><span class="header-icon">📱</span> <span data-i18n="dev_cred_title">Short-Term Device Credit Customers</span></h1>
+            <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="dev_cred_subtitle">Track in-house mobile phone loans, customer NICs, IMEI & repayments</p>
+          </div>
+          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" id="devCreditAddBtn" onclick="App.showAddDeviceCreditModal()">
+              <span>📱</span> <span data-i18n="btn_add_device_credit">+ New Device Credit Agreement</span>
+            </button>
+            <button type="button" class="btn btn-ghost" id="devCreditTopScanBtn" onclick="App.openImeiScannerModal()" style="border:1px solid rgba(245,158,11,0.4); color:var(--accent-gold); font-weight:700;">
+              <span>📷</span> <span data-i18n="btn_scan_imei">Scan IMEI Barcode</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="summary-grid" style="margin-bottom:24px;">
+          <div class="card accent-blue">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_total_loaned">💳 Total Loan Value</span>
+              <div class="card-icon">💳</div>
+            </div>
+            <div class="card-value" id="kpiDevCreditLoaned">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiDevCreditAgreementsCount">0 Agreements</div>
+          </div>
+
+          <div class="card accent-green">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_total_collected">💰 Total Collected</span>
+              <div class="card-icon">💰</div>
+            </div>
+            <div class="card-value" id="kpiDevCreditCollected">Rs.0.00</div>
+            <div class="card-diff profit" id="kpiDevCreditSettledCount">0 Settled</div>
+          </div>
+
+          <div class="card accent-gold">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_total_outstanding">⏳ Outstanding Balance</span>
+              <div class="card-icon">⏳</div>
+            </div>
+            <div class="card-value" id="kpiDevCreditOutstanding" style="color:var(--accent-gold);">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiDevCreditActiveCount">0 Active Loans</div>
+          </div>
+
+          <div class="card accent-red">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_total_overdue">🔔 Due Today / Overdue</span>
+              <div class="card-icon">🔔</div>
+            </div>
+            <div class="card-value" id="kpiDevCreditOverdue" style="color:var(--accent-red);">0</div>
+            <div class="card-diff loss" id="kpiDevCreditDueSubtitle">0 Needs Attention</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="card" style="margin-bottom:24px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+            <!-- Search Box -->
+            <div style="flex:1; min-width:260px; position:relative;">
+              <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:1.1rem; opacity:0.6;">🔍</span>
+              <input type="text" id="devCreditSearchInput" class="form-input" placeholder="Search by Name, Phone, NIC, Model, or IMEI..." style="padding-left:38px; width:100%; border-radius:var(--radius-sm);" data-i18n="dev_cred_search_ph">
+            </div>
+
+            <!-- Filter Tabs -->
+            <div class="tab-pills" id="devCreditFilterTabs" style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="tab-pill active" data-filter="all" onclick="App.setDevCreditFilter('all')">
+                <span data-i18n="tab_all_credits">All Agreements</span> (<span id="countDevAll">0</span>)
+              </button>
+              <button type="button" class="tab-pill" data-filter="due" onclick="App.setDevCreditFilter('due')" style="color:var(--accent-red); font-weight:700;">
+                <span data-i18n="tab_due_credits">🔔 Due / Overdue</span> (<span id="countDevDue">0</span>)
+              </button>
+              <button type="button" class="tab-pill" data-filter="active" onclick="App.setDevCreditFilter('active')">
+                <span data-i18n="tab_active_credits">⏳ Active</span> (<span id="countDevActive">0</span>)
+              </button>
+              <button type="button" class="tab-pill" data-filter="settled" onclick="App.setDevCreditFilter('settled')">
+                <span data-i18n="tab_settled_credits">✅ Settled</span> (<span id="countDevSettled">0</span>)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Agreements List Container -->
+        <div id="devCreditListContainer"></div>
       </div>
 
     </main>

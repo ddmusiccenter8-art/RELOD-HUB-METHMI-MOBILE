@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shop-tracker-v19.0';
+const CACHE_NAME = 'shop-tracker-v20.0';
 const ASSETS = [
   './',
   './index.html',
@@ -32,51 +32,40 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Only intercept GET requests for same origin
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
-    return;
-  }
-
-  const url = event.request.url;
-  const isCodeAsset = url.endsWith('.html') || url.endsWith('.js') || url.endsWith('.css') || url.endsWith('/') || url.includes('/?');
-
-  if (isCodeAsset) {
-    // Network-first strategy for code to guarantee instant updates
+  // Navigation requests: Network-first to always get latest index.html
+  if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then(networkResponse => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          // Fallback to cache when offline
-          return caches.match(event.request);
-        })
+      fetch(event.request).then(response => {
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return response;
+      }).catch(() => {
+        return caches.match('./index.html');
+      })
     );
     return;
   }
 
-  // Cache-first for images/icons
+  // Static assets: Cache-first with background network update
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then(networkResponse => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+      const fetchPromise = fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, responseToCache);
+          });
         }
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseClone);
-        });
         return networkResponse;
+      }).catch(() => {
+        // Network failure, return nothing (cachedResponse will handle it)
       });
+
+      return cachedResponse || fetchPromise;
     })
   );
 });

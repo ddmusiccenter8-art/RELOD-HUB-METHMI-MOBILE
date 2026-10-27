@@ -95,6 +95,7 @@ const DB = {
   SHIFTS_KEY: 'spt_shifts',
   EXPENSES_KEY: 'spt_expenses',
   BANK_TRANSACTIONS_KEY: 'spt_bank_transactions',
+  DEVICE_CREDITS_KEY: 'spt_device_credits',
 
   _initialized: false,
 
@@ -159,6 +160,22 @@ const DB = {
       const idbExpenses = await IDB.load(this.EXPENSES_KEY);
       if (idbExpenses && idbExpenses.length > 0) {
         localStorage.setItem(this.EXPENSES_KEY, JSON.stringify(idbExpenses));
+      }
+    }
+
+    const lsBank = localStorage.getItem(this.BANK_TRANSACTIONS_KEY);
+    if (!lsBank || lsBank === '[]') {
+      const idbBank = await IDB.load(this.BANK_TRANSACTIONS_KEY);
+      if (idbBank && idbBank.length > 0) {
+        localStorage.setItem(this.BANK_TRANSACTIONS_KEY, JSON.stringify(idbBank));
+      }
+    }
+
+    const lsDevCredits = localStorage.getItem(this.DEVICE_CREDITS_KEY);
+    if (!lsDevCredits || lsDevCredits === '[]') {
+      const idbDevCredits = await IDB.load(this.DEVICE_CREDITS_KEY);
+      if (idbDevCredits && idbDevCredits.length > 0) {
+        localStorage.setItem(this.DEVICE_CREDITS_KEY, JSON.stringify(idbDevCredits));
       }
     }
 
@@ -1818,6 +1835,186 @@ const DB = {
     return new Date().toISOString().split('T')[0];
   },
 
+  // ================================================================
+  // DEVICE CREDITS (SHORT-TERM PHONE LOANS)
+  // ================================================================
+  getDeviceCredits(shopId = null) {
+    try {
+      const all = JSON.parse(localStorage.getItem(this.DEVICE_CREDITS_KEY) || '[]');
+      if (shopId) return all.filter(c => c.shopId === shopId);
+      return all;
+    } catch {
+      return [];
+    }
+  },
+
+  saveDeviceCredits(credits) {
+    try {
+      localStorage.setItem(this.DEVICE_CREDITS_KEY, JSON.stringify(credits));
+      IDB.save(this.DEVICE_CREDITS_KEY, credits);
+    } catch (e) {
+      console.error('Failed to save device credits', e);
+    }
+  },
+
+  addDeviceCredit(creditData) {
+    const credits = this.getDeviceCredits();
+    const id = 'dc_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+    const totalPrice = parseFloat(creditData.totalPrice) || 0;
+    const downPayment = parseFloat(creditData.downPayment) || 0;
+    const balanceDue = Math.max(0, totalPrice - downPayment);
+    const status = balanceDue <= 0.01 ? 'settled' : 'active';
+
+    const newCredit = {
+      id,
+      shopId: creditData.shopId || this.getActiveShopId(),
+      customerName: creditData.customerName?.trim() || '',
+      primaryPhone: creditData.primaryPhone?.trim() || '',
+      secondaryPhone: creditData.secondaryPhone?.trim() || '',
+      nicNumber: creditData.nicNumber?.trim() || '',
+      address: creditData.address?.trim() || '',
+      customerPhoto: creditData.customerPhoto || '',
+      nicFrontPhoto: creditData.nicFrontPhoto || '',
+      nicBackPhoto: creditData.nicBackPhoto || '',
+      phoneModel: creditData.phoneModel?.trim() || '',
+      imeiNumber: creditData.imeiNumber?.trim() || '',
+      imeiNumber2: creditData.imeiNumber2?.trim() || '',
+      devicePhoto: creditData.devicePhoto || '',
+      totalPrice,
+      downPayment,
+      balanceDue,
+      agreementDate: creditData.agreementDate || this.getTodayDate(),
+      creditPeriodDays: parseInt(creditData.creditPeriodDays, 10) || 14,
+      dueDate: creditData.dueDate || '',
+      status,
+      payments: creditData.payments || [],
+      notes: creditData.notes?.trim() || '',
+      createdAt: new Date().toISOString()
+    };
+    credits.unshift(newCredit);
+    this.saveDeviceCredits(credits);
+    return newCredit;
+  },
+
+  updateDeviceCredit(id, creditData) {
+    const credits = this.getDeviceCredits();
+    const idx = credits.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    
+    // Recalculate balance if financials updated
+    const existing = credits[idx];
+    const totalPrice = (creditData.totalPrice !== undefined) ? (parseFloat(creditData.totalPrice) || 0) : existing.totalPrice;
+    const downPayment = (creditData.downPayment !== undefined) ? (parseFloat(creditData.downPayment) || 0) : existing.downPayment;
+    const payments = creditData.payments || existing.payments || [];
+    const totalPayments = payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    const balanceDue = Math.max(0, totalPrice - downPayment - totalPayments);
+    const status = balanceDue <= 0.01 ? 'settled' : (creditData.status || existing.status);
+
+    credits[idx] = {
+      ...existing,
+      ...creditData,
+      totalPrice,
+      downPayment,
+      balanceDue,
+      status,
+      updatedAt: new Date().toISOString()
+    };
+    this.saveDeviceCredits(credits);
+    return credits[idx];
+  },
+
+  addDevicePayment(id, paymentData) {
+    const credits = this.getDeviceCredits();
+    const credit = credits.find(c => c.id === id);
+    if (!credit) return null;
+
+    const pAmount = parseFloat(paymentData.amount) || 0;
+    if (pAmount <= 0) return credit;
+
+    const payment = {
+      id: 'pay_' + Date.now(),
+      date: paymentData.date || this.getTodayDate(),
+      amount: pAmount,
+      note: paymentData.note?.trim() || '',
+      cashier: paymentData.cashier || ''
+    };
+
+    if (!Array.isArray(credit.payments)) credit.payments = [];
+    credit.payments.push(payment);
+
+    const totalPaid = (credit.downPayment || 0) + credit.payments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+    credit.balanceDue = Math.max(0, credit.totalPrice - totalPaid);
+
+    if (credit.balanceDue <= 0.01) {
+      credit.status = 'settled';
+      credit.settledAt = new Date().toISOString();
+    }
+
+    this.saveDeviceCredits(credits);
+    return credit;
+  },
+
+  deleteDeviceCredit(id) {
+    const credits = this.getDeviceCredits();
+    const filtered = credits.filter(c => c.id !== id);
+    this.saveDeviceCredits(filtered);
+    return true;
+  },
+
+  getDeviceCreditStats(shopId = null) {
+    const credits = this.getDeviceCredits(shopId);
+    const today = this.getTodayDate();
+
+    let totalAgreements = credits.length;
+    let totalLoanValue = 0;
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    let activeCount = 0;
+    let dueTodayCount = 0;
+    let overdueCount = 0;
+    let settledCount = 0;
+
+    credits.forEach(c => {
+      totalLoanValue += (c.totalPrice || 0);
+      const paid = (c.downPayment || 0) + (c.payments || []).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+      totalCollected += paid;
+      totalOutstanding += (c.balanceDue || 0);
+
+      if (c.balanceDue <= 0.01 || c.status === 'settled') {
+        settledCount++;
+      } else {
+        activeCount++;
+        if (c.dueDate) {
+          if (c.dueDate === today) {
+            dueTodayCount++;
+          } else if (c.dueDate < today) {
+            overdueCount++;
+          }
+        }
+      }
+    });
+
+    return {
+      totalAgreements,
+      totalLoanValue,
+      totalCollected,
+      totalOutstanding,
+      activeCount,
+      dueTodayCount,
+      overdueCount,
+      settledCount
+    };
+  },
+
+  getDueDeviceCredits(shopId = null) {
+    const credits = this.getDeviceCredits(shopId);
+    const today = this.getTodayDate();
+    return credits.filter(c => {
+      if (c.balanceDue <= 0.01 || c.status === 'settled') return false;
+      return c.dueDate && c.dueDate <= today;
+    }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  },
+
   // Export all data
   exportData() {
     return JSON.stringify({
@@ -1828,9 +2025,10 @@ const DB = {
       distributorTopups: this.getDistributorTopups(null),
       shifts: this.getShifts(null),
       expenses: this.getExpenses(null),
+      deviceCredits: this.getDeviceCredits(null),
       activeShopId: this.getActiveShopId(),
       exportedAt: new Date().toISOString(),
-      version: '3.0'
+      version: '4.0'
     }, null, 2);
   },
 
@@ -1845,6 +2043,7 @@ const DB = {
       if (data.distributorTopups) this.saveDistributorTopups(data.distributorTopups);
       if (data.shifts) this.saveShifts(data.shifts);
       if (data.expenses) this.saveExpenses(data.expenses);
+      if (data.deviceCredits) this.saveDeviceCredits(data.deviceCredits);
       if (data.activeShopId) this.setActiveShop(data.activeShopId);
       return true;
     } catch (e) {
