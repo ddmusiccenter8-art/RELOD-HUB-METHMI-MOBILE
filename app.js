@@ -231,10 +231,38 @@ const App = {
     document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
     const activeLink = document.querySelector(`.nav-links a[data-page="${page}"]`);
     if (activeLink) activeLink.classList.add('active');
+
+    // Update bottom nav
+    document.querySelectorAll('.bottom-nav-item').forEach(a => a.classList.remove('active'));
+    const activeBottom = document.querySelector(`.bottom-nav-item[data-page="${page}"]`);
+    if (activeBottom) activeBottom.classList.add('active');
+
+    // Update mobile page title
+    const titles = {
+      dashboard: I18N.t('nav_dashboard') || 'Dashboard',
+      update: I18N.t('nav_reload') || 'Reload & Payments',
+      shifts: I18N.t('nav_shifts') || 'Shift Tally',
+      credits: I18N.t('nav_credits') || 'Ledger',
+      'device-credits': I18N.t('nav_dev_credits') || 'Device Credits',
+      history: I18N.t('nav_history') || 'Update History',
+      shops: I18N.t('nav_shops') || 'Manage Shops',
+      reports: I18N.t('nav_reports') || 'Reports'
+    };
+    const titleEl = document.getElementById('mobileCurrentPageTitle');
+    if (titleEl) titleEl.textContent = titles[page] || page;
+
+    // Close mobile sidebar
+    const sb = document.getElementById('sidebar');
+    const so = document.getElementById('sidebarOverlay');
+    if (sb) sb.classList.remove('open');
+    if (so) so.classList.remove('open');
+
     // Show page
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const pageEl = document.getElementById(`page-${page}`);
     if (pageEl) pageEl.classList.add('active');
+
+    window.scrollTo({ top: 0, behavior: 'instant' });
     // Refresh page data
     this.refreshPage(page);
   },
@@ -254,14 +282,25 @@ const App = {
 
   // ---- Mobile Menu ----
   setupMobileMenu() {
-    document.getElementById('hamburgerBtn').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('open');
-      document.getElementById('sidebarOverlay').classList.toggle('open');
-    });
-    document.getElementById('sidebarOverlay').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.remove('open');
-      document.getElementById('sidebarOverlay').classList.remove('open');
-    });
+    const toggleMenu = () => {
+      const sb = document.getElementById('sidebar');
+      const so = document.getElementById('sidebarOverlay');
+      if (sb) sb.classList.toggle('open');
+      if (so) so.classList.toggle('open');
+    };
+    const hb = document.getElementById('hamburgerBtn');
+    if (hb) hb.addEventListener('click', toggleMenu);
+    const mb = document.getElementById('mobileMenuBtn');
+    if (mb) mb.addEventListener('click', toggleMenu);
+
+    const so = document.getElementById('sidebarOverlay');
+    if (so) {
+      so.addEventListener('click', () => {
+        const sb = document.getElementById('sidebar');
+        if (sb) sb.classList.remove('open');
+        so.classList.remove('open');
+      });
+    }
   },
 
   updateTodayDate() {

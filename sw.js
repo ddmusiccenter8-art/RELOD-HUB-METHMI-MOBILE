@@ -1,4 +1,4 @@
-const CACHE_NAME = 'shop-tracker-v22.0';
+const CACHE_NAME = 'shop-tracker-v23.0';
 const ASSETS = [
   './',
   './index.html',
@@ -31,41 +31,28 @@ self.addEventListener('activate', event => {
   self.clients.claim();
 });
 
+// Network-First strategy: ensures mobile phones immediately download latest updates from GitHub
 self.addEventListener('fetch', event => {
-  // Navigation requests: Network-first to always get latest index.html
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).then(response => {
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return response;
-      }).catch(() => {
-        return caches.match('./index.html');
-      })
-    );
-    return;
-  }
+  if (event.request.method !== 'GET') return;
 
-  // Static assets: Cache-first with background network update
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      const fetchPromise = fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-          const responseToCache = networkResponse.clone();
+    fetch(event.request)
+      .then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'default')) {
+          const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
+            cache.put(event.request, responseClone);
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // Network failure, return nothing (cachedResponse will handle it)
-      });
-
-      return cachedResponse || fetchPromise;
-    })
+      })
+      .catch(() => {
+        return caches.match(event.request).then(cachedResponse => {
+          if (cachedResponse) return cachedResponse;
+          if (event.request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });

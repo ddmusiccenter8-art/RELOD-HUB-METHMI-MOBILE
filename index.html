@@ -15,13 +15,36 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1c23">
   
-  <link rel="stylesheet" href="style.css?v=22.0">
+  <link rel="stylesheet" href="style.css?v=23.0">
 </head>
 <body>
 
   <!-- Mobile Hamburger -->
   <button class="hamburger" id="hamburgerBtn" aria-label="Menu">☰</button>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Modern Mobile Top App Bar (Native Mobile Experience) -->
+  <header class="mobile-top-header" id="mobileTopHeader">
+    <button type="button" class="mobile-header-btn" id="mobileMenuBtn" aria-label="Menu">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    </button>
+    <div class="mobile-header-center">
+      <div class="mobile-shop-chip" onclick="App.navigateTo('shops')">
+        <span class="mobile-shop-icon">🏪</span>
+        <span class="mobile-shop-name" id="mobileActiveShopName">Main Shop</span>
+        <span class="mobile-shop-arrow">▾</span>
+      </div>
+      <div class="mobile-page-name" id="mobileCurrentPageTitle">Dashboard</div>
+    </div>
+    <div class="mobile-header-actions">
+      <button type="button" class="mobile-header-action-btn" onclick="App.showShiftSummaryModal()" title="Shift Closing">
+        🌙
+      </button>
+      <button type="button" class="mobile-header-action-btn" onclick="App.navigateTo('update')" title="Add Update" style="background:var(--accent-blue); color:#fff; font-weight:800;">
+        +
+      </button>
+    </div>
+  </header>
 
   <div class="app-wrapper">
     <!-- Sidebar -->
@@ -902,6 +925,30 @@
     </div>
   </div>
 
+    <!-- Modern Mobile Bottom Navigation Bar (Thumb Friendly) -->
+  <nav class="mobile-bottom-nav" id="mobileBottomNav">
+    <a href="#dashboard" class="bottom-nav-item active" data-page="dashboard" onclick="App.navigateTo('dashboard'); return false;">
+      <span class="bottom-nav-icon">📊</span>
+      <span class="bottom-nav-label" data-i18n="nav_dashboard">Dashboard</span>
+    </a>
+    <a href="#update" class="bottom-nav-item" data-page="update" onclick="App.navigateTo('update'); return false;">
+      <span class="bottom-nav-icon">📱</span>
+      <span class="bottom-nav-label" data-i18n="nav_reload">Reload</span>
+    </a>
+    <a href="#shifts" class="bottom-nav-item" data-page="shifts" onclick="App.navigateTo('shifts'); return false;">
+      <span class="bottom-nav-icon">🏪</span>
+      <span class="bottom-nav-label" data-i18n="nav_shifts">Shifts</span>
+    </a>
+    <a href="#credits" class="bottom-nav-item" data-page="credits" onclick="App.navigateTo('credits'); return false;">
+      <span class="bottom-nav-icon">📒</span>
+      <span class="bottom-nav-label" data-i18n="nav_credits">Ledger</span>
+    </a>
+    <a href="#device-credits" class="bottom-nav-item" data-page="device-credits" onclick="App.navigateTo('device-credits'); return false;">
+      <span class="bottom-nav-icon">💳</span>
+      <span class="bottom-nav-label" data-i18n="nav_dev_credits">Loans</span>
+    </a>
+  </nav>
+
   <!-- Toast Container -->
   <div class="toast-container" id="toastContainer"></div>
 
@@ -911,10 +958,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=19.0"></script>
-  <script src="firebase-init.js?v=19.0"></script>
-  <script src="data.js?v=19.0"></script>
-  <script src="app.js?v=19.0"></script>
+  <script src="i18n.js?v=23.0"></script>
+  <script src="firebase-init.js?v=23.0"></script>
+  <script src="data.js?v=23.0"></script>
+  <script src="app.js?v=23.0"></script>
   
   <!-- Register Service Worker -->
   <script>
