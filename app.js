@@ -322,9 +322,14 @@ const App = {
 
   refreshShopSelector() {
     const sel = document.getElementById('shopSelector');
-    const shops = DB.getShops();
-    const activeId = DB.getActiveShopId();
-    sel.innerHTML = `<option value="">${I18N.t('select_shop') || '-- Select Shop --'}</option>`;
+    if (!sel) return;
+    const shops = DB.getShops(false);
+    let activeId = DB.getActiveShopId();
+    if ((!activeId || !shops.some(s => s.id === activeId)) && shops.length > 0) {
+      activeId = shops[0].id;
+      DB.setActiveShop(activeId);
+    }
+    sel.innerHTML = '';
     shops.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.id;
@@ -332,6 +337,15 @@ const App = {
       if (s.id === activeId) opt.selected = true;
       sel.appendChild(opt);
     });
+    if (shops.length === 0) {
+      sel.innerHTML = `<option value="">${I18N.t('select_shop') || '-- Select Shop --'}</option>`;
+    }
+
+    const activeShop = shops.find(s => s.id === activeId);
+    const mShopEl = document.getElementById('mobileActiveShopName');
+    if (mShopEl) {
+      mShopEl.textContent = activeShop ? activeShop.name : (shops[0] ? shops[0].name : 'Main Shop');
+    }
     this.updateTopBarBadges();
   },
 
@@ -5348,6 +5362,11 @@ Thank you! - ${shopName}`;
     }
   },
 
+  setDevCreditShopFilter(shopId) {
+    this.devCreditShopFilter = shopId;
+    this.renderDeviceCreditsPage();
+  },
+
   setDevCreditFilter(filter) {
     this.devCreditActiveFilter = filter;
     const tabs = document.querySelectorAll('#devCreditFilterTabs .tab-pill');
@@ -5362,8 +5381,26 @@ Thank you! - ${shopName}`;
   },
 
   renderDeviceCreditsPage() {
-    const shopId = DB.getActiveShopId();
-    const stats = DB.getDeviceCreditStats(shopId);
+    // Populate Device Credit shop filter dropdown
+    const shopFilterEl = document.getElementById('devCreditShopFilter');
+    const shops = DB.getShops(false);
+    const activeShopId = DB.getActiveShopId();
+    const selectedShopFilter = this.devCreditShopFilter || (activeShopId || 'all');
+    this.devCreditShopFilter = selectedShopFilter;
+
+    if (shopFilterEl) {
+      shopFilterEl.innerHTML = `<option value="all">🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Shops)' : 'All Shops'}</option>`;
+      shops.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = '🏪 ' + s.name;
+        if (s.id === selectedShopFilter) opt.selected = true;
+        shopFilterEl.appendChild(opt);
+      });
+    }
+
+    const targetShopId = selectedShopFilter === 'all' ? null : selectedShopFilter;
+    const stats = DB.getDeviceCreditStats(targetShopId);
 
     // Update KPI cards
     const loanedEl = document.getElementById('kpiDevCreditLoaned');
@@ -5409,7 +5446,7 @@ Thank you! - ${shopName}`;
     if (countSettled) countSettled.textContent = stats.settledCount;
 
     // Filter and search
-    let credits = DB.getDeviceCredits(shopId);
+    let credits = DB.getDeviceCredits(targetShopId);
     const today = DB.getTodayDate();
 
     // 1. Status Filter
@@ -5960,7 +5997,9 @@ Thank you! - ${shopName}`;
       return;
     }
 
+    const currentActiveShopId = DB.getActiveShopId() || (DB.getShops(false)[0]?.id || 'main');
     const payload = {
+      shopId: currentActiveShopId,
       customerName: custName,
       nicNumber,
       primaryPhone: phone1,

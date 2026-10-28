@@ -230,6 +230,33 @@ const DB = {
         }
       }
 
+      // Initial device credits cloud sync: upload local credits if cloud is empty
+      const devCreditsSnapshot = await window.FS.collection('payment_tracker_device_credits').limit(1).get();
+      const localDevCredits = this.getDeviceCredits();
+      if (devCreditsSnapshot.empty && localDevCredits.length > 0) {
+        console.log('☁️ Uploading local device credits to empty Firebase...');
+        const batch = window.FS.batch();
+        localDevCredits.forEach(credit => {
+          const ref = window.FS.collection('payment_tracker_device_credits').doc(credit.id);
+          batch.set(ref, credit);
+        });
+        await batch.commit();
+        console.log('✅ Device credits uploaded to cloud!');
+      }
+
+      // Initial customer credits cloud sync
+      const creditsSnapshot = await window.FS.collection('payment_tracker_credits').limit(1).get();
+      const localCredits = this.getCredits(null, true);
+      if (creditsSnapshot.empty && localCredits.length > 0) {
+        console.log('☁️ Uploading local customer credits to empty Firebase...');
+        const batch = window.FS.batch();
+        localCredits.forEach(credit => {
+          const ref = window.FS.collection('payment_tracker_credits').doc(credit.id);
+          batch.set(ref, credit);
+        });
+        await batch.commit();
+      }
+
       // 2. Setup listeners for real-time cloud sync
       this._setupFirebaseListeners();
       
@@ -302,6 +329,31 @@ const DB = {
       snapshot.forEach(doc => list.push(doc.data()));
       list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       this._dualSave(this.BANK_TRANSACTIONS_KEY, list);
+    });
+
+    // Real-time Cloud Sync for Short-Term Device Credits
+    window.FS.collection('payment_tracker_device_credits').onSnapshot(snapshot => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const list = [];
+      snapshot.forEach(doc => list.push(doc.data()));
+      list.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
+      this._dualSave(this.DEVICE_CREDITS_KEY, list);
+      console.log('📱 Real-time sync: Received ' + list.length + ' device credits from Firebase');
+      if (window.App) {
+        window.App.updateTopBarBadges();
+        if (window.App.currentPage === 'device-credits') window.App.renderDeviceCreditsPage();
+        if (window.App.currentPage === 'dashboard') window.App.renderDashboard();
+      }
+    });
+
+    // Real-time Cloud Sync for Customer Ledger Credits
+    window.FS.collection('payment_tracker_credits').onSnapshot(snapshot => {
+      if (snapshot.metadata.hasPendingWrites) return;
+      const list = [];
+      snapshot.forEach(doc => list.push(doc.data()));
+      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      this._dualSave(this.CREDITS_KEY, list);
+      if (window.App && window.App.currentPage === 'credits') window.App.renderCreditsPage();
     });
   },
 
@@ -409,7 +461,15 @@ const DB = {
   },
 
   getActiveShopId() {
-    return localStorage.getItem(this.ACTIVE_SHOP_KEY);
+    let id = localStorage.getItem(this.ACTIVE_SHOP_KEY);
+    const shops = this.getShops(false);
+    if (shops.length > 0) {
+      if (!id || !shops.some(s => s.id === id)) {
+        id = shops[0].id;
+        this.setActiveShop(id);
+      }
+    }
+    return id || '';
   },
 
   setActiveShop(id) {
@@ -1846,7 +1906,9 @@ const DB = {
   getDeviceCredits(shopId = null) {
     try {
       const all = JSON.parse(localStorage.getItem(this.DEVICE_CREDITS_KEY) || '[]');
-      if (shopId) return all.filter(c => c.shopId === shopId);
+      if (shopId && shopId !== 'all') {
+        return all.filter(c => !c.shopId || c.shopId === shopId);
+      }
       return all;
     } catch {
       return [];
@@ -1898,6 +1960,7 @@ const DB = {
     };
     credits.unshift(newCredit);
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', newCredit.id, newCredit);
     return newCredit;
   },
 
@@ -1925,6 +1988,7 @@ const DB = {
       updatedAt: new Date().toISOString()
     };
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', id, credits[idx]);
     return credits[idx];
   },
 
@@ -1956,6 +2020,7 @@ const DB = {
     }
 
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', id, credit);
     return credit;
   },
 
@@ -1963,6 +2028,7 @@ const DB = {
     const credits = this.getDeviceCredits();
     const filtered = credits.filter(c => c.id !== id);
     this.saveDeviceCredits(filtered);
+    this._deleteFromFirebase('payment_tracker_device_credits', id);
     return true;
   },
 

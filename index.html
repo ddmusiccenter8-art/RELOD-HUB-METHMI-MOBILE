@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1c23">
   
-  <link rel="stylesheet" href="style.css?v=23.0">
+  <link rel="stylesheet" href="style.css?v=24.0">
 </head>
 <body>
 
@@ -824,7 +824,10 @@
             <h1><span class="header-icon">📱</span> <span data-i18n="dev_cred_title">Short-Term Device Credit Customers</span></h1>
             <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="dev_cred_subtitle">Track in-house mobile phone loans, customer NICs, IMEI & repayments</p>
           </div>
-          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
+          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <select id="devCreditShopFilter" class="form-select" onchange="App.setDevCreditShopFilter(this.value)" style="font-weight:700; width:auto; padding:6px 12px; font-size:0.85rem; height:auto; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+              <option value="all">🏪 All Shops</option>
+            </select>
             <button type="button" class="btn btn-primary" id="devCreditAddBtn" onclick="App.showAddDeviceCreditModal()">
               <span>📱</span> <span data-i18n="btn_add_device_credit">+ New Device Credit Agreement</span>
             </button>
@@ -958,10 +961,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=23.0"></script>
-  <script src="firebase-init.js?v=23.0"></script>
-  <script src="data.js?v=23.0"></script>
-  <script src="app.js?v=23.0"></script>
+  <script src="i18n.js?v=24.0"></script>
+  <script src="firebase-init.js?v=24.0"></script>
+  <script src="data.js?v=24.0"></script>
+  <script src="app.js?v=24.0"></script>
   
   <!-- Register Service Worker -->
   <script>
