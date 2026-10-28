@@ -313,10 +313,16 @@ const App = {
   // ---- Shop Selector ----
   setupShopSelector() {
     const sel = document.getElementById('shopSelector');
-    sel.addEventListener('change', () => {
-      DB.setActiveShop(sel.value);
-      this.refreshPage(this.currentPage);
-    });
+    if (sel) {
+      sel.addEventListener('change', () => {
+        DB.setActiveShop(sel.value);
+        this.refreshPage(this.currentPage);
+        const sb = document.getElementById('sidebar');
+        const so = document.getElementById('sidebarOverlay');
+        if (sb) sb.classList.remove('open');
+        if (so) so.classList.remove('open');
+      });
+    }
     this.refreshShopSelector();
   },
 
@@ -2494,8 +2500,89 @@ const App = {
     container.innerHTML = html;
   },
 
+  
+  // ---- Mobile 1-Tap Shop Switcher Modal ----
+  showShopSwitcherModal() {
+    const shops = DB.getShops(false);
+    let activeId = DB.getActiveShopId();
+    if ((!activeId || !shops.some(s => s.id === activeId)) && shops.length > 0) {
+      activeId = shops[0].id;
+      DB.setActiveShop(activeId);
+    }
+
+    let shopsHtml = shops.map(s => {
+      const isActive = s.id === activeId;
+      return `
+        <div onclick="App.switchShopFromModal('${s.id}')" style="
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 13px 15px;
+          margin-bottom: 8px;
+          border-radius: var(--radius-md);
+          background: ${isActive ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-card)'};
+          border: 2px solid ${isActive ? 'var(--accent-blue)' : 'var(--border-glass)'};
+          cursor: pointer;
+          transition: var(--transition);
+        ">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="font-size:1.6rem; line-height:1;">🏪</div>
+            <div>
+              <div style="font-weight:800; font-size:1.05rem; color:${isActive ? 'var(--accent-blue)' : 'var(--text-primary)'};">${s.name}</div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                ${isActive ? '✅ ' + (I18N.currentLang === 'si' ? 'දැනට ක්‍රියාකාරී ශාඛාව' : 'Currently Active Branch') : (I18N.currentLang === 'si' ? 'මෙම ශාඛාවට මාරු වීමට ඔබන්න' : 'Tap to switch to this branch')}
+              </div>
+            </div>
+          </div>
+          <div>
+            ${isActive 
+              ? '<span class="date-pill" style="background:var(--accent-blue); color:#fff; font-weight:800; font-size:0.75rem; padding:4px 10px;">ACTIVE</span>' 
+              : '<button type="button" class="btn btn-sm btn-ghost" style="border:1px solid var(--border-glass); font-weight:700;">Select ➜</button>'
+            }
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    if (shops.length === 0) {
+      shopsHtml = `<div class="empty-state" style="padding:20px;"><div class="empty-text">No shops created yet</div></div>`;
+    }
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:10px;">
+          ${I18N.currentLang === 'si' ? 'ඔබට අවශ්‍ය ශාඛාව (Shop) තෝරා ගන්න:' : 'Select your active shop / branch:'}
+        </p>
+        <div style="max-height:55vh; max-height:55dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-right:2px;">
+          ${shopsHtml}
+        </div>
+        <div style="margin-top:10px; padding-top:10px; border-top:1px solid var(--border-glass); display:flex; justify-content:space-between; align-items:center;">
+          <button type="button" class="btn btn-primary" onclick="App.closeSubModal(); App.showAddShopModal();" style="font-weight:700; width:100%;">
+            + ${I18N.currentLang === 'si' ? 'අලුත් ශාඛාවක් එකතු කරන්න (Add Shop)' : 'Add New Branch / Shop'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    this.showSubModal(
+      `🏪 ${I18N.currentLang === 'si' ? 'ශාඛාව තෝරන්න (Select Shop)' : 'Switch Active Shop'}`,
+      bodyHtml,
+      [
+        { text: I18N.t('btn_cancel') || 'Close', class: 'btn-ghost', onClick: () => this.closeSubModal() }
+      ]
+    );
+  },
+
+  switchShopFromModal(shopId) {
+    DB.setActiveShop(shopId);
+    this.refreshShopSelector();
+    this.refreshPage(this.currentPage);
+    this.closeSubModal();
+    const shop = DB.getShop(shopId);
+    this.showToast(`🏪 Switched to ${shop ? shop.name : 'Shop'}!`, 'success');
+  },
+
   showMainDashboard() {
-    DB.setActiveShop('');
     this.refreshShopSelector();
     this.navigateTo('dashboard');
   },
