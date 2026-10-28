@@ -153,6 +153,43 @@ const App = {
     document.getElementById('modalOverlay').classList.remove('active');
   },
 
+  // ---- Sub Modal (for Denominations, Image Lightbox, Stacked Dialogs) ----
+  showSubModal(title, bodyHTML, actions) {
+    const titleEl = document.getElementById('subModalTitle');
+    const bodyEl = document.getElementById('subModalBody');
+    const actionsEl = document.getElementById('subModalActions');
+    const overlay = document.getElementById('subModalOverlay');
+    if (!overlay) return;
+
+    if (titleEl) titleEl.innerHTML = title;
+    if (bodyEl) bodyEl.innerHTML = bodyHTML;
+    if (actionsEl) {
+      actionsEl.innerHTML = '';
+      if (typeof actions === 'string') {
+        actionsEl.innerHTML = actions;
+      } else if (Array.isArray(actions)) {
+        actions.forEach(action => {
+          const btn = document.createElement('button');
+          btn.className = `btn ${action.class || 'btn-ghost'}`;
+          if (action.style) btn.style.cssText = action.style;
+          btn.textContent = action.text;
+          btn.onclick = () => {
+            action.onClick();
+          };
+          actionsEl.appendChild(btn);
+        });
+      }
+    }
+    overlay.classList.add('active');
+  },
+
+  closeSubModal() {
+    const overlay = document.getElementById('subModalOverlay');
+    if (overlay) {
+      overlay.classList.remove('active');
+    }
+  },
+
   // ---- Navigation ----
   setupNavigation() {
     document.querySelectorAll('.nav-links a').forEach(link => {
@@ -177,6 +214,15 @@ const App = {
         this.closeModal();
       }
     });
+
+    const subOverlay = document.getElementById('subModalOverlay');
+    if (subOverlay) {
+      subOverlay.addEventListener('click', (e) => {
+        if (e.target === subOverlay) {
+          this.closeSubModal();
+        }
+      });
+    }
   },
 
   navigateTo(page) {
@@ -3802,12 +3848,13 @@ Thank you! - ${shopName}`;
       </div>
     `;
 
-    this.showModal(
+    this.showSubModal(
       `🧮 ${I18N.t('denom_title') || 'Cash Denomination Counter'}`,
       bodyHtml,
       `
-        <button type="button" class="btn btn-ghost" onclick="App.resetDenoms()">${I18N.t('denom_reset') || '🔄 Reset'}</button>
-        <button type="button" class="btn btn-primary" onclick="App.applyDenominationTotal()">${I18N.t('denom_apply') || '✅ Apply to Cash Drawer'}</button>
+        <button type="button" class="btn btn-ghost" onclick="App.closeSubModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
+        <button type="button" class="btn btn-secondary" onclick="App.resetDenoms()">${I18N.t('denom_reset') || '🔄 Reset'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.applyDenominationTotal()" style="background:#16a34a; border-color:#16a34a; color:#fff; font-weight:800;">${I18N.t('denom_apply') || '✅ Apply to Cash Drawer'}</button>
       `
     );
 
@@ -3874,9 +3921,11 @@ Thank you! - ${shopName}`;
       if (this.currentDenomTarget === 'reloadCashInput') {
         this.lastReloadDenominations = denomsCopy;
         this.renderDenomsSummaryChip(denomsCopy);
+      } else if (this.currentDenomTarget === 'reloadHubCashInput') {
+        this.lastHubDenominations = denomsCopy;
       }
     }
-    this.closeModal();
+    this.closeSubModal();
     this.showToast(`✅ Cash count applied: ${DB.formatCurrency(total)}`, 'success');
   },
 
@@ -4178,7 +4227,7 @@ Thank you! - ${shopName}`;
         </div>
 
         <!-- Shift Type & Cashier Name -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label" style="font-size:0.75rem; margin-bottom:2px;">${I18N.t('shift_type') || 'Shift Type'}</label>
             <select class="form-select" id="shiftModalType" style="padding:6px 8px; font-size:0.85rem; height:34px;">
@@ -4195,7 +4244,7 @@ Thank you! - ${shopName}`;
 
         <!-- Core Grid: Float, POS Sales, Card, Expenses -->
         <div style="background:var(--bg-card); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px;">
             <div class="form-group" style="margin-bottom:0;">
               <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--text-secondary);">1. Opening Cash Float</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}" style="padding:6px 8px; font-size:0.95rem; font-weight:700; height:34px;">
@@ -4227,11 +4276,12 @@ Thank you! - ${shopName}`;
 
         <!-- Actual Counted Cash in Drawer -->
         <div class="form-group" style="margin-bottom:0; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius-sm); padding:8px 12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
             <label class="form-label" style="font-weight:800; color:var(--accent-gold); font-size:0.82rem; margin-bottom:0;">💵 5. Actual Counted Cash in Drawer</label>
             <button type="button" class="btn btn-xs btn-primary" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 10px; font-weight:700; background:#f59e0b; border:none; color:#000;">🧮 Count Notes (5000, 2000...)</button>
           </div>
           <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.25rem; font-weight:900; padding:6px 10px; text-align:right;">
+          <div id="shiftCountedDenomsSummary" style="font-size:0.75rem; color:var(--accent-gold); font-weight:700; margin-top:4px;"></div>
         </div>
 
         <!-- Tally Verdict Live Badge -->
@@ -4304,7 +4354,7 @@ Thank you! - ${shopName}`;
     updateCalc();
   },
 
-    openDenominationModalForShiftModal() {
+  openDenominationModalForShiftModal() {
     this.openDenominationModal((total, denoms) => {
       const cntInp = document.getElementById('shiftModalCounted');
       if (cntInp) {
@@ -4312,7 +4362,21 @@ Thank you! - ${shopName}`;
         cntInp.dispatchEvent(new Event('input', { bubbles: true }));
       }
       this.lastShiftDenominations = denoms;
-    });
+      const sumEl = document.getElementById('shiftCountedDenomsSummary');
+      if (sumEl && denoms) {
+        let parts = [];
+        if (denoms.n5000) parts.push(`5000x${denoms.n5000}`);
+        if (denoms.n2000) parts.push(`2000x${denoms.n2000}`);
+        if (denoms.n1000) parts.push(`1000x${denoms.n1000}`);
+        if (denoms.n500) parts.push(`500x${denoms.n500}`);
+        if (denoms.n100) parts.push(`100x${denoms.n100}`);
+        if (denoms.n50) parts.push(`50x${denoms.n50}`);
+        if (denoms.n20) parts.push(`20x${denoms.n20}`);
+        if (denoms.n10) parts.push(`10x${denoms.n10}`);
+        if (denoms.coins) parts.push(`Coins: ${denoms.coins}`);
+        sumEl.textContent = parts.length > 0 ? `🧮 Notes: ` + parts.join(', ') : '';
+      }
+    }, this.lastShiftDenominations || null);
   },
 
   saveShiftSummaryModal(action = 'pdf') {
@@ -6128,7 +6192,7 @@ Thank you! - ${shopName}`;
         </div>
       </div>
     `;
-    this.showModal(title, bodyHtml, [{ text: 'Close', class: 'btn-primary', onClick: () => this.closeModal() }]);
+    this.showSubModal(title, bodyHtml, [{ text: 'Close', class: 'btn-primary', onClick: () => this.closeSubModal() }]);
   },
 
   sendWhatsAppReminder(creditId) {

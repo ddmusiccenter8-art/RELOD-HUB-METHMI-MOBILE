@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Shop Tracker">
+  <meta name="format-detection" content="telephone=no">
   <meta name="description" content="Shop Payment Tracker - Mobile Reload, Bill Payment, Mobile Loan & Bank Payment Management System">
   <title>Shop Payment Tracker</title>
   
@@ -10,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1c23">
   
-  <link rel="stylesheet" href="style.css?v=19.0">
+  <link rel="stylesheet" href="style.css?v=22.0">
 </head>
 <body>
 
@@ -885,6 +890,15 @@
       <div class="modal-title" id="modalTitle">Modal</div>
       <div id="modalBody"></div>
       <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <!-- Sub-Modal Overlay (Nested dialogs: Denomination Counter, Image Zoom, Overlaid Dialogs) -->
+  <div class="modal-overlay sub-modal-overlay" id="subModalOverlay">
+    <div class="modal sub-modal" id="subModalContent">
+      <div class="modal-title sub-modal-title" id="subModalTitle">Sub Modal</div>
+      <div id="subModalBody"></div>
+      <div class="modal-actions sub-modal-actions" id="subModalActions"></div>
     </div>
   </div>
 

@@ -925,6 +925,7 @@ select option {
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -932,7 +933,7 @@ select option {
   opacity: 0;
   visibility: hidden;
   transition: var(--transition);
-  padding: 16px;
+  padding: 12px;
   overflow-y: auto;
 }
 
@@ -947,14 +948,16 @@ select option {
   border-radius: var(--radius-xl);
   padding: 18px 22px;
   width: 96%;
-  max-width: 560px;
-  max-height: 88vh;
+  max-width: 580px;
+  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   transform: scale(0.95);
   transition: var(--transition);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
   margin: auto;
+  box-sizing: border-box;
 }
 
 .modal-overlay.active .modal {
@@ -975,11 +978,88 @@ select option {
 
 #modalBody {
   overflow-y: auto;
-  max-height: calc(88vh - 125px);
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(90dvh - 125px);
   padding-right: 4px;
 }
 
 .modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-glass);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ---- Sub Modal (for Denominations, Image Lightbox, Stacked Dialogs) ---- */
+.sub-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 2500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: var(--transition);
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.sub-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.sub-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-xl);
+  padding: 16px 18px;
+  width: 96%;
+  max-width: 580px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.95);
+  transition: var(--transition);
+  box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.6), 0 15px 15px -5px rgba(0, 0, 0, 0.5);
+  margin: auto;
+  box-sizing: border-box;
+  z-index: 2510;
+}
+
+.sub-modal-overlay.active .sub-modal {
+  transform: scale(1);
+}
+
+.sub-modal-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border-glass);
+  padding-bottom: 10px;
+}
+
+#subModalBody {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(90dvh - 125px);
+  padding-right: 4px;
+}
+
+.sub-modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
@@ -1650,15 +1730,128 @@ select option {
     padding: 8px 10px;
     margin-bottom: 16px;
     gap: 8px;
+    flex-direction: column;
   }
   .top-bar-btn {
-    padding: 6px 10px;
-    font-size: 0.78rem;
+    padding: 7px 11px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
-  .top-bar-left, .top-bar-right {
+  .top-bar-left {
+    display: flex;
+    align-items: center;
     gap: 6px;
     width: 100%;
-    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    padding-bottom: 3px;
+  }
+  .top-bar-left::-webkit-scrollbar {
+    display: none;
+  }
+  .top-bar-right {
+    gap: 6px;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+  }
+}
+
+/* Responsive enhancements for all mobile devices (iPhone, Android, Tablets) */
+@media (max-width: 640px) {
+  .modal, .sub-modal {
+    width: 96% !important;
+    max-width: 100% !important;
+    padding: 14px 12px !important;
+    border-radius: var(--radius-lg) !important;
+    margin: 8px auto !important;
+  }
+  
+  .modal-title, .sub-modal-title {
+    font-size: 1.05rem !important;
+    margin-bottom: 8px !important;
+    padding-bottom: 8px !important;
+  }
+  
+  #modalBody, #subModalBody {
+    max-height: calc(90dvh - 120px) !important;
+    padding-right: 2px !important;
+  }
+  
+  .modal-actions, .sub-modal-actions {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  
+  .modal-actions button, .modal-actions .btn,
+  .sub-modal-actions button, .sub-modal-actions .btn {
+    flex: 1 1 calc(50% - 6px) !important;
+    min-height: 42px !important;
+    font-size: 0.85rem !important;
+    padding: 8px 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+  }
+
+  /* Denomination Counter on phones */
+  .denom-grid {
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+    max-height: 52vh !important;
+    max-height: 52dvh !important;
+  }
+  
+  .denom-row {
+    padding: 7px 10px !important;
+    gap: 6px !important;
+  }
+  
+  .denom-label {
+    min-width: 80px !important;
+    font-size: 0.86rem !important;
+  }
+  
+  .denom-btn-step {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.25rem !important;
+  }
+  
+  .denom-count-input {
+    width: 55px !important;
+    height: 36px !important;
+    font-size: 1rem !important;
+  }
+  
+  .denom-subtotal {
+    min-width: 80px !important;
+    font-size: 0.88rem !important;
+  }
+
+  .denom-total-bar {
+    padding: 10px 14px !important;
+  }
+  
+  .denom-total-bar .total-sum {
+    font-size: 1.25rem !important;
+  }
+
+  /* Prevent iOS automatic zoom when focusing inputs */
+  input.form-input, select.form-select, textarea.form-input {
+    font-size: 16px !important;
+  }
+
+  /* Action buttons at bottom of update form */
+  #saveAndShareWhatsAppBtn, #saveUpdateOnlyBtn, #clearFormBtn {
+    width: 100% !important;
+    flex: 1 1 100% !important;
   }
 }
 
