@@ -2601,3 +2601,57 @@ select option {
     font-size: 1.25rem !important;
   }
 }
+
+/* ---- Shake Prevent Animation (accidental backdrop dismiss prevention) ---- */
+@keyframes modalShake {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.02) translateX(-5px); }
+  75% { transform: scale(1.02) translateX(5px); }
+}
+
+.modal.shake-prevent, .sub-modal.shake-prevent {
+  animation: modalShake 0.35s ease-in-out !important;
+}
+
+/* ---- Cloud Connection Live Status Indicators ---- */
+.cloud-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.cloud-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.cloud-dot.online {
+  background: #16a34a;
+  box-shadow: 0 0 8px #16a34a;
+}
+
+.cloud-dot.offline {
+  background: #e4002b;
+  box-shadow: 0 0 8px #e4002b;
+}
+
+.mobile-cloud-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-glass);
+  border: 1px solid var(--border-glass);
+}

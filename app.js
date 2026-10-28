@@ -45,6 +45,7 @@ const App = {
     this.setupReportsPage();
     this.setupExportImport();
     this.setupMobileMenu();
+    this.setupCloudListeners();
 
     // Quick Add Shop
     document.getElementById('quickAddShopBtn').addEventListener('click', () => {
@@ -129,7 +130,14 @@ const App = {
 
   // ---- Modal ----
   showModal(title, bodyHTML, actions) {
-    document.getElementById('modalTitle').innerHTML = title;
+    document.getElementById('modalTitle').innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+        <div style="display:flex; align-items:center; gap:8px;">${title}</div>
+        <button type="button" onclick="App.closeModal()" title="Close" aria-label="Close" style="
+          background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-secondary); width:32px; height:32px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; font-weight:700; transition:var(--transition);
+        ">✕</button>
+      </div>
+    `;
     document.getElementById('modalBody').innerHTML = bodyHTML;
     const actionsEl = document.getElementById('modalActions');
     actionsEl.innerHTML = '';
@@ -161,7 +169,16 @@ const App = {
     const overlay = document.getElementById('subModalOverlay');
     if (!overlay) return;
 
-    if (titleEl) titleEl.innerHTML = title;
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+          <div style="display:flex; align-items:center; gap:8px;">${title}</div>
+          <button type="button" onclick="App.closeSubModal()" title="Close" aria-label="Close" style="
+            background:rgba(255,255,255,0.06); border:1px solid var(--border-glass); color:var(--text-secondary); width:32px; height:32px; border-radius:50%; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; line-height:1; font-weight:700; transition:var(--transition);
+          ">✕</button>
+        </div>
+      `;
+    }
     if (bodyEl) bodyEl.innerHTML = bodyHTML;
     if (actionsEl) {
       actionsEl.innerHTML = '';
@@ -208,10 +225,14 @@ const App = {
       });
     });
 
-    // Close modal on overlay click
+    // Prevent accidental dismiss when clicking/touching outside!
     document.getElementById('modalOverlay').addEventListener('click', (e) => {
       if (e.target === document.getElementById('modalOverlay')) {
-        this.closeModal();
+        const modal = document.querySelector('#modalOverlay .modal');
+        if (modal) {
+          modal.classList.add('shake-prevent');
+          setTimeout(() => modal.classList.remove('shake-prevent'), 350);
+        }
       }
     });
 
@@ -219,7 +240,11 @@ const App = {
     if (subOverlay) {
       subOverlay.addEventListener('click', (e) => {
         if (e.target === subOverlay) {
-          this.closeSubModal();
+          const subModal = document.getElementById('subModalContent');
+          if (subModal) {
+            subModal.classList.add('shake-prevent');
+            setTimeout(() => subModal.classList.remove('shake-prevent'), 350);
+          }
         }
       });
     }
@@ -311,6 +336,40 @@ const App = {
   },
 
   // ---- Shop Selector ----
+  
+  // ---- Cloud Connection Status UI ----
+  updateCloudStatusUI(status) {
+    const isOnline = status === 'online';
+    const textEl = document.getElementById('cloudStatusText');
+    const dotEls = document.querySelectorAll('.cloud-dot');
+    const pillEl = document.getElementById('mobileCloudStatusPill');
+
+    if (textEl) {
+      textEl.textContent = isOnline ? (I18N.currentLang === 'si' ? '☁️ Cloud: සක්‍රීයයි (Online)' : '☁️ Cloud: Online') : (I18N.currentLang === 'si' ? '☁️ Cloud: විසන්ධි වී ඇත' : '☁️ Cloud: Offline');
+      textEl.style.color = isOnline ? 'var(--accent-green)' : 'var(--accent-red)';
+    }
+
+    dotEls.forEach(d => {
+      d.className = 'cloud-dot ' + (isOnline ? 'online' : 'offline');
+    });
+
+    if (pillEl) {
+      pillEl.title = isOnline ? 'Cloud: Connected' : 'Cloud: Offline';
+    }
+  },
+
+  setupCloudListeners() {
+    window.addEventListener('online', () => {
+      DB.setCloudStatus(true);
+      this.showToast('🟢 ' + (I18N.currentLang === 'si' ? 'අන්තර්ජාලය සහ Cloud සම්බන්ධ විය!' : 'Internet & Cloud Connected!'), 'success');
+    });
+    window.addEventListener('offline', () => {
+      DB.setCloudStatus(false);
+      this.showToast('🔴 ' + (I18N.currentLang === 'si' ? 'අන්තර්ජාලය විසන්ධි විය (Offline ක්‍රියාත්මකයි)' : 'Working Offline (Local Storage Active)'), 'warning');
+    });
+    this.updateCloudStatusUI(DB.cloudStatus);
+  },
+
   setupShopSelector() {
     const sel = document.getElementById('shopSelector');
     if (sel) {
@@ -5865,7 +5924,8 @@ Thank you! - ${shopName}`;
               <label class="form-label" style="margin-bottom:0;">${I18N.t('dev_imei_lbl') || 'IMEI 1 Number'} *</label>
               <button type="button" class="btn btn-xs btn-ghost" onclick="App.openImeiScannerModal('devImei1')" style="padding:1px 6px; font-size:0.72rem; color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4);">📷 Scan</button>
             </div>
-            <input type="text" class="form-input" id="devImei1" required value="${existing?.imeiNumber || ''}" placeholder="15 digits (e.g. 864234051234567)">
+            <input type="text" class="form-input" id="devImei1" required value="${existing?.imeiNumber || ''}" placeholder="15 digits (e.g. 864234051234567)" oninput="App.checkDuplicateImei('${editCreditId || ''}')">
+          <div id="devImeiWarning" style="display:none; font-size:0.8rem; font-weight:700; color:var(--accent-red); margin-top:5px; background:rgba(228,0,43,0.08); padding:6px 10px; border-radius:6px; border:1px solid rgba(228,0,43,0.3);"></div>
           </div>
         </div>
 
@@ -6040,6 +6100,48 @@ Thank you! - ${shopName}`;
     }
   },
 
+  
+  // ---- Live IMEI Duplicate Checker ----
+  checkDuplicateImei(editCreditId = null) {
+    const imeiInp = document.getElementById('devImei1');
+    const warningEl = document.getElementById('devImeiWarning');
+    if (!imeiInp || !warningEl) return false;
+
+    const val = imeiInp.value.trim().toLowerCase();
+    if (!val || val.length < 5) {
+      warningEl.style.display = 'none';
+      imeiInp.style.borderColor = '';
+      imeiInp.style.boxShadow = '';
+      return false;
+    }
+
+    const allCredits = DB.getDeviceCredits();
+    const existing = allCredits.find(c => 
+      c.id !== editCreditId && 
+      c.imeiNumber && 
+      c.imeiNumber.trim().toLowerCase() === val
+    );
+
+    if (existing) {
+      const isSettled = existing.status === 'settled';
+      const statusText = isSettled 
+        ? (I18N.currentLang === 'si' ? 'පියවා අවසන් (Settled)' : 'Settled') 
+        : (I18N.currentLang === 'si' ? `හිඟ මුදල: ${DB.formatCurrency(existing.balanceDue)}` : `Balance: ${DB.formatCurrency(existing.balanceDue)}`);
+      
+      warningEl.style.display = 'block';
+      warningEl.innerHTML = `❌ <strong>IMEI Already Registered!</strong> (දැනටමත් ලියාපදිංචි කර ඇත):<br>
+        👤 <strong>${existing.customerName}</strong> | 📞 ${existing.primaryPhone} | 📱 ${existing.phoneModel} [${statusText}]`;
+      imeiInp.style.borderColor = 'var(--accent-red)';
+      imeiInp.style.boxShadow = '0 0 0 3px var(--accent-red-glow)';
+      return true;
+    } else {
+      warningEl.style.display = 'none';
+      imeiInp.style.borderColor = 'var(--accent-green)';
+      imeiInp.style.boxShadow = '0 0 0 3px var(--accent-green-glow)';
+      return false;
+    }
+  },
+
   saveDeviceCreditAgreement(editCreditId = null) {
     const custName = document.getElementById('devCustName')?.value.trim();
     const nicNumber = document.getElementById('devCustNic')?.value.trim();
@@ -6073,6 +6175,15 @@ Thank you! - ${shopName}`;
     }
     if (!imei1) {
       this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර IMEI අංකය ඇතුළත් කරන්න' : 'Please enter IMEI Number', 'error');
+      return;
+    }
+
+    // Check duplicate IMEI
+    if (this.checkDuplicateImei(editCreditId)) {
+      this.showToast(I18N.currentLang === 'si' ? '❌ මෙම IMEI අංකය දැනටමත් පද්ධතියේ පවතී!' : '❌ Cannot Save: This IMEI already exists in database!', 'error');
+      alert(I18N.currentLang === 'si' 
+        ? '❌ මෙම IMEI අංකය දැනටමත් වෙනත් පාරිභෝගික ගිවිසුමක ලියාපදිංචි කර ඇත! එකම IMEI අංකය නැවත ඇතුළත් කළ නොහැක.' 
+        : '❌ Cannot Save: This IMEI number is already registered under another agreement in the database!');
       return;
     }
     if (totalPrice <= 0) {

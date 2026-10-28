@@ -96,6 +96,13 @@ const DB = {
   EXPENSES_KEY: 'spt_expenses',
   BANK_TRANSACTIONS_KEY: 'spt_bank_transactions',
   DEVICE_CREDITS_KEY: 'spt_device_credits',
+  cloudStatus: navigator.onLine ? 'online' : 'offline',
+  setCloudStatus(isOnline) {
+    this.cloudStatus = isOnline ? 'online' : 'offline';
+    if (window.App && window.App.updateCloudStatusUI) {
+      window.App.updateCloudStatusUI(this.cloudStatus);
+    }
+  },
 
   _initialized: false,
 
@@ -230,31 +237,25 @@ const DB = {
         }
       }
 
-      // Initial device credits cloud sync: upload local credits if cloud is empty
-      const devCreditsSnapshot = await window.FS.collection('payment_tracker_device_credits').limit(1).get();
+      // Upload any local device credits, shifts, and customer credits to 'payment_tracker_updates' so all devices can see them!
       const localDevCredits = this.getDeviceCredits();
-      if (devCreditsSnapshot.empty && localDevCredits.length > 0) {
-        console.log('☁️ Uploading local device credits to empty Firebase...');
+      if (localDevCredits.length > 0) {
         const batch = window.FS.batch();
         localDevCredits.forEach(credit => {
-          const ref = window.FS.collection('payment_tracker_device_credits').doc(credit.id);
-          batch.set(ref, credit);
+          const ref = window.FS.collection('payment_tracker_updates').doc('devcred_' + credit.id);
+          batch.set(ref, { ...credit, docType: 'device_credit' }, { merge: true });
         });
-        await batch.commit();
-        console.log('✅ Device credits uploaded to cloud!');
+        await batch.commit().catch(e => console.warn('Cloud sync error for device credits:', e));
       }
 
-      // Initial customer credits cloud sync
-      const creditsSnapshot = await window.FS.collection('payment_tracker_credits').limit(1).get();
       const localCredits = this.getCredits(null, true);
-      if (creditsSnapshot.empty && localCredits.length > 0) {
-        console.log('☁️ Uploading local customer credits to empty Firebase...');
+      if (localCredits.length > 0) {
         const batch = window.FS.batch();
         localCredits.forEach(credit => {
-          const ref = window.FS.collection('payment_tracker_credits').doc(credit.id);
-          batch.set(ref, credit);
+          const ref = window.FS.collection('payment_tracker_updates').doc('cred_' + credit.id);
+          batch.set(ref, { ...credit, docType: 'credit' }, { merge: true });
         });
-        await batch.commit();
+        await batch.commit().catch(e => console.warn('Cloud sync error for credits:', e));
       }
 
       // 2. Setup listeners for real-time cloud sync
@@ -289,17 +290,45 @@ const DB = {
 
     let isFirstUpdatesLoad = true;
     window.FS.collection('payment_tracker_updates').onSnapshot(snapshot => {
-      if (snapshot.metadata.hasPendingWrites) return; // Ignore local writes
-      
+      // Set cloud status online when snapshot arrives!
+      this.setCloudStatus(true);
+      if (snapshot.metadata.hasPendingWrites) return;
+
       const updates = [];
-      snapshot.forEach(doc => updates.push(doc.data()));
-      
+      const devCredits = [];
+      const credits = [];
+
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        if (d.docType === 'device_credit' || doc.id.startsWith('devcred_') || doc.id.startsWith('dc_')) {
+          devCredits.push(d);
+        } else if (d.docType === 'credit' || doc.id.startsWith('cred_') || doc.id.startsWith('cr_')) {
+          credits.push(d);
+        } else {
+          updates.push(d);
+        }
+      });
+
       this._dualSave(this.UPDATES_KEY, updates);
-      
+      if (devCredits.length > 0 || !localStorage.getItem(this.DEVICE_CREDITS_KEY)) {
+        devCredits.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
+        this._dualSave(this.DEVICE_CREDITS_KEY, devCredits);
+      }
+      if (credits.length > 0 || !localStorage.getItem(this.CREDITS_KEY)) {
+        credits.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        this._dualSave(this.CREDITS_KEY, credits);
+      }
+
       if (!isFirstUpdatesLoad) {
-        if (window.App && window.App.refreshPage) window.App.refreshPage(window.App.currentPage);
+        if (window.App) {
+          window.App.updateTopBarBadges();
+          window.App.refreshPage(window.App.currentPage);
+        }
       }
       isFirstUpdatesLoad = false;
+    }, err => {
+      console.warn('Firebase payment_tracker_updates error:', err);
+      this.setCloudStatus(false);
     });
 
     // Shifts sync listener
@@ -1960,7 +1989,7 @@ const DB = {
     };
     credits.unshift(newCredit);
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', newCredit.id, newCredit);
+    this._syncToFirebase('payment_tracker_updates', 'devcred_' + newCredit.id, { ...newCredit, docType: 'device_credit' });
     return newCredit;
   },
 
@@ -1988,7 +2017,7 @@ const DB = {
       updatedAt: new Date().toISOString()
     };
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', id, credits[idx]);
+    this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credits[idx], docType: 'device_credit' });
     return credits[idx];
   },
 
@@ -2020,7 +2049,7 @@ const DB = {
     }
 
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', id, credit);
+    this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credit, docType: 'device_credit' });
     return credit;
   },
 
@@ -2028,7 +2057,7 @@ const DB = {
     const credits = this.getDeviceCredits();
     const filtered = credits.filter(c => c.id !== id);
     this.saveDeviceCredits(filtered);
-    this._deleteFromFirebase('payment_tracker_device_credits', id);
+    this._deleteFromFirebase('payment_tracker_updates', 'devcred_' + id);
     return true;
   },
 
