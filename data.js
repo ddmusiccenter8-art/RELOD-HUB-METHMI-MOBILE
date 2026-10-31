@@ -628,7 +628,8 @@ const DB = {
       simTotal, reloadCash, reloadTotal,
       banks, totalBankAcct, totalBankCash, bankTotal,
       totalCash, cashInDrawer: totalCash, totalCapital,
-      reloadDenominations: (u.reload && u.reload.denominations) ? u.reload.denominations : null
+      reloadDenominations: (u.reload && u.reload.denominations) ? u.reload.denominations : null,
+      hubDenominations: (u.reload && u.reload.hubDenominations) ? u.reload.hubDenominations : null
     };
   },
 
@@ -1410,7 +1411,9 @@ const DB = {
       status: data.status || 'balanced', // 'balanced', 'excess', 'shortage'
       denominations: data.denominations || null,
       note: (data.note || data.notes || '').trim(),
-      notes: (data.note || data.notes || '').trim()
+      notes: (data.note || data.notes || '').trim(),
+      specialNotes: (data.specialNotes || data.cashNote || '').trim(),
+      cashNote: (data.specialNotes || data.cashNote || '').trim()
     };
     list.unshift(item);
     this.saveShifts(list);
@@ -1899,6 +1902,41 @@ const DB = {
   },
 
   // ---- Utility ----
+
+  formatDenominationsText(denoms, isDetailed = true) {
+    if (!denoms) return [];
+    const multipliers = [
+      { key: 'n5000', label: 'Rs. 5,000', val: 5000 },
+      { key: 'n2000', label: 'Rs. 2,000', val: 2000 },
+      { key: 'n1000', label: 'Rs. 1,000', val: 1000 },
+      { key: 'n500',  label: 'Rs. 500',   val: 500 },
+      { key: 'n100',  label: 'Rs. 100',   val: 100 },
+      { key: 'n50',   label: 'Rs. 50',    val: 50 },
+      { key: 'n20',   label: 'Rs. 20',    val: 20 },
+      { key: 'n10',   label: 'Rs. 10',    val: 10 }
+    ];
+    const lines = [];
+    multipliers.forEach(m => {
+      const cnt = parseInt(denoms[m.key] || 0, 10);
+      if (cnt > 0) {
+        const sub = cnt * m.val;
+        if (isDetailed) {
+          lines.push(`• 💵 ${m.label} × ${cnt} = ${this.formatCurrency(sub)}`);
+        } else {
+          lines.push(`${m.val}x${cnt}`);
+        }
+      }
+    });
+    const coins = parseFloat(denoms.coins) || 0;
+    if (coins > 0) {
+      if (isDetailed) {
+        lines.push(`• 🪙 Coins / Small Change = ${this.formatCurrency(coins)}`);
+      } else {
+        lines.push(`Coins:${this.formatCurrency(coins)}`);
+      }
+    }
+    return lines;
+  },
 
   formatCurrency(amount) {
     return 'Rs.' + parseFloat(amount || 0).toLocaleString('en-LK', {

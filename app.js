@@ -1087,7 +1087,7 @@ const App = {
           const map = { n5000: 5000, n2000: 2000, n1000: 1000, n500: 500, n100: 100, n50: 50, n20: 20, n10: 10, coins: 1 };
           Object.keys(map).forEach(k => { sum += (this.lastReloadDenominations[k] || 0) * map[k]; });
           if (Math.abs(sum - (parseFloat(cashDrawerEl.value) || 0)) > 0.01) {
-            this.lastReloadDenominations = null;
+            this.lastReloadDenominations = null; this.lastHubDenominations = null;
             this.renderDenomsSummaryChip(null);
           }
         }
@@ -1143,7 +1143,7 @@ const App = {
         const noteEl = document.getElementById('updateNoteInput');
         if (noteEl) noteEl.value = '';
         this.editingUpdateId = null;
-        this.lastReloadDenominations = null;
+        this.lastReloadDenominations = null; this.lastHubDenominations = null;
         this.renderDenomsSummaryChip(null);
         const btn = updateForm.querySelector('button[type="submit"]');
         if (btn) btn.innerHTML = '💾 Save Only';
@@ -1675,8 +1675,9 @@ const App = {
       const bank = row.querySelector('.bank-select')?.value || 'Commercial Bank';
       const accountAmount = parseFloat(row.querySelector('.bank-acct-input')?.value) || 0;
       const cashInDrawer = parseFloat(row.querySelector('.bank-cash-input')?.value) || 0;
+      const denominations = row._denominations || null;
       if (accountAmount > 0 || cashInDrawer > 0 || bankRows.length === 1) {
-        banks.push({ bank, accountAmount, cashInDrawer });
+        banks.push({ bank, accountAmount, cashInDrawer, denominations });
       }
     });
 
@@ -1739,7 +1740,8 @@ const App = {
         cashInDrawer: reloadCash,
         hubCash: reloadHubCash,
         drawerTotal: reloadCash + reloadHubCash,
-        denominations: this.lastReloadDenominations || null
+        denominations: this.lastReloadDenominations || null,
+        hubDenominations: this.lastHubDenominations || null
       },
       mobileRental: {
         banks
@@ -1756,13 +1758,13 @@ const App = {
     if (this.editingUpdateId) {
       update = DB.editUpdate(this.editingUpdateId, updatePayload);
       this.editingUpdateId = null;
-      this.lastReloadDenominations = null;
+      this.lastReloadDenominations = null; this.lastHubDenominations = null;
       const btn = document.querySelector('#updateForm button[type="submit"]');
       if (btn) btn.innerHTML = '💾 Save Update';
       this.showToast(I18N.currentLang === 'si' ? '✅ Update එක සාර්ථකව සටහන් විය!' : '✅ Update successfully saved!', 'success');
     } else {
       update = DB.addUpdate(updatePayload);
-      this.lastReloadDenominations = null;
+      this.lastReloadDenominations = null; this.lastHubDenominations = null;
     }
 
     // If Save & WhatsApp requested, immediately open WhatsApp
@@ -1895,22 +1897,22 @@ const App = {
 
     // 1. Reload SIMs Track
     msg += `🔄 *RELOAD SIMS BALANCE:*\n`;
-    msg += `• Dialog SIM: Rs. ${DB.formatCurrency(vals.dialog)}\n`;
-    msg += `• Mobitel SIM: Rs. ${DB.formatCurrency(vals.mobitel)}\n`;
-    msg += `• Airtel SIM: Rs. ${DB.formatCurrency(vals.airtel)}\n`;
-    msg += `• Hutch SIM: Rs. ${DB.formatCurrency(vals.hutch)}\n`;
-    msg += `👉 *Total SIMs Balance:* *Rs. ${DB.formatCurrency(vals.simTotal)}*\n\n`;
+    msg += `• Dialog SIM: ${DB.formatCurrency(vals.dialog)}\n`;
+    msg += `• Mobitel SIM: ${DB.formatCurrency(vals.mobitel)}\n`;
+    msg += `• Airtel SIM: ${DB.formatCurrency(vals.airtel)}\n`;
+    msg += `• Hutch SIM: ${DB.formatCurrency(vals.hutch)}\n`;
+    msg += `👉 *Total SIMs Balance:* *${DB.formatCurrency(vals.simTotal)}*\n\n`;
 
     // 2. Cash in Drawer
     msg += `💵 *CASH IN DRAWER:*\n`;
-    msg += `• Reload Physical Cash: Rs. ${DB.formatCurrency(vals.reloadCash)}\n`;
+    msg += `• Reload Physical Cash: ${DB.formatCurrency(vals.reloadCash)}\n`;
     if (u.reload && u.reload.hubCash > 0) {
-      msg += `• Hub / Floating Cash: Rs. ${DB.formatCurrency(u.reload.hubCash)}\n`;
+      msg += `• Hub / Floating Cash: ${DB.formatCurrency(u.reload.hubCash)}\n`;
     }
     if (vals.totalBankCash > 0) {
-      msg += `• Bank Drawer Cash: Rs. ${DB.formatCurrency(vals.totalBankCash)}\n`;
+      msg += `• Bank Drawer Cash: ${DB.formatCurrency(vals.totalBankCash)}\n`;
     }
-    msg += `👉 *Total Cash in Drawer:* *Rs. ${DB.formatCurrency(vals.totalCash)}*\n`;
+    msg += `👉 *Total Cash in Drawer:* *${DB.formatCurrency(vals.totalCash)}*\n`;
 
     // Note denomination breakdown if present
     const denoms = u.reload?.denominations;
@@ -1929,20 +1931,20 @@ const App = {
         msg += `🧮 *Notes Breakdown:* ${parts.join(', ')}\n`;
       }
     }
-    msg += `👉 *Combined Reload Track (SIMs + Cash):* *Rs. ${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
+    msg += `👉 *Combined Reload Track (SIMs + Cash):* *${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
 
     // 3. Bank Track
     msg += `🏦 *BANK PAYMENTS & ACCOUNTS:*\n`;
     if (vals.banks && vals.banks.length > 0) {
       vals.banks.forEach(b => {
-        msg += `• ${b.bank}: Acct Rs. ${DB.formatCurrency(b.accountAmount)} | Cash Rs. ${DB.formatCurrency(b.cashInDrawer)}\n`;
+        msg += `• ${b.bank}: Acct ${DB.formatCurrency(b.accountAmount)} | Cash ${DB.formatCurrency(b.cashInDrawer)}\n`;
       });
     }
-    msg += `👉 *Total Bank Track:* *Rs. ${DB.formatCurrency(vals.bankTotal)}*\n\n`;
+    msg += `👉 *Total Bank Track:* *${DB.formatCurrency(vals.bankTotal)}*\n\n`;
 
     // 4. Grand Total Capital
     msg += `=================================\n`;
-    msg += `💰 *GRAND TOTAL CAPITAL:* *Rs. ${DB.formatCurrency(vals.totalCapital)}*\n`;
+    msg += `💰 *GRAND TOTAL CAPITAL:* *${DB.formatCurrency(vals.totalCapital)}*\n`;
     msg += `=================================\n\n`;
 
     // 5. Comparison / Profit & Loss vs Previous / Morning Update
@@ -1954,19 +1956,19 @@ const App = {
       const prevTime = comp.previousUpdateTime ? DB.formatTime(comp.previousUpdateTime) : 'Previous';
 
       msg += `📊 *P&L COMPARISON (VS ${prevTime.toUpperCase()}):*\n`;
-      msg += `• Reload Track Change: ${rDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(rDiff)}\n`;
-      msg += `• Bank Track Change: ${bDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(bDiff)}\n`;
+      msg += `• Reload Track Change: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}\n`;
+      msg += `• Bank Track Change: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}\n`;
 
       if (oType === 'profit') {
-        msg += `• *NET OPERATING PROFIT: +Rs. ${DB.formatCurrency(oDiff)}* ✅\n`;
+        msg += `• *NET OPERATING PROFIT: +${DB.formatCurrency(oDiff)}* ✅\n`;
       } else if (oType === 'loss') {
-        msg += `• *NET OPERATING LOSS: -Rs. ${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
+        msg += `• *NET OPERATING LOSS: -${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
       } else {
         msg += `• *NET OPERATING BALANCE: Rs. 0.00* ➖\n`;
       }
 
       if (u.adjustments && (u.adjustments.creditsTotal > 0 || u.adjustments.routersTotal > 0 || u.adjustments.topupsTotal > 0)) {
-        msg += `⚖️ *Adjustments:* Credits +Rs. ${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +Rs. ${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -Rs. ${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
+        msg += `⚖️ *Adjustments:* Credits +${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
       }
     } else {
       msg += `📌 *Status:* First Opening Capital Recorded\n`;
@@ -3998,9 +4000,16 @@ Thank you! - ${shopName}`;
   // ================================================================
   openDenominationModal(targetInputIdOrFn, initialDenoms = null) {
     this.currentDenomTarget = targetInputIdOrFn;
-    let counts = initialDenoms || (this.lastReloadDenominations && targetInputIdOrFn === 'reloadCashInput' ? this.lastReloadDenominations : {
-      n5000: 0, n2000: 0, n1000: 0, n500: 0, n100: 0, n50: 0, n20: 0, n10: 0, coins: 0
-    });
+    let counts = initialDenoms;
+    if (!counts) {
+      if (typeof targetInputIdOrFn === 'string' && targetInputIdOrFn === 'reloadCashInput' && this.lastReloadDenominations) {
+        counts = this.lastReloadDenominations;
+      } else if (typeof targetInputIdOrFn === 'string' && targetInputIdOrFn === 'reloadHubCashInput' && this.lastHubDenominations) {
+        counts = this.lastHubDenominations;
+      } else {
+        counts = { n5000: 0, n2000: 0, n1000: 0, n500: 0, n100: 0, n50: 0, n20: 0, n10: 0, coins: 0 };
+      }
+    }
     this.currentDenoms = { ...counts };
 
     const denomsConfig = [
@@ -4119,35 +4128,30 @@ Thank you! - ${shopName}`;
       }
       if (this.currentDenomTarget === 'reloadCashInput') {
         this.lastReloadDenominations = denomsCopy;
-        this.renderDenomsSummaryChip(denomsCopy);
+        this.renderDenomsSummaryChip(denomsCopy, 'countedDenomsSummary');
       } else if (this.currentDenomTarget === 'reloadHubCashInput') {
         this.lastHubDenominations = denomsCopy;
+        this.renderDenomsSummaryChip(denomsCopy, 'countedHubDenomsSummary');
       }
     }
     this.closeSubModal();
     this.showToast(`✅ Cash count applied: ${DB.formatCurrency(total)}`, 'success');
   },
 
-  renderDenomsSummaryChip(denoms) {
-    const el = document.getElementById('countedDenomsSummary');
+  renderDenomsSummaryChip(denoms, targetId = 'countedDenomsSummary') {
+    const el = document.getElementById(targetId);
     if (!el) return;
     if (!denoms) {
       el.innerHTML = '';
       return;
     }
-    const parts = [];
-    if (denoms.n5000 > 0) parts.push(`5000×${denoms.n5000}`);
-    if (denoms.n2000 > 0) parts.push(`2000×${denoms.n2000}`);
-    if (denoms.n1000 > 0) parts.push(`1000×${denoms.n1000}`);
-    if (denoms.n500  > 0) parts.push(`500×${denoms.n500}`);
-    if (denoms.n100  > 0) parts.push(`100×${denoms.n100}`);
-    if (denoms.n50   > 0) parts.push(`50×${denoms.n50}`);
-    if (denoms.n20   > 0) parts.push(`20×${denoms.n20}`);
-    if (denoms.n10   > 0) parts.push(`10×${denoms.n10}`);
-    if (denoms.coins > 0) parts.push(`Coins: ${DB.formatCurrency(denoms.coins)}`);
-
+    const parts = DB.formatDenominationsText(denoms, false);
     if (parts.length > 0) {
-      el.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:6px; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.35); color:var(--accent-gold); font-size:0.78rem; font-weight:700;">🧮 ${parts.join(', ')}</span>`;
+      const isBlue = targetId.includes('Hub') || targetId.includes('hub');
+      const color = isBlue ? 'var(--accent-blue)' : 'var(--accent-gold)';
+      const bg = isBlue ? 'rgba(59,130,246,0.15)' : 'rgba(245,158,11,0.15)';
+      const border = isBlue ? 'rgba(59,130,246,0.35)' : 'rgba(245,158,11,0.35)';
+      el.innerHTML = `<span style="display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:6px; background:${bg}; border:1px solid ${border}; color:${color}; font-size:0.78rem; font-weight:700;">🧮 ${parts.join(', ')}</span>`;
     } else {
       el.innerHTML = '';
     }
@@ -4158,11 +4162,18 @@ Thank you! - ${shopName}`;
     if (!row) return;
     const cashInput = row.querySelector('.bank-cash-input');
     if (!cashInput) return;
-    this.openDenominationModal((total) => {
+    const initialDenoms = row._denominations || null;
+    this.openDenominationModal((total, denoms) => {
       cashInput.value = total;
+      row._denominations = denoms;
+      const chip = row.querySelector('.bank-row-denom-chip');
+      if (chip) {
+        const parts = DB.formatDenominationsText(denoms, false);
+        chip.textContent = parts.length > 0 ? '🧮 ' + parts.join(', ') : '';
+      }
       cashInput.dispatchEvent(new Event('input', { bubbles: true }));
       cashInput.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    }, initialDenoms);
   },
 
   // ================================================================
@@ -4539,9 +4550,9 @@ Thank you! - ${shopName}`;
         if (Math.abs(diff) < 0.01) {
           vBadge.innerHTML = `<span class="tally-badge balanced" style="font-size:0.85rem; font-weight:800;">✅ 100% Balanced (Rs. 0.00)</span>`;
         } else if (diff > 0) {
-          vBadge.innerHTML = `<span class="tally-badge excess" style="font-size:0.85rem; font-weight:800;">🟢 Excess (+Rs. ${DB.formatCurrency(diff)})</span>`;
+          vBadge.innerHTML = `<span class="tally-badge excess" style="font-size:0.85rem; font-weight:800;">🟢 Excess (+${DB.formatCurrency(diff)})</span>`;
         } else {
-          vBadge.innerHTML = `<span class="tally-badge shortage" style="font-size:0.85rem; font-weight:800;">🔴 Shortage (-Rs. ${DB.formatCurrency(Math.abs(diff))})</span>`;
+          vBadge.innerHTML = `<span class="tally-badge shortage" style="font-size:0.85rem; font-weight:800;">🔴 Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`;
         }
       }
     };
@@ -4708,41 +4719,33 @@ Thank you! - ${shopName}`;
     msg += `=================================\n\n`;
 
     msg += `🛒 *POS MACHINE SALES:*\n`;
-    msg += `• Cash Sales: Rs. ${DB.formatCurrency(posCash)}\n`;
-    msg += `• Card Sales: Rs. ${DB.formatCurrency(posCard)}\n`;
-    if (posCheque > 0) msg += `• Cheque/QR: Rs. ${DB.formatCurrency(posCheque)}\n`;
-    msg += `• *Gross Total Sales: Rs. ${DB.formatCurrency(posTotal)}*\n\n`;
+    msg += `• Cash Sales: ${DB.formatCurrency(posCash)}\n`;
+    msg += `• Card Sales: ${DB.formatCurrency(posCard)}\n`;
+    if (posCheque > 0) msg += `• Cheque/QR: ${DB.formatCurrency(posCheque)}\n`;
+    msg += `• *Gross Total Sales: ${DB.formatCurrency(posTotal)}*\n\n`;
 
     msg += `💵 *DRAWER CASH FLOW:*\n`;
-    msg += `• 1. Opening Float: Rs. ${DB.formatCurrency(s.openingFloat || 0)}\n`;
-    msg += `• 2. (+) POS Cash: Rs. ${DB.formatCurrency(posCash)}\n`;
-    msg += `• 3. (-) Day Expenses: Rs. ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}\n`;
-    msg += `• *Expected Cash: Rs. ${DB.formatCurrency(s.expectedCash || 0)}*\n`;
-    msg += `• *Actual Counted: Rs. ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n`;
+    msg += `• 1. Opening Float: ${DB.formatCurrency(s.openingFloat || 0)}\n`;
+    msg += `• 2. (+) POS Cash: ${DB.formatCurrency(posCash)}\n`;
+    msg += `• 3. (-) Day Expenses: ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}\n`;
+    msg += `• *Expected Cash: ${DB.formatCurrency(s.expectedCash || 0)}*\n`;
+    msg += `• *Actual Counted: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n`;
 
     const diff = s.difference || 0;
     if (Math.abs(diff) < 0.01) {
-      msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED (Rs. 0.00)*\n`;
+      msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED (Rs. 0.00)*\n\n`;
     } else if (diff > 0) {
-      msg += `• *VERDICT: 🟢 CASH EXCESS (+Rs. ${DB.formatCurrency(diff)})*\n`;
+      msg += `• *VERDICT: 🟢 CASH EXCESS (+${DB.formatCurrency(diff)})*\n\n`;
     } else {
-      msg += `• *VERDICT: 🔴 CASH SHORTAGE (-Rs. ${DB.formatCurrency(Math.abs(diff))})*\n`;
+      msg += `• *VERDICT: 🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})*\n\n`;
     }
 
-    if (s.denominations) {
-      const d = s.denominations;
-      let parts = [];
-      if (d.n5000) parts.push(`5000x${d.n5000}`);
-      if (d.n2000) parts.push(`2000x${d.n2000}`);
-      if (d.n1000) parts.push(`1000x${d.n1000}`);
-      if (d.n500) parts.push(`500x${d.n500}`);
-      if (d.n100) parts.push(`100x${d.n100}`);
-      if (d.n50) parts.push(`50x${d.n50}`);
-      if (d.n20) parts.push(`20x${d.n20}`);
-      if (d.coins) parts.push(`Coins: ${d.coins}`);
-      if (parts.length > 0) {
-        msg += `\n🧮 *Notes Counted:* ${parts.join(', ')}\n`;
-      }
+    // COUNTED NOTES BREAKDOWN (ලාච්චුවේ ගැණූ මුදල් නෝට්ටු විස්තරය)
+    const noteLines = DB.formatDenominationsText(s.denominations, true);
+    if (noteLines.length > 0) {
+      msg += `🧮 *ලාච්චුවේ ගැණූ මුදල් නෝට්ටු විස්තරය (CASH DRAWER NOTES BREAKDOWN):*\n`;
+      msg += noteLines.join('\n') + '\n';
+      msg += `👉 *මුළු ගැණූ මුදල (Total Notes Cash): ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n\n`;
     }
 
     if (s.specialNotes || s.cashNote) {
@@ -5042,7 +5045,7 @@ Thank you! - ${shopName}`;
     });
 
     this.closeModal();
-    this.showToast(`✅ Rs. ${DB.formatCurrency(amount)} බැංකුවට තැන්පත් කිරීම සාර්ථකයි!`, 'success');
+    this.showToast(`✅ ${DB.formatCurrency(amount)} බැංකුවට තැන්පත් කිරීම සාර්ථකයි!`, 'success');
     this.refreshPage(this.currentPage);
   },
 
@@ -5117,7 +5120,7 @@ Thank you! - ${shopName}`;
     });
 
     this.closeModal();
-    this.showToast(`✅ Rs. ${DB.formatCurrency(amount)} කැෂ් අවුට් සටහන් කිරීම සාර්ථකයි!`, 'success');
+    this.showToast(`✅ ${DB.formatCurrency(amount)} කැෂ් අවුට් සටහන් කිරීම සාර්ථකයි!`, 'success');
     this.refreshPage(this.currentPage);
   },
 
@@ -5221,7 +5224,7 @@ Thank you! - ${shopName}`;
     });
 
     this.closeModal();
-    this.showToast(`🌅 උදෑසන ආරම්භක මුදල (Rs. ${DB.formatCurrency(openingFloat)}) සාර්ථකව සටහන් විය!`, 'success');
+    this.showToast(`🌅 උදෑසන ආරම්භක මුදල (${DB.formatCurrency(openingFloat)}) සාර්ථකව සටහන් විය!`, 'success');
     this.refreshPage(this.currentPage);
   },
 
@@ -5288,26 +5291,166 @@ Thank you! - ${shopName}`;
   shareDailyWhatsAppSummary() {
     const shopId = DB.getActiveShopId();
     if (!shopId) { this.showToast('Select a shop first', 'error'); return; }
-    const today = new Date().toISOString().split('T')[0];
-    const shop = DB.getShops().find(s => s.id === shopId);
-    const todayUpdates = DB.getUpdates(shopId).filter(u => u.date === today);
+    const today = DB.getTodayDate ? DB.getTodayDate() : new Date().toISOString().split('T')[0];
+    const shop = DB.getShop ? DB.getShop(shopId) : DB.getShops().find(s => s.id === shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+
+    // 1. Shifts for today (Cashier Drawer)
+    const todayShifts = DB.getShiftsForShopByDate ? DB.getShiftsForShopByDate(shopId, today) : [];
+    const eveningShift = todayShifts.find(s => s.shiftType === 'evening') || (todayShifts.length > 0 ? todayShifts[0] : null);
+    const morningShift = todayShifts.find(s => s.shiftType === 'morning');
+
+    // 2. Updates for today (Reload & Bank)
+    const todayUpdates = DB.getUpdatesForShopByDate ? DB.getUpdatesForShopByDate(shopId, today) : [];
+    const latestUpdate = todayUpdates.length > 0 ? todayUpdates[0] : (DB.getLastUpdate ? DB.getLastUpdate(shopId) : null);
+    const updVals = latestUpdate ? DB.extractValues(latestUpdate) : null;
+
+    // 3. Today's Expenses
     const todayExpenses = DB.getExpensesForShopByDate ? DB.getExpensesForShopByDate(shopId, today) : [];
     const totalExp = todayExpenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-    let reloadTotal = 0, bankTotal = 0;
-    todayUpdates.forEach(u => {
-      reloadTotal += (u.dialog || 0) + (u.mobitel || 0) + (u.airtel || 0) + (u.hutch || 0);
-      bankTotal += u.bankTotal || 0;
-    });
-    let msg = `📊 *METHMI MOBILE - DAILY SUMMARY*\n`;
-    msg += `📅 Date: ${today}\n`;
-    msg += `🏪 Shop: ${shop ? shop.name : ''}\n`;
-    msg += `=================================\n`;
-    msg += `📱 Reload Total: Rs. ${DB.formatCurrency(reloadTotal)}\n`;
-    msg += `🏦 Bank Total: Rs. ${DB.formatCurrency(bankTotal)}\n`;
-    msg += `💸 Expenses: Rs. ${DB.formatCurrency(totalExp)}\n`;
-    msg += `📝 Updates: ${todayUpdates.length}\n`;
+
+    let msg = `🏪 *${shopName.toUpperCase()} - NIGHTLY CLOSING & SUMMARY*\n`;
+    msg += `📅 Date: ${DB.formatDate(today)}\n`;
+    msg += `⏰ Generated: ${DB.formatTime(new Date().toISOString())}\n`;
+    msg += `=================================\n\n`;
+
+    // SECTION 1: PHYSICAL CASH IN DRAWERS (NO APP MONEY - PURE CASH)
+    msg += `💵 *1. PHYSICAL CASH IN DRAWERS (ලාච්චු වල භෞතික මුදල්):*\n`;
+    msg += `*(නෝට්ටු කවුන්ටරයෙන් ගැණූ සත්‍ය මුදල් ප්‍රමාණයන්)*\n\n`;
+
+    let totalPhysicalCash = 0;
+
+    // A. Shop Cashier Drawer (Shift Tally)
+    if (eveningShift) {
+      const counted = eveningShift.countedCash || eveningShift.actualCountedCash || 0;
+      totalPhysicalCash += counted;
+      msg += `🛒 *Shop Sales Cashier Drawer (විකුණුම් ලාච්චුව):*\n`;
+      msg += `• Actual Counted Cash: ${DB.formatCurrency(counted)}\n`;
+      
+      const noteLines = DB.formatDenominationsText(eveningShift.denominations, true);
+      if (noteLines.length > 0) {
+        msg += `🧮 *ගැණූ නෝට්ටු විස්තරය (Notes Breakdown):*\n`;
+        msg += noteLines.join('\n') + '\n';
+      }
+      
+      const diff = eveningShift.difference || 0;
+      if (Math.abs(diff) < 0.01) {
+        msg += `• Tally Verdict: ✅ 100% PERFECTLY BALANCED (Rs. 0.00)\n`;
+      } else if (diff > 0) {
+        msg += `• Tally Verdict: 🟢 CASH EXCESS (+${DB.formatCurrency(diff)})\n`;
+      } else {
+        msg += `• Tally Verdict: 🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})\n`;
+      }
+      if (eveningShift.specialNotes || eveningShift.cashNote) {
+        msg += `• 📝 Special Note: ${eveningShift.specialNotes || eveningShift.cashNote}\n`;
+      }
+      msg += `\n`;
+    } else if (morningShift) {
+      const floatVal = morningShift.openingFloat || 0;
+      totalPhysicalCash += floatVal;
+      msg += `🌅 *Morning Shift Opening Float: ${DB.formatCurrency(floatVal)}*\n`;
+      const mLines = DB.formatDenominationsText(morningShift.denominations, true);
+      if (mLines.length > 0) {
+        msg += mLines.join('\n') + '\n';
+      }
+      msg += `\n`;
+    }
+
+    // B. Reload Drawer Cash
+    if (updVals) {
+      const reloadCash = updVals.reloadCash || 0;
+      const hubCash = (latestUpdate && latestUpdate.reload && latestUpdate.reload.hubCash) ? parseFloat(latestUpdate.reload.hubCash) || 0 : 0;
+      const reloadDrawerTotal = reloadCash + hubCash;
+      totalPhysicalCash += reloadDrawerTotal;
+
+      msg += `🔄 *Reload Cash Drawer (රීලෝඩ් මුදල් ලාච්චුව):*\n`;
+      msg += `• Physical Drawer Cash: ${DB.formatCurrency(reloadCash)}\n`;
+      if (latestUpdate && latestUpdate.reload && latestUpdate.reload.denominations) {
+        const rLines = DB.formatDenominationsText(latestUpdate.reload.denominations, true);
+        if (rLines.length > 0) {
+          msg += `  🧮 *Notes:*\n  ${rLines.join('\n  ')}\n`;
+        }
+      }
+      if (hubCash > 0) {
+        msg += `• Hub / Floating Cash: ${DB.formatCurrency(hubCash)}\n`;
+        if (latestUpdate && latestUpdate.reload && latestUpdate.reload.hubDenominations) {
+          const hLines = DB.formatDenominationsText(latestUpdate.reload.hubDenominations, true);
+          if (hLines.length > 0) {
+            msg += `  🧮 *Hub Notes:*\n  ${hLines.join('\n  ')}\n`;
+          }
+        }
+      }
+      msg += `• *Total Reload Cash: ${DB.formatCurrency(reloadDrawerTotal)}*\n\n`;
+
+      // C. Bank Cash in Drawer
+      if (updVals.totalBankCash > 0) {
+        totalPhysicalCash += updVals.totalBankCash;
+        msg += `🏦 *Bank Cash in Drawer (බැංකු ලාච්චුවේ මුදල්):*\n`;
+        msg += `• Bank Cash: ${DB.formatCurrency(updVals.totalBankCash)}\n`;
+        if (updVals.banks) {
+          updVals.banks.forEach(b => {
+            if (b.cashInDrawer > 0) {
+              msg += `  - ${b.bank} Cash: ${DB.formatCurrency(b.cashInDrawer)}\n`;
+              if (b.denominations) {
+                const bLines = DB.formatDenominationsText(b.denominations, true);
+                if (bLines.length > 0) msg += `    🧮 *Notes:*\n    ${bLines.join('\n    ')}\n`;
+              }
+            }
+          });
+        }
+        msg += `\n`;
+      }
+    }
+
+    msg += `👉 *💰 TOTAL PHYSICAL CASH IN ALL DRAWERS: ${DB.formatCurrency(totalPhysicalCash)}*\n`;
+    msg += `=================================\n\n`;
+
+    // SECTION 2: DIGITAL RELOAD SIM BALANCES
+    if (updVals) {
+      msg += `📱 *2. RELOAD SIM BALANCES (සිම්පත් වල ශේෂයන්):*\n`;
+      msg += `• Dialog: ${DB.formatCurrency(updVals.dialog)}\n`;
+      msg += `• Mobitel: ${DB.formatCurrency(updVals.mobitel)}\n`;
+      msg += `• Airtel: ${DB.formatCurrency(updVals.airtel)}\n`;
+      msg += `• Hutch: ${DB.formatCurrency(updVals.hutch)}\n`;
+      msg += `• *Total SIMs Balance: ${DB.formatCurrency(updVals.simTotal)}*\n\n`;
+
+      // SECTION 3: BANK DIGITAL APP BALANCES (NOT CASH IN DRAWER)
+      msg += `🏛️ *3. BANK MOBILE APPS (ඩිජිටල් බැංකු ඇප් ශේෂයන්):*\n`;
+      msg += `*(Mobile Banking Apps වල ඇති ශේෂයන් - ලාච්චුවේ මුදල් නොවේ)*\n`;
+      if (updVals.banks && updVals.banks.length > 0) {
+        updVals.banks.forEach(b => {
+          if (b.accountAmount > 0) {
+            msg += `• ${b.bank} App: ${DB.formatCurrency(b.accountAmount)}` + '\n';
+          }
+        });
+      }
+      msg += `• *Total in Bank Apps: ${DB.formatCurrency(updVals.totalBankAcct)}*\n\n`;
+    }
+
+    // SECTION 4: POS & EXPENSES
+    msg += `🛒 *4. POS SALES & EXPENSES:*\n`;
+    if (eveningShift) {
+      const posCash = eveningShift.posCashSales || 0;
+      const posCard = eveningShift.posCardSales || 0;
+      const posTotal = eveningShift.posGrossSales || eveningShift.posSales || (posCash + posCard);
+      msg += `• POS Gross Sales: ${DB.formatCurrency(posTotal)} (Cash: ${DB.formatCurrency(posCash)} | Card: ${DB.formatCurrency(posCard)})\n`;
+    }
+    msg += `• Today Expenses: ${DB.formatCurrency(totalExp)}\n`;
+    if (todayExpenses.length > 0) {
+      todayExpenses.forEach(e => {
+        msg += `  - ${e.description || e.category}: ${DB.formatCurrency(e.amount)}\n`;
+      });
+    }
+    msg += `\n`;
+
+    // GRAND TOTAL
+    if (updVals) {
+      msg += `=================================\n`;
+      msg += `💰 *GRAND TOTAL CAPITAL & ASSETS: ${DB.formatCurrency(updVals.totalCapital)}*\n`;
+    }
     msg += `=================================\n`;
     msg += `Generated via Methmi Shop Tracker`;
+
     const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   },
@@ -5353,7 +5496,7 @@ Thank you! - ${shopName}`;
     // Morning Float
     msg += `🌅 *1. MORNING OPENING FLOAT:*\n`;
     if (morningShift) {
-      msg += `• Float Amount: Rs. ${DB.formatCurrency(morningShift.openingFloat)}\n`;
+      msg += `• Float Amount: ${DB.formatCurrency(morningShift.openingFloat)}\n`;
       if (morningShift.denominations) {
         const d = morningShift.denominations;
         let parts = [];
@@ -5375,10 +5518,10 @@ Thank you! - ${shopName}`;
     // POS Sales
     msg += `🛒 *2. TODAY POS SALES:*\n`;
     if (eveningShift) {
-      msg += `• Cash Sales: Rs. ${DB.formatCurrency(eveningShift.posCashSales || 0)}\n`;
-      msg += `• Card Sales: Rs. ${DB.formatCurrency(eveningShift.posCardSales || 0)}\n`;
-      msg += `• Cheque/QR: Rs. ${DB.formatCurrency(eveningShift.posChequeSales || 0)}\n`;
-      msg += `• *POS Gross Total: Rs. ${DB.formatCurrency(eveningShift.posSales || 0)}*\n`;
+      msg += `• Cash Sales: ${DB.formatCurrency(eveningShift.posCashSales || 0)}\n`;
+      msg += `• Card Sales: ${DB.formatCurrency(eveningShift.posCardSales || 0)}\n`;
+      msg += `• Cheque/QR: ${DB.formatCurrency(eveningShift.posChequeSales || 0)}\n`;
+      msg += `• *POS Gross Total: ${DB.formatCurrency(eveningShift.posSales || 0)}*\n`;
     } else {
       msg += `• POS Sales: Pending evening close\n`;
     }
@@ -5386,10 +5529,10 @@ Thank you! - ${shopName}`;
 
     // Expenses
     msg += `💸 *3. DAY EXPENSES & DRAWINGS:*\n`;
-    msg += `• Total Expenses Deducted: Rs. ${DB.formatCurrency(totalExp)}\n`;
+    msg += `• Total Expenses Deducted: ${DB.formatCurrency(totalExp)}\n`;
     if (todayExpenses.length > 0) {
       todayExpenses.forEach(e => {
-        msg += `  - ${e.description || e.category}: Rs. ${DB.formatCurrency(e.amount)}\n`;
+        msg += `  - ${e.description || e.category}: ${DB.formatCurrency(e.amount)}\n`;
       });
     }
     msg += `\n`;
@@ -5397,39 +5540,31 @@ Thank you! - ${shopName}`;
     // Bank Deposits & Cashouts
     if (bDeposits > 0 || bCashOuts > 0) {
       msg += `🏦 *4. BANK TRANSFERS:*\n`;
-      if (bDeposits > 0) msg += `• Bank Deposits (+): Rs. ${DB.formatCurrency(bDeposits)}\n`;
-      if (bCashOuts > 0) msg += `• Cash Outs (-): Rs. ${DB.formatCurrency(bCashOuts)}\n`;
+      if (bDeposits > 0) msg += `• Bank Deposits (+): ${DB.formatCurrency(bDeposits)}\n`;
+      if (bCashOuts > 0) msg += `• Cash Outs (-): ${DB.formatCurrency(bCashOuts)}\n`;
       msg += `\n`;
     }
 
     // Evening Reconciliation
     msg += `🌇 *5. EVENING DRAWER RECONCILIATION:*\n`;
     if (eveningShift) {
-      msg += `• Expected Cash: Rs. ${DB.formatCurrency(eveningShift.expectedCash)}\n`;
-      msg += `• Actual Counted Cash: Rs. ${DB.formatCurrency(eveningShift.actualCountedCash)}\n`;
-      if (eveningShift.denominations) {
-        const d = eveningShift.denominations;
-        let parts = [];
-        if (d.n5000) parts.push(`5000x${d.n5000}`);
-        if (d.n2000) parts.push(`2000x${d.n2000}`);
-        if (d.n1000) parts.push(`1000x${d.n1000}`);
-        if (d.n500) parts.push(`500x${d.n500}`);
-        if (d.n100) parts.push(`100x${d.n100}`);
-        if (d.n50) parts.push(`50x${d.n50}`);
-        if (d.n20) parts.push(`20x${d.n20}`);
-        if (d.coins) parts.push(`Coins: ${d.coins}`);
-        msg += `• Evening Notes: ${parts.join(', ')}\n`;
+      msg += `• Expected Cash: ${DB.formatCurrency(eveningShift.expectedCash)}\n`;
+      msg += `• Actual Counted Cash: ${DB.formatCurrency(eveningShift.actualCountedCash)}\n`;
+      const eveNotes = DB.formatDenominationsText(eveningShift.denominations, true);
+      if (eveNotes.length > 0) {
+        msg += `🧮 *සවස ලාච්චුවේ ගැණූ නෝට්ටු විස්තරය (Evening Notes Breakdown):*\n`;
+        msg += eveNotes.join('\n') + '\n';
       }
-      msg += `• Discrepancy (Diff): Rs. ${DB.formatCurrency(eveningShift.difference)}\n`;
+      msg += `• Discrepancy (Diff): ${DB.formatCurrency(eveningShift.difference)}\n`;
       if (eveningShift.specialNotes || eveningShift.cashNote) {
         msg += `• 📝 Special Cash Note: ${eveningShift.specialNotes || eveningShift.cashNote}\n`;
       }
       if (Math.abs(eveningShift.difference) < 0.01) {
         msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED*\n`;
       } else if (eveningShift.difference > 0) {
-        msg += `• *VERDICT: 🟢 CASH EXCESS (+Rs. ${DB.formatCurrency(eveningShift.difference)})*\n`;
+        msg += `• *VERDICT: 🟢 CASH EXCESS (+${DB.formatCurrency(eveningShift.difference)})*\n`;
       } else {
-        msg += `• *VERDICT: 🔴 CASH SHORTAGE (-Rs. ${DB.formatCurrency(Math.abs(eveningShift.difference))})*\n`;
+        msg += `• *VERDICT: 🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(eveningShift.difference))})*\n`;
       }
     } else {
       msg += `• Evening Shift closing not completed yet.\n`;
