@@ -71,6 +71,24 @@ const App = {
 
     // Check if backup is overdue (> 2 days)
     this.checkBackupReminder();
+
+    // Check direct Mobile Signing Link (#sign?id=... or ?id=...)
+    const checkMobileSignLink = () => {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('sign') || search.includes('sign')) {
+        const targetStr = hash.includes('sign') ? hash : search;
+        const idMatch = targetStr.match(/id=([^&]+)/);
+        const langMatch = targetStr.match(/lang=([^&]+)/);
+        if (idMatch && idMatch[1]) {
+          setTimeout(() => {
+            this.openCreditAgreementModal(idMatch[1], langMatch ? langMatch[1] : 'si');
+          }, 350);
+        }
+      }
+    };
+    checkMobileSignLink();
+    window.addEventListener('hashchange', checkMobileSignLink);
   },
 
   // ---- Backup Status ----
@@ -6455,55 +6473,96 @@ Thank you! - ${shopName}`;
   // DIGITAL SIGNATURE & DOWN PAYMENT SHORTAGE CREDIT AGREEMENT
   // ================================================================
   initSignaturePad(canvasId) {
-    const canvas = document.getElementById(canvasId);
+    let canvas = document.getElementById(canvasId);
     if (!canvas) return;
+
+    // Cleanly clone canvas to clear any previous listeners
+    const parent = canvas.parentNode;
+    const cleanCanvas = canvas.cloneNode(true);
+    if (parent) {
+      parent.replaceChild(cleanCanvas, canvas);
+      canvas = cleanCanvas;
+    }
+
+    // High resolution internal bitmap (1000 x 360) so NO coordinates are ever clipped on any screen width
+    canvas.width = 1000;
+    canvas.height = 360;
+    canvas.style.width = '100%';
+    canvas.style.height = canvas.classList.contains('fullscreen-pad') ? '260px' : '175px';
+    canvas.style.touchAction = 'none';
+
     const ctx = canvas.getContext('2d');
-    let drawing = false;
-
-    // Adapt to display scale
-    const rect = canvas.getBoundingClientRect();
-    const width = rect.width > 50 ? rect.width : 420;
-    const height = 150;
-    canvas.width = width * 2;
-    canvas.height = height * 2;
-    canvas.style.width = width + 'px';
-    canvas.style.height = height + 'px';
-
-    ctx.scale(2, 2);
-    ctx.lineWidth = 2.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 4.5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#0f172a';
 
+    this._hasDrawnSignature = false;
+    this._signatureCanvas = canvas;
+    this._signatureCtx = ctx;
+
+    let drawing = false;
+
     const getPos = (e) => {
       const r = canvas.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      let clientX, clientY;
+      if (e.touches && e.touches.length > 0) {
+        clientX = e.touches[0].clientX;
+        clientY = e.touches[0].clientY;
+      } else if (e.changedTouches && e.changedTouches.length > 0) {
+        clientX = e.changedTouches[0].clientX;
+        clientY = e.changedTouches[0].clientY;
+      } else {
+        clientX = e.clientX;
+        clientY = e.clientY;
+      }
+
+      // Proportional mapping: converts touch/mouse screen point across 100% of visible box to internal 1000x360 canvas pixels
+      const width = r.width || 1;
+      const height = r.height || 1;
+      const normX = Math.max(0, Math.min(1, (clientX - r.left) / width));
+      const normY = Math.max(0, Math.min(1, (clientY - r.top) / height));
       return {
-        x: clientX - r.left,
-        y: clientY - r.top
+        x: normX * canvas.width,
+        y: normY * canvas.height
       };
     };
 
     const startDraw = (e) => {
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       drawing = true;
       const pos = getPos(e);
       ctx.beginPath();
       ctx.moveTo(pos.x, pos.y);
+      ctx.lineTo(pos.x + 0.1, pos.y + 0.1);
+      ctx.stroke();
       this._hasDrawnSignature = true;
+      const statusEl = document.getElementById('sigPadStatusFullscreen') || document.getElementById('sigPadStatus');
+      if (statusEl) {
+        statusEl.textContent = '✍️ අත්සන් කරමින්... (Drawing...)';
+        statusEl.style.color = 'var(--accent-blue)';
+      }
     };
 
     const draw = (e) => {
       if (!drawing) return;
-      e.preventDefault();
+      if (e.cancelable) e.preventDefault();
       const pos = getPos(e);
       ctx.lineTo(pos.x, pos.y);
       ctx.stroke();
     };
 
     const stopDraw = () => {
-      drawing = false;
+      if (drawing) {
+        drawing = false;
+        const statusEl = document.getElementById('sigPadStatusFullscreen') || document.getElementById('sigPadStatus');
+        if (statusEl) {
+          statusEl.textContent = '✓ අත්සන සටහන් විය (Signature Captured)';
+          statusEl.style.color = 'var(--accent-green)';
+        }
+      }
     };
 
     canvas.addEventListener('mousedown', startDraw);
@@ -6512,17 +6571,79 @@ Thank you! - ${shopName}`;
 
     canvas.addEventListener('touchstart', startDraw, { passive: false });
     canvas.addEventListener('touchmove', draw, { passive: false });
-    window.addEventListener('touchend', stopDraw);
-
-    this._signatureCanvas = canvas;
-    this._signatureCtx = ctx;
-    this._hasDrawnSignature = false;
+    window.addEventListener('touchend', stopDraw, { passive: false });
+    window.addEventListener('touchcancel', stopDraw, { passive: false });
   },
 
   clearSignaturePad() {
     if (!this._signatureCanvas || !this._signatureCtx) return;
-    this._signatureCtx.clearRect(0, 0, this._signatureCanvas.width, this._signatureCanvas.height);
+    this._signatureCtx.fillStyle = '#ffffff';
+    this._signatureCtx.fillRect(0, 0, this._signatureCanvas.width, this._signatureCanvas.height);
     this._hasDrawnSignature = false;
+    const statusEl = document.getElementById('sigPadStatusFullscreen') || document.getElementById('sigPadStatus');
+    if (statusEl) {
+      statusEl.textContent = 'Waiting for signature...';
+      statusEl.style.color = 'var(--text-muted)';
+    }
+  },
+
+  openMobileFullscreenSignModal(creditId, lang = 'si') {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div style="font-size:0.85rem; color:var(--text-secondary); line-height:1.4;">
+          📱 <strong>${credit.customerName}</strong> (${credit.phoneModel})<br>
+          <span style="color:var(--accent-gold); font-size:0.8rem;">ජංගම දුරකථනයෙන් පහසුවෙන් ඇඟිල්ලෙන් අත්සන් කිරීමට පහත සම්පූර්ණ කොටුව භාවිතා කරන්න (Sign in the box below):</span>
+        </div>
+
+        <div style="border:2px dashed #0284c7; border-radius:8px; background:#fff; overflow:hidden; touch-action:none;">
+          <canvas id="creditSignatureCanvasFullscreen" class="fullscreen-pad" style="display:block; width:100%; height:260px; touch-action:none; cursor:crosshair;"></canvas>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem;">
+          <span id="sigPadStatusFullscreen" style="color:var(--text-muted); font-weight:700;">👆 තිරය මත අත්සන් කරන්න</span>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.clearSignaturePad()" style="color:var(--accent-red); border:1px solid rgba(239,68,68,0.3); font-weight:700;">
+            🧹 Clear
+          </button>
+        </div>
+      </div>
+    `;
+
+    this.showSubModal(
+      '📱 Mobile Fullscreen Signature Pad',
+      bodyHtml,
+      [
+        { text: 'Close', class: 'btn-ghost', onClick: () => this.closeSubModal() },
+        { text: '✅ Apply Signature', class: 'btn-primary', onClick: () => {
+            if (!this._hasDrawnSignature) {
+              this.showToast('කරුණාකර පළමුව අත්සන තබන්න', 'warning');
+              return;
+            }
+            const sigData = this._signatureCanvas ? this._signatureCanvas.toDataURL('image/png') : '';
+            if (sigData) {
+              DB.saveCreditSignature(creditId, sigData, lang);
+              this.showToast('✅ ඩිජිටල් අත්සන සුරැකිණි!', 'success');
+              this.closeSubModal();
+              this.openCreditAgreementModal(creditId, lang);
+            }
+          }
+        }
+      ]
+    );
+
+    setTimeout(() => {
+      this.initSignaturePad('creditSignatureCanvasFullscreen');
+      if (credit.signature && this._signatureCtx) {
+        const img = new Image();
+        img.onload = () => {
+          this._signatureCtx.drawImage(img, 0, 0, this._signatureCanvas.width, this._signatureCanvas.height);
+          this._hasDrawnSignature = true;
+        };
+        img.src = credit.signature;
+      }
+    }, 150);
   },
 
   openCreditAgreementModal(creditId, lang = 'si') {
@@ -6619,13 +6740,18 @@ Thank you! - ${shopName}`;
 
         <!-- Digital Signature Canvas Pad -->
         <div style="background:var(--bg-card); padding:10px; border-radius:8px; border:1px solid rgba(2,132,199,0.35);">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
             <label style="font-size:0.85rem; font-weight:800; color:var(--accent-blue); margin-bottom:0;">
-              ✍️ පාරිභෝගික ඩිජිටල් අත්සන (Sign on Screen with Finger / Stylus):
+              ✍️ පාරිභෝගික ඩිජිටල් අත්සන (Sign Across the Box with Finger / Stylus):
             </label>
-            <button type="button" class="btn btn-xs btn-ghost" onclick="App.clearSignaturePad()" style="color:var(--accent-red); border:1px solid rgba(239,68,68,0.3); font-size:0.75rem; padding:2px 8px;">
-              🧹 Clear / Re-sign
-            </button>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-xs btn-primary" onclick="App.openMobileFullscreenSignModal('${credit.id}', '${lang}')" style="font-size:0.72rem; padding:2px 8px; font-weight:700; background:#0284c7; border:none;">
+                📱 Big Mobile Pad
+              </button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.clearSignaturePad()" style="color:var(--accent-red); border:1px solid rgba(239,68,68,0.3); font-size:0.72rem; padding:2px 8px;">
+                🧹 Clear
+              </button>
+            </div>
           </div>
           <div style="border:2px dashed rgba(2,132,199,0.5); border-radius:6px; background:#ffffff; overflow:hidden;">
             <canvas id="creditSignatureCanvas" style="display:block; touch-action:none; cursor:crosshair;"></canvas>
@@ -6657,7 +6783,7 @@ Thank you! - ${shopName}`;
       if (credit.signature && this._signatureCtx) {
         const img = new Image();
         img.onload = () => {
-          this._signatureCtx.drawImage(img, 0, 0, this._signatureCanvas.width / 2, this._signatureCanvas.height / 2);
+          this._signatureCtx.drawImage(img, 0, 0, this._signatureCanvas.width, this._signatureCanvas.height);
           this._hasDrawnSignature = true;
         };
         img.src = credit.signature;
@@ -6740,6 +6866,8 @@ Thank you! - ${shopName}`;
       msg += `மேற்குறிப்பிட்ட அனைத்து நிபந்தனைகளையும் நான் தெளிவாக வாசித்து முழுமையாகப் புரிந்துகொண்டு எனது டிஜிட்டல் கையொப்பத்தை இட்டுள்ளேன்.\n`;
       msg += `• நிலை: ${credit.signature ? '✅ டிஜிட்டல் கையொப்பம் இடப்பட்டுள்ளது (Digitally Signed)' : '⏳ கையொப்பம் நிலுவையில் உள்ளது'}\n`;
       if (credit.signedAt) msg += `• திகதி: ${DB.formatDateTime(credit.signedAt)}\n`;
+      msg += `\n📱 *மொபைல் மூலம் டிஜிட்டல் கையொப்பமிட (Sign via Mobile):*\n`;
+      msg += `https://ddmusiccenter8-art.github.io/RELOD-HUB-METHMI-MOBILE/#sign?id=${credit.id}&lang=ta\n`;
       msg += `\n=================================\n`;
       msg += `${shopName}`;
     } else {
@@ -6777,6 +6905,8 @@ Thank you! - ${shopName}`;
       msg += `ඉහත සියලු කරුණු සහ කොන්දේසි මා කියවා තේරුම් ගෙන ඊට එකඟ වී ඩිජිටල් අත්සන තබා මෙම දුරකථනය ලබාගතිමි.\n`;
       msg += `• තත්ත්වය: ${credit.signature ? '✅ ඩිජිටල් අත්සන තබා තහවුරු කර ඇත (Digitally Signed)' : '⏳ අත්සන් කිරීම තවම සිදුකර නැත'}\n`;
       if (credit.signedAt) msg += `• අත්සන් කළ දිනය: ${DB.formatDateTime(credit.signedAt)}\n`;
+      msg += `\n📱 *ජංගම දුරකථනයෙන් ඩිජිටල් අත්සන තැබීමට පිවිසෙන්න (Sign via Mobile):*\n`;
+      msg += `https://ddmusiccenter8-art.github.io/RELOD-HUB-METHMI-MOBILE/#sign?id=${credit.id}&lang=si\n`;
       msg += `\n=================================\n`;
       msg += `${shopName}`;
     }
