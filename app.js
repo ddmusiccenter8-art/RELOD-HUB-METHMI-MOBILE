@@ -6450,6 +6450,507 @@ Thank you! - ${shopName}`;
     }
   },
 
+
+  // ================================================================
+  // DIGITAL SIGNATURE & DOWN PAYMENT SHORTAGE CREDIT AGREEMENT
+  // ================================================================
+  initSignaturePad(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+
+    // Adapt to display scale
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width > 50 ? rect.width : 420;
+    const height = 150;
+    canvas.width = width * 2;
+    canvas.height = height * 2;
+    canvas.style.width = width + 'px';
+    canvas.style.height = height + 'px';
+
+    ctx.scale(2, 2);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#0f172a';
+
+    const getPos = (e) => {
+      const r = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: clientX - r.left,
+        y: clientY - r.top
+      };
+    };
+
+    const startDraw = (e) => {
+      e.preventDefault();
+      drawing = true;
+      const pos = getPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+      this._hasDrawnSignature = true;
+    };
+
+    const draw = (e) => {
+      if (!drawing) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+    };
+
+    const stopDraw = () => {
+      drawing = false;
+    };
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stopDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    window.addEventListener('touchend', stopDraw);
+
+    this._signatureCanvas = canvas;
+    this._signatureCtx = ctx;
+    this._hasDrawnSignature = false;
+  },
+
+  clearSignaturePad() {
+    if (!this._signatureCanvas || !this._signatureCtx) return;
+    this._signatureCtx.clearRect(0, 0, this._signatureCanvas.width, this._signatureCanvas.height);
+    this._hasDrawnSignature = false;
+  },
+
+  openCreditAgreementModal(creditId, lang = 'si') {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) {
+      this.showToast('Credit agreement not found', 'error');
+      return;
+    }
+
+    const shop = DB.getShop(credit.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+
+    const reqDown = parseFloat(credit.totalPrice) || 0;
+    const paidDown = parseFloat(credit.downPayment) || 0;
+    const balDue = parseFloat(credit.balanceDue) || 0;
+    const days = credit.creditPeriodDays || 14;
+
+    const isTa = lang === 'ta';
+    const isEn = lang === 'en';
+
+    let clausesHtml = '';
+    if (isTa) {
+      clausesHtml = `
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; font-size:0.83rem; line-height:1.5; color:var(--text-secondary); max-height:220px; overflow-y:auto;">
+          <div style="font-weight:800; color:var(--accent-gold); margin-bottom:8px; font-size:0.9rem;">⚖️ ஆரம்பக் கொடுப்பனவு நிலுவைக்கான சட்ட நிபந்தனைகள்:</div>
+          <p style="margin-bottom:8px;"><strong>1. 14/15 நாட்களுக்குப் பின் ரூ. 1,200/- ஆரம்ப அபராதம்:</strong> ஆரம்பக் கொடுப்பனவில் குறைவாக உள்ள நிலுவைத் தொகையான <strong>${DB.formatCurrency(balDue)}</strong> ஐ ஒப்புக்கொண்டபடி ${days} நாட்களுக்குள் செலுத்தத் தவறினால், அந்தத் தொகையுடன் மேலதிகமாக <strong>ரூ. 1,200/- ஆரம்ப அபராதமாக (Late Penalty)</strong> உடனடியாகச் சேர்க்கப்படும்.</p>
+          <p style="margin-bottom:8px;"><strong>2. தொடர்ந்து தாமதமாகும் ஒவ்வொரு மாதத்திற்கும் ரூ. 300/- அபராதம்:</strong> குறித்த திகதிக்குப் பின்னரும் நிலுவையையும் அபராதத்தையும் செலுத்தாது அடுத்த தவணை வரை தாமதப்படுத்தும் <strong>ஒவ்வொரு மேலதிக மாதத்திற்கும் ரூ. 300/- வீதம் தொடர்ச்சியாக அபராதம்</strong> கூட்டப்படும்.</p>
+          <p style="margin-bottom:8px;"><strong>3. தொலைபேசி முடக்கப்படுதல் & திறக்க 15 நாட்கள்:</strong> நிலுவை செலுத்தாமையினால் தொலைபேசி முடக்கப்பட்டால் (Locked), அபராதத்துடன் அனைத்து நிலுவையும் செலுத்தப்பட்ட பின்னரும் தொலைபேசியை மீண்டும் திறந்து வழங்க (Unlock) <strong>குறைந்தது 15 நாட்கள்</strong> செல்லும் என்பதை ஒப்புக்கொள்கிறேன்.</p>
+          <p style="margin-bottom:8px;"><strong>4. சேவை மற்றும் உத்தரவாதம் இடைநிறுத்தம்:</strong> நிலுவை செலுத்தாததால் தொலைபேசி லாக் செய்யப்பட்டால், முழு நிலுவையும் அபராதமும் செலுத்தி முடிக்கப்படும் வரை தொலைபேசிக்கான உத்தரவாதமோ (Warranty) பழுதுபார்ப்பு சேவைகளோ வழங்கப்படமாட்டாது.</p>
+          <p style="margin-bottom:8px;"><strong>5. சட்டபூர்வ உரிமை மற்றும் பொலிஸ் முறைப்பாடு கட்டுப்பாடு:</strong> ஆரம்பக் கொடுப்பனவு நிலுவையும் அபராதமும் முழுமையாக தீர்க்கப்படும் வரை தொலைபேசியின் முழுமையான சட்டபூர்வ உரிமை நிறுவனத்திற்கே உரியதாகும். தொலைபேசி தொலைந்துபோனாலோ பொலிஸ் முறைப்பாடு செய்யும் உரிமை வாடிக்கையாளருக்கு இல்லை; நிலுவையை முழுமையாக செலுத்த வாடிக்கையாளர் கடமைப்பட்டுள்ளார்.</p>
+          <p style="margin-bottom:0;"><strong>6. தொலைபேசியை மீளப்பெறுதல் & சட்ட நடவடிக்கை அதிகாரம்:</strong> வாக்குறுதியளித்தபடி பணத்தைச் செலுத்தத் தவறினால், தொலைபேசியை மீளக் கைப்பற்றவோ வாடிக்கையாளருக்கு எதிராக நீதிமன்ற சட்ட நடவடிக்கை எடுக்கவோ நிறுவனத்திற்கு முழுமையான சட்ட அதிகாரம் உண்டு.</p>
+        </div>
+      `;
+    } else if (isEn) {
+      clausesHtml = `
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; font-size:0.83rem; line-height:1.5; color:var(--text-secondary); max-height:220px; overflow-y:auto;">
+          <div style="font-weight:800; color:var(--accent-gold); margin-bottom:8px; font-size:0.9rem;">⚖️ Down Payment Shortage Legal Terms:</div>
+          <p style="margin-bottom:8px;"><strong>1. Immediate Rs. 1,200/- Late Penalty:</strong> If the down payment shortage balance of <strong>${DB.formatCurrency(balDue)}</strong> is not paid within the agreed ${days} days, a mandatory late fine of <strong>Rs. 1,200/-</strong> is added immediately.</p>
+          <p style="margin-bottom:8px;"><strong>2. Monthly Rs. 300/- Rolling Surcharge:</strong> For every additional month delayed without clearing the due shortage and penalty, an additional fee of <strong>Rs. 300/- per month</strong> will accumulate.</p>
+          <p style="margin-bottom:8px;"><strong>3. Remote Lock & 15-Day Unlock Processing:</strong> Default will cause remote device lock. After full settlement of balance and fines, unlocking requires a minimum of <strong>15 working days</strong>.</p>
+          <p style="margin-bottom:8px;"><strong>4. Warranty & Support Suspension:</strong> No warranty or repair services will be provided while the device is locked due to default.</p>
+          <p style="margin-bottom:8px;"><strong>5. Ownership & Police Complaint Restriction:</strong> The device remains the legal property of the shop until 100% cleared. Customer cannot lodge police complaints for lost device and remains fully liable.</p>
+          <p style="margin-bottom:0;"><strong>6. Legal Repossession & Action:</strong> The shop reserves full legal authority to repossess the phone and institute legal recovery proceedings.</p>
+        </div>
+      `;
+    } else {
+      clausesHtml = `
+        <div style="background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; font-size:0.83rem; line-height:1.5; color:var(--text-secondary); max-height:220px; overflow-y:auto;">
+          <div style="font-weight:800; color:var(--accent-gold); margin-bottom:8px; font-size:0.9rem;">⚖️ මූලික ගෙවීම් හිඟ ශේෂය සඳහා වූ නෛතික කොන්දේසි:</div>
+          <p style="margin-bottom:8px;"><strong>1. දින 14/15 න් පසු රු. 1,200/- ක මූලික දඩය:</strong> මෙම දුරකථනය ලබාගැනීමේදී මූලික මුදලින් (Down Payment) අඩු වූ හිඟ ශේෂය <strong>${DB.formatCurrency(balDue)}</strong> ඉහත පොරොන්දු වූ පරිදි දින ${days} ක් ඇතුළත නොගෙවා එම දිනය පසුවූ වහාම, හිඟ මුදලට අමතරව <strong>රු. 1,200/- ක මූලික දඩ මුදලක් (Late Penalty)</strong> අනිවාර්යයෙන්ම එකතු වේ.</p>
+          <p style="margin-bottom:8px;"><strong>2. ප්‍රමාද වන සෑම අමතර මාසයකටම රු. 300/- බැගින්:</strong> දිනය පසුවීමෙන් පසු හිඟ මුදල සහ දඩය නොගෙවා තවදුරටත් මඟහරින්නේ නම්, ඊළඟ වාරික දිනය දක්වා හෝ තවත් මාසයක් ගතවන <strong>සෑම අමතර මාසයකටම රු. 300/- බැගින් අමතර දඩයක් (Monthly Surcharge)</strong> අඛණ්ඩව එකතු වේ.</p>
+          <p style="margin-bottom:8px;"><strong>3. දුරකථනය ලොක් වීම (Remote Lock) & අන්ලොක් වීමට දින 15ක්:</strong> මූලික ගෙවීම් හිඟය නොගෙවීම නිසා අප ආයතනය හෝ ෆිනෑන්ස් සමාගම (Intex Finance ඇතුළු) මඟින් දුරකථනය Remote Lock කරනු ලැබේ. ඉන්පසු හිඟ මුදල සහ දඩ සම්පූර්ණයෙන්ම ගෙවා අවසන් කළද, දුරකථනය නැවත Unlock කර යථා තත්ත්වයට පත් කරදීමට <strong>අවම වශයෙන් දින 15 ක කාලයක්</strong> ගතවන බවට එකඟ වෙමි.</p>
+          <p style="margin-bottom:8px;"><strong>4. වගකීම් සහතිකය & සේවාවන් අත්හිටුවීම:</strong> දුරකථනය ලොක් වූ පසු, හිඟ මුදල සහ සියලු දඩ මුදල් එකවර ගෙවා නිදහස් කරගන්නා තෙක් දුරකථනය සඳහා ආයතනයෙන් හෝ ෆිනෑන්ස් සමාගමෙන් කිසිදු Warranty හෝ අලුත්වැඩියා පාරිභෝගික සහයක් සපයනු නොලැබේ.</p>
+          <p style="margin-bottom:8px;"><strong>5. නෛතික අයිතිය සහ පොලිස් පැමිණිලි සීමා කිරීම:</strong> මූලික ගෙවීමේ අඩු මුදල සහ දඩ මුදල් සම්පූර්ණයෙන්ම ගෙවා නිදහස් කරගන්නා තෙක් මෙම දුරකථනයේ නෛතික හිමිකාරිත්වය ආයතනය සතු වේ. දුරකථනය නැතිවීමක් සිදුවුවද පොලිසියේ පැමිණිල්ලක් දැමීමේ අයිතියක් පාරිභෝගිකයාට නොමැති අතර, අස්ථානගත වුවද සම්පූර්ණ හිඟ මුදල් ගෙවීමට පාරිභෝගිකයා නීතියෙන් බැඳී සිටී.</p>
+          <p style="margin-bottom:0;"><strong>6. නඩු පැවරීම & දුරකථනය යළි අත්පත් කරගැනීම:</strong> පොරොන්දු වූ පරිදි මුදල් නොගෙවා දිගින් දිගටම පැහැර හරින්නේ නම්, දුරකථනය යළි ආයතනය සන්තකයට ලබාගැනීමට සහ පාරිභෝගිකයාට එරෙහිව සිවිල් හා අපරාධ නඩු පැවරීමට මෙත්මි මොබයිල් ආයතනයට පූර්ණ නෛතික බලතල හිමිවේ.</p>
+        </div>
+      `;
+    }
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <!-- Language Switcher Bar -->
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:6px; border:1px solid var(--border-glass);">
+          <span style="font-size:0.8rem; font-weight:700; color:var(--text-secondary);">🌐 Select Language (භාෂාව තෝරන්න):</span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-xs ${lang === 'si' ? 'btn-primary' : 'btn-ghost'}" onclick="App.openCreditAgreementModal('${credit.id}', 'si')" style="font-weight:700;">🇱🇰 සිංහල</button>
+            <button type="button" class="btn btn-xs ${lang === 'ta' ? 'btn-primary' : 'btn-ghost'}" onclick="App.openCreditAgreementModal('${credit.id}', 'ta')" style="font-weight:700;">🇮🇳 தமிழ்</button>
+            <button type="button" class="btn btn-xs ${lang === 'en' ? 'btn-primary' : 'btn-ghost'}" onclick="App.openCreditAgreementModal('${credit.id}', 'en')" style="font-weight:700;">🇬🇧 English</button>
+          </div>
+        </div>
+
+        <!-- Customer & Device Overview -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; background:var(--bg-glass); padding:10px; border-radius:8px; border:1px solid var(--border-glass); font-size:0.82rem;">
+          <div>
+            <div>👤 <strong>${credit.customerName}</strong></div>
+            <div style="color:var(--text-muted); font-size:0.75rem;">NIC: ${credit.nicNumber || 'N/A'} | 📞 ${credit.primaryPhone}</div>
+            <div style="margin-top:4px;">📱 <strong>${credit.phoneModel}</strong></div>
+            <div style="color:var(--text-muted); font-size:0.75rem; font-family:monospace;">IMEI: ${credit.imeiNumber || 'N/A'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="color:var(--text-muted); font-size:0.75rem;">Required Down Payment: ${DB.formatCurrency(reqDown)}</div>
+            <div style="color:var(--accent-blue); font-size:0.75rem;">Paid: ${DB.formatCurrency(paidDown)}</div>
+            <div style="font-size:1.15rem; font-weight:900; color:var(--accent-red); margin-top:2px;">
+              Shortage Due: ${DB.formatCurrency(balDue)}
+            </div>
+            <div style="font-size:0.75rem; color:var(--accent-gold); font-weight:700; margin-top:2px;">
+              ⏳ Period: ${days} Days (Due: ${credit.dueDate || 'N/A'})
+            </div>
+          </div>
+        </div>
+
+        <!-- Clauses Box -->
+        ${clausesHtml}
+
+        <!-- Digital Signature Canvas Pad -->
+        <div style="background:var(--bg-card); padding:10px; border-radius:8px; border:1px solid rgba(2,132,199,0.35);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label style="font-size:0.85rem; font-weight:800; color:var(--accent-blue); margin-bottom:0;">
+              ✍️ පාරිභෝගික ඩිජිටල් අත්සන (Sign on Screen with Finger / Stylus):
+            </label>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.clearSignaturePad()" style="color:var(--accent-red); border:1px solid rgba(239,68,68,0.3); font-size:0.75rem; padding:2px 8px;">
+              🧹 Clear / Re-sign
+            </button>
+          </div>
+          <div style="border:2px dashed rgba(2,132,199,0.5); border-radius:6px; background:#ffffff; overflow:hidden;">
+            <canvas id="creditSignatureCanvas" style="display:block; touch-action:none; cursor:crosshair;"></canvas>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px; font-size:0.72rem; color:var(--text-muted);">
+            <span>👆 තිරය මත ඇඟිල්ලෙන් අත්සන් කරන්න</span>
+            <span id="sigPadStatus" style="font-weight:700; color:${credit.signature ? 'var(--accent-green)' : 'var(--text-muted)'};">
+              ${credit.signature ? '✓ Previously Signed' : 'Waiting for signature...'}
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+
+    this.showModal(
+      `📝 ${credit.customerName} - Agreement & Signature`,
+      bodyHtml,
+      [
+        { text: 'Close', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: '💾 Save Signature', class: 'btn-primary', onClick: () => this.saveCreditAgreementSignature(credit.id, lang) },
+        { text: '📲 WhatsApp', class: 'btn-success', onClick: () => this.sendWhatsAppAgreement(credit.id, lang) },
+        { text: '📄 Print PDF', class: 'btn-secondary', onClick: () => this.printCreditAgreement(credit.id, lang) }
+      ]
+    );
+
+    // Initialize signature pad after DOM renders
+    setTimeout(() => {
+      this.initSignaturePad('creditSignatureCanvas');
+      if (credit.signature && this._signatureCtx) {
+        const img = new Image();
+        img.onload = () => {
+          this._signatureCtx.drawImage(img, 0, 0, this._signatureCanvas.width / 2, this._signatureCanvas.height / 2);
+          this._hasDrawnSignature = true;
+        };
+        img.src = credit.signature;
+      }
+    }, 150);
+  },
+
+  saveCreditAgreementSignature(creditId, lang = 'si') {
+    if (!this._hasDrawnSignature) {
+      this.showToast('කරුණාකර පළමුව තිරය මත අත්සන තබන්න (Please sign on screen)', 'warning');
+      return;
+    }
+    const signatureData = this._signatureCanvas ? this._signatureCanvas.toDataURL('image/png') : '';
+    if (!signatureData) {
+      this.showToast('Failed to capture signature', 'error');
+      return;
+    }
+
+    DB.saveCreditSignature(creditId, signatureData, lang);
+    this.showToast('✅ ගිවිසුම සහ ඩිජිටල් අත්සන සාර්ථකව සුරැකිණි! (Agreement Signed & Saved)', 'success');
+    this.closeModal();
+    this.showDeviceCreditDetailsModal(creditId);
+  },
+
+  sendWhatsAppAgreement(creditId, lang = 'si') {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    let phone = (credit.primaryPhone || '').replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '94' + phone.substring(1);
+    } else if (phone && !phone.startsWith('94')) {
+      phone = '94' + phone;
+    }
+
+    const shop = DB.getShop(credit.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+
+    const reqDown = parseFloat(credit.totalPrice) || 0;
+    const paidDown = parseFloat(credit.downPayment) || 0;
+    const balDue = parseFloat(credit.balanceDue) || 0;
+    const days = credit.creditPeriodDays || 14;
+
+    const isTa = lang === 'ta';
+    const isEn = lang === 'en';
+
+    let msg = '';
+    if (isTa) {
+      msg = `📱 *${shopName.toUpperCase()} - ஆரம்பக் கொடுப்பනவு நிலுவைக்கான சட்ட ஒப்பந்தம்*\n`;
+      msg += `(Down Payment Shortage Credit Agreement & Legal Terms)\n`;
+      msg += `=================================\n\n`;
+      msg += `👤 *வாடிக்கையாளர் விபரம்:*\n`;
+      msg += `• பெயர்: ${credit.customerName}\n`;
+      msg += `• அடையாள அட்டை (NIC): ${credit.nicNumber || 'N/A'}\n`;
+      msg += `• தொலைபேசி: ${credit.primaryPhone}\n`;
+      msg += `• தொலைபேசி மாடல்: ${credit.phoneModel}\n`;
+      msg += `• IMEI: ${credit.imeiNumber || 'N/A'}\n\n`;
+      msg += `💵 *ஆரம்பக் கொடுப்பனவு மற்றும் கடன் விபரம்:*\n`;
+      msg += `• செலுத்த வேண்டிய ஆரம்பக் கொடுப்பனவு: ${DB.formatCurrency(reqDown)}\n`;
+      msg += `• செலுத்திய ஆரம்பத் தொகை: ${DB.formatCurrency(paidDown)}\n`;
+      msg += `👉 *குறைவாக உள்ள நிலுவைத் தொகை (Balance Due): ${DB.formatCurrency(balDue)}*\n`;
+      msg += `⏳ *ஒப்புக்கொள்ளப்பட்ட அவகாசம்:* ${days} நாட்களுக்குள்\n`;
+      msg += `📅 *செலுத்த வேண்டிய இறுதித் திகதி:* ${credit.dueDate || '14 நாட்களுக்குள்'}\n\n`;
+      msg += `=================================\n`;
+      msg += `⚖️ *முக்கிய சட்ட நிபந்தனைகள் மற்றும் விதிமுறைகள்:*\n\n`;
+      msg += `1️⃣ *14/15 நாட்களுக்குப் பின் ரூ. 1,200/- ஆரம்ப அபராதம்:*\n`;
+      msg += `ஆரம்பக் கொடுப்பனவில் குறைவாக இருந்த நிலுவைத் தொகையான ${DB.formatCurrency(balDue)} ஐ ஒப்புக்கொண்டபடி ${days} நாட்களுக்குள் செலுத்தத் தவறினால், அந்தத் தொகையுடன் மேலதிகமாக *ரூ. 1,200/- ஆரம்ப அபராதமாக (Late Penalty)* உடனடியாகச் சேர்க்கப்படும்.\n\n`;
+      msg += `2️⃣ *தொடர்ந்து தாமதமாகும் ஒவ்வொரு மாதத்திற்கும் ரூ. 300/- அபராதம்:*\n`;
+      msg += `குறித்த திகதிக்குப் பின்னரும் நிலுவையையும் அபராதத்தையும் செலுத்தாது அடுத்த தவணை வரை தாமதப்படுத்தும் *ஒவ்வொரு மேலதிக மாதத்திற்கும் ரூ. 300/- வீதம் அபராதம்* தொடர்ச்சியாக கூட்டப்படும்.\n\n`;
+      msg += `3️⃣ *தொலைபேசி முடக்கப்படுதல் & திறக்க 15 நாட்கள்:*\n`;
+      msg += `நிலுவையைச் செலுத்தாமையினால் தொலைபேசி முடக்கப்பட்டால் (Locked), அபராதத்துடன் அனைத்து நிலுவையும் செலுத்தப்பட்ட பின்னரும் தொலைபேசியை மீண்டும் திறந்து வழங்க (Unlock) *குறைந்தது 15 நாட்கள்* செல்லும் என்பதை ஒப்புக்கொள்கிறேன்.\n\n`;
+      msg += `4️⃣ *சேவை மற்றும் உத்தரவாதம் இடைநிறுத்தம்:*\n`;
+      msg += `நிலுவை செலுத்தாததால் தொலைபேசி லாக் செய்யப்பட்டால், முழு நிலுவையும் அபராதமும் செலுத்தி முடிக்கப்படும் வரை உத்தரவாதமோ (Warranty) பழுதுபார்ப்பு சேவைகளோ வழங்கப்படமாட்டாது.\n\n`;
+      msg += `5️⃣ *சட்டபூர்வ உரிமை மற்றும் பொலிஸ் முறைப்பாடு கட்டுப்பாடு:*\n`;
+      msg += `நிலுவையும் அபராதமும் முழுமையாக தீர்க்கப்படும் வரை தொலைபேசியின் முழுமையான சட்டபூர்வ உரிமை நிறுவனத்திற்கே உரியதாகும். தொலைபேசி தொலைந்துபோனாலோ பொலிஸ் முறைப்பாடு செய்யும் உரிமை வாடிக்கையாளருக்கு இல்லை; நிலுவையை முழுமையாக செலுத்த வாடிக்கையாளர் கடமைப்பட்டுள்ளார்.\n\n`;
+      msg += `6️⃣ *தொலைபேசியை மீளப்பெறுதல் & சட்ட நடவடிக்கை அதிகாரம்:*\n`;
+      msg += `வாக்குறுதியளித்தபடி பணத்தைச் செலுத்தத் தவறினால், தொலைபேசியை மீளக் கைப்பற்றவோ வாடிக்கையாளருக்கு எதிராக நீதிமன்ற சட்ட நடவடிக்கை எடுக்கவோ நிறுவனத்திற்கு முழுமையான சட்ட அதிகாரம் உண்டு.\n\n`;
+      msg += `=================================\n`;
+      msg += `✍️ *வாடிக்கையாளர் உறுதிமொழி:*\n`;
+      msg += `மேற்குறிப்பிட்ட அனைத்து நிபந்தனைகளையும் நான் தெளிவாக வாசித்து முழுமையாகப் புரிந்துகொண்டு எனது டிஜிட்டல் கையொப்பத்தை இட்டுள்ளேன்.\n`;
+      msg += `• நிலை: ${credit.signature ? '✅ டிஜிட்டல் கையொப்பம் இடப்பட்டுள்ளது (Digitally Signed)' : '⏳ கையொப்பம் நிலுவையில் உள்ளது'}\n`;
+      if (credit.signedAt) msg += `• திகதி: ${DB.formatDateTime(credit.signedAt)}\n`;
+      msg += `\n=================================\n`;
+      msg += `${shopName}`;
+    } else {
+      msg = `📱 *${shopName.toUpperCase()} - මූලික ගෙවීම් හිඟ ශේෂ ණය සහන ගිවිසුම*\n`;
+      msg += `(Down Payment Shortage Credit Agreement & Legal Terms)\n`;
+      msg += `=================================\n\n`;
+      msg += `👤 *පාරිභෝගික විස්තර:*\n`;
+      msg += `• නම: ${credit.customerName}\n`;
+      msg += `• හැඳුනුම්පත (NIC): ${credit.nicNumber || 'N/A'}\n`;
+      msg += `• දුරකථන: ${credit.primaryPhone}\n`;
+      msg += `• දුරකථන මාදිලිය: ${credit.phoneModel}\n`;
+      msg += `• IMEI: ${credit.imeiNumber || 'N/A'}\n\n`;
+      msg += `💵 *මූලික ගෙවීම් සහ ණය ශේෂය:*\n`;
+      msg += `• නියමිත මූලික මුදල (Required Down Payment): ${DB.formatCurrency(reqDown)}\n`;
+      msg += `• ගෙවූ මූලික මුදල (Cash Paid): ${DB.formatCurrency(paidDown)}\n`;
+      msg += `👉 *අඩු වූ හිඟ ණය ශේෂය (Down Payment Shortage Due): ${DB.formatCurrency(balDue)}*\n`;
+      msg += `⏳ *පොරොන්දු වූ දින ගණන:* දින ${days} ක් ඇතුළත\n`;
+      msg += `📅 *ගෙවිය යුතු අවසන් දිනය:* ${credit.dueDate || 'දින 14ක් ඇතුළත'}\n\n`;
+      msg += `=================================\n`;
+      msg += `⚖️ *ප්‍රධාන නෛතික කොන්දේසි සහ රෙගුලාසි:*\n\n`;
+      msg += `1️⃣ *දින 14/15 න් පසු රු. 1,200/- ක මූලික දඩය:*\n`;
+      msg += `ඉහත පොරොන්දු වූ පරිදි දින ${days} ඇතුළත මෙම අඩු වූ මූලික මුදල ${DB.formatCurrency(balDue)} නොගෙවා එම දිනය පසුවූ වහාම, හිඟ මුදලට අමතරව *රු. 1,200/- ක මූලික දඩ මුදලක් (Late Penalty)* අනිවාර්යයෙන්ම එකතු වේ.\n\n`;
+      msg += `2️⃣ *ප්‍රමාද වන සෑම අමතර මාසයකටම රු. 300/- බැගින්:*\n`;
+      msg += `දිනය පසුවීමෙන් පසු හිඟ මුදල සහ දඩය නොගෙවා තවදුරටත් මඟහරින්නේ නම්, ඊළඟ වාරික දිනය දක්වා හෝ තවත් මාසයක් ගතවන *සෑම අමතර මාසයකටම රු. 300/- බැගින් අමතර දඩයක් (Monthly Surcharge)* අඛණ්ඩව එකතු වේ.\n\n`;
+      msg += `3️⃣ *දුරකථනය ලොක් වීම (Remote Lock) & අන්ලොක් වීමට දින 15ක්:*\n`;
+      msg += `මූලික ගෙවීම් හිඟය නොගෙවීම නිසා අප ආයතනය හෝ ෆිනෑන්ස් සමාගම (Intex Finance ඇතුළු) මඟින් මෙම දුරකථනය Remote Lock කරනු ලැබේ. ඉන්පසු හිඟ මුදල සහ දඩ සම්පූර්ණයෙන්ම ගෙවා අවසන් කළද, දුරකථනය නැවත Unlock කර යථා තත්ත්වයට පත් කරදීමට *අවම වශයෙන් දින 15 ක කාලයක්* ගතවන බවට එකඟ වෙමි.\n\n`;
+      msg += `4️⃣ *වගකීම් සහතිකය & සේවාවන් අත්හිටුවීම:*\n`;
+      msg += `දුරකථනය ලොක් වූ පසු, හිඟ මුදල සහ සියලු දඩ මුදල් එකවර ගෙවා නිදහස් කරගන්නා තෙක් දුරකථනය සඳහා ආයතනයෙන් හෝ ෆිනෑන්ස් සමාගමෙන් කිසිදු Warranty හෝ අලුත්වැඩියා පාරිභෝගික සහයක් සපයනු නොලැබේ.\n\n`;
+      msg += `5️⃣ *නෛතික අයිතිය සහ පොලිස් පැමිණිලි සීමා කිරීම:*\n`;
+      msg += `මූලික ගෙවීමේ අඩු මුදල සහ දඩ මුදල් සම්පූර්ණයෙන්ම ගෙවා නිදහස් කරගන්නා තෙක් මෙම දුරකථනයේ නෛතික හිමිකාරිත්වය ආයතනය සතු වේ. දුරකථනය නැතිවීමක් සිදුවුවද පොලිසියේ පැමිණිල්ලක් දැමීමේ අයිතියක් පාරිභෝගිකයාට නොමැති අතර, අස්ථානගත වුවද සම්පූර්ණ හිඟ මුදල් ගෙවීමට පාරිභෝගිකයා නීතියෙන් බැඳී සිටී.\n\n`;
+      msg += `6️⃣ *නඩු පැවරීම & දුරකථනය යළි අත්පත් කරගැනීම:*\n`;
+      msg += `පොරොන්දු වූ පරිදි මුදල් නොගෙවා දිගින් දිගටම පැහැර හරින්නේ නම්, දුරකථනය යළි ආයතනය සන්තකයට ලබාගැනීමට සහ පාරිභෝගිකයාට එරෙහිව සිවිල් හා අපරාධ නඩු පැවරීමට මෙත්මි මොබයිල් ආයතනයට පූර්ණ නෛතික බලතල හිමිවේ.\n\n`;
+      msg += `=================================\n`;
+      msg += `✍️ *පාරිභෝගික එකඟතා ප්‍රකාශය:*\n`;
+      msg += `ඉහත සියලු කරුණු සහ කොන්දේසි මා කියවා තේරුම් ගෙන ඊට එකඟ වී ඩිජිටල් අත්සන තබා මෙම දුරකථනය ලබාගතිමි.\n`;
+      msg += `• තත්ත්වය: ${credit.signature ? '✅ ඩිජිටල් අත්සන තබා තහවුරු කර ඇත (Digitally Signed)' : '⏳ අත්සන් කිරීම තවම සිදුකර නැත'}\n`;
+      if (credit.signedAt) msg += `• අත්සන් කළ දිනය: ${DB.formatDateTime(credit.signedAt)}\n`;
+      msg += `\n=================================\n`;
+      msg += `${shopName}`;
+    }
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
+  printCreditAgreement(creditId, lang = 'si') {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    const shop = DB.getShop(credit.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+
+    const reqDown = parseFloat(credit.totalPrice) || 0;
+    const paidDown = parseFloat(credit.downPayment) || 0;
+    const balDue = parseFloat(credit.balanceDue) || 0;
+    const days = credit.creditPeriodDays || 14;
+
+    const isTa = lang === 'ta';
+
+    const printHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Device Credit Agreement - ${credit.customerName}</title>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; padding: 24px; color: #111; max-width: 780px; margin: auto; font-size: 13px; line-height: 1.45; }
+          .header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 16px; }
+          .shop-title { font-size: 22px; font-weight: 800; text-transform: uppercase; color: #0f172a; }
+          .sub-title { font-size: 14px; font-weight: 700; color: #0284c7; margin-top: 4px; }
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+          .info-box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; }
+          .info-label { font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: 700; }
+          .info-value { font-size: 14px; font-weight: 700; color: #0f172a; margin-top: 2px; }
+          .clauses-box { background: #fafafa; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px 18px; margin: 16px 0; }
+          .clause-item { margin-bottom: 10px; }
+          .clause-num { font-weight: 800; color: #b91c1c; }
+          .photos-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+          .photo-card { border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px; text-align: center; background: #fff; }
+          .photo-card img { width: 100%; height: 90px; object-fit: cover; border-radius: 4px; }
+          .photo-label { font-size: 10px; font-weight: 700; color: #475569; margin-top: 4px; }
+          .sig-section { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 35px; padding-top: 15px; border-top: 1px solid #94a3b8; }
+          .sig-box { width: 44%; text-align: center; }
+          .sig-img { max-height: 65px; max-width: 180px; object-fit: contain; margin-bottom: 4px; }
+          .sig-line { border-top: 1px solid #334155; margin-top: 4px; padding-top: 4px; font-weight: 700; font-size: 12px; }
+          @media print {
+            .no-print { display: none !important; }
+            body { padding: 0 !important; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:12px 18px; margin-bottom:20px; border-radius:8px;">
+          <div style="font-weight:700;">📄 Device Credit Agreement & Legal Contract</div>
+          <div style="display:flex; gap:10px;">
+            <button onclick="window.print()" style="background:#2563eb; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:700; cursor:pointer;">🖨️ Print / Save PDF</button>
+            <button onclick="window.close()" style="background:#475569; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:700; cursor:pointer;">✖ Close</button>
+          </div>
+        </div>
+
+        <div class="header">
+          <div class="shop-title">🏪 ${shopName}</div>
+          <div class="sub-title">${isTa ? 'ஆரம்பக் கொடுப்பனவு நிலுவைக்கான சட்ட ஒப்பந்தப் பத்திரம்' : 'මූලික ගෙවීම් හිඟ ශේෂය සඳහා වූ නෛතික ගිවිසුම් පත්‍රිකාව'}</div>
+          <div style="font-size:11px; color:#64748b; margin-top:4px;">Down Payment Shortage Credit Agreement & Promissory Bond</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="info-box">
+            <div class="info-label">Customer Details (පාරිභෝගික විස්තර)</div>
+            <div class="info-value">👤 ${credit.customerName}</div>
+            <div style="font-size:12px; color:#334155; margin-top:2px;">NIC: <strong>${credit.nicNumber || 'N/A'}</strong> | Phone: <strong>${credit.primaryPhone}</strong></div>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">Address: ${credit.address || 'N/A'}</div>
+          </div>
+          <div class="info-box">
+            <div class="info-label">Device & Loan Details (දුරකථන විස්තර)</div>
+            <div class="info-value">📱 ${credit.phoneModel}</div>
+            <div style="font-size:12px; color:#334155; margin-top:2px; font-family:monospace;">IMEI: <strong>${credit.imeiNumber || 'N/A'}</strong></div>
+            <div style="font-size:11px; color:#64748b; margin-top:2px;">Agreed Date: ${credit.agreementDate} | Due Date: <strong>${credit.dueDate || 'N/A'}</strong></div>
+          </div>
+        </div>
+
+        <div class="info-box" style="margin-bottom:14px; background:#eff6ff; border-color:#bfdbfe;">
+          <div style="display:grid; grid-template-columns:repeat(4, 1fr); text-align:center;">
+            <div>
+              <div class="info-label">Required Down Payment</div>
+              <div style="font-size:14px; font-weight:800; color:#1e3a8a;">${DB.formatCurrency(reqDown)}</div>
+            </div>
+            <div>
+              <div class="info-label">Down Payment Paid</div>
+              <div style="font-size:14px; font-weight:800; color:#0284c7;">${DB.formatCurrency(paidDown)}</div>
+            </div>
+            <div>
+              <div class="info-label">Shortage Due to Shop</div>
+              <div style="font-size:16px; font-weight:900; color:#b91c1c;">${DB.formatCurrency(balDue)}</div>
+            </div>
+            <div>
+              <div class="info-label">Promised Grace Period</div>
+              <div style="font-size:14px; font-weight:800; color:#d97706;">${days} Days</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="clauses-box">
+          <div style="font-weight:800; font-size:13px; color:#0f172a; margin-bottom:8px; border-bottom:1px solid #cbd5e1; padding-bottom:4px;">
+            ${isTa ? '⚖️ முக்கிய சட்ட நிபந்தனைகள் மற்றும் விதிமுறைகள்:' : '⚖️ ප්‍රධාන නෛතික කොන්දේසි සහ රෙගුලාසි:'}
+          </div>
+          ${isTa ? `
+            <div class="clause-item"><span class="clause-num">1.</span> <strong>14/15 நாட்களுக்குப் பின் ரூ. 1,200/- ஆரம்ப அபராதம்:</strong> ஆரம்பக் கொடுப்பனவில் குறைவாக உள்ள நிலுவைத் தொகையான ${DB.formatCurrency(balDue)} ஐ ஒப்புக்கொண்டபடி ${days} நாட்களுக்குள் செலுத்தத் தவறினால், அந்தத் தொகையுடன் மேலதிகமாக <strong>ரூ. 1,200/- ஆரம்ப அபராதமாக (Late Penalty)</strong> உடனடியாகச் சேர்க்கப்படும்.</div>
+            <div class="clause-item"><span class="clause-num">2.</span> <strong>தொடர்ந்து தாமதமாகும் ஒவ்வொரு மாதத்திற்கும் ரூ. 300/- அபராதம்:</strong> குறித்த திகதிக்குப் பின்னரும் நிலுவையையும் அபராதத்தையும் செலுத்தாது அடுத்த தவணை வரை தாமதப்படுத்தும் ஒவ்வொரு மேலதிக மாதத்திற்கும் <strong>ரூ. 300/- வீதம் தொடர்ச்சியாக அபராதம்</strong> கூட்டப்படும்.</div>
+            <div class="clause-item"><span class="clause-num">3.</span> <strong>தொலைபேசி முடக்கப்படுதல் & திறக்க 15 நாட்கள்:</strong> நிலுவை செலுத்தாமையினால் தொலைபேசி முடக்கப்பட்டால் (Locked), அபராதத்துடன் அனைத்து நிலுவையும் செலுத்தப்பட்ட பின்னரும் தொலைபேசியை மீண்டும் திறந்து வழங்க (Unlock) <strong>குறைந்தது 15 நாட்கள்</strong> செல்லும் என்பதை ஒப்புக்கொள்கிறேன்.</div>
+            <div class="clause-item"><span class="clause-num">4.</span> <strong>சேவை மற்றும் உத்தரவாதம் இடைநிறுத்தம்:</strong> நிலுவை செலுத்தாததால் தொலைபேசி லாக் செய்யப்பட்டால், முழு நிலுவையும் அபராதமும் செலுத்தி முடிக்கப்படும் வரை உத்தரவாதமோ (Warranty) பழுதுபார்ப்பு சேவைகளோ வழங்கப்படமாட்டாது.</div>
+            <div class="clause-item"><span class="clause-num">5.</span> <strong>சட்டபூர்வ உரிமை மற்றும் பொலிஸ் முறைப்பாடு கட்டுப்பாடு:</strong> நிலுவையும் அபராதமும் முழுமையாக தீர்க்கப்படும் வரை தொலைபேசியின் முழுமையான சட்டபூர்வ உரிமை நிறுவனத்திற்கே உரியதாகும். தொலைபேசி தொலைந்துபோனாலோ பொலிஸ் முறைப்பாடு செய்யும் உரிமை வாடிக்கையாளருக்கு இல்லை; நிலுவையை முழுமையாக செலுத்த வாடிக்கையாளர் கடமைப்பட்டுள்ளார்.</div>
+            <div class="clause-item" style="margin-bottom:0;"><span class="clause-num">6.</span> <strong>தொலைபேசியை மீளப்பெறுதல் & சட்ட நடவடிக்கை அதிகாரம்:</strong> வாக்குறுதியளித்தபடி பணத்தைச் செலுத்தத் தவறினால், தொலைபேசியை மீளக் கைப்பற்றவோ வாடிக்கையாளருக்கு எதிராக நீதிமன்ற சட்ட நடவடிக்கை எடுக்கவோ நிறுவனத்திற்கு முழுமையான சட்ட அதிகாரம் உண்டு.</div>
+          ` : `
+            <div class="clause-item"><span class="clause-num">1.</span> <strong>දින 14/15 න් පසු රු. 1,200/- ක මූලික දඩය:</strong> මෙම දුරකථනය ලබාගැනීමේදී මූලික මුදලින් (Down Payment) අඩු වූ හිඟ ශේෂය ${DB.formatCurrency(balDue)} ඉහත පොරොන්දු වූ පරිදි දින ${days} ක් ඇතුළත නොගෙවා එම දිනය පසුවූ වහාම, හිඟ මුදලට අමතරව <strong>රු. 1,200/- ක මූලික දඩ මුදලක් (Late Penalty)</strong> අනිවාර්යයෙන්ම එකතු වේ.</div>
+            <div class="clause-item"><span class="clause-num">2.</span> <strong>ප්‍රමාද වන සෑම අමතර මාසයකටම රු. 300/- බැගින්:</strong> දිනය පසුවීමෙන් පසු හිඟ මුදල සහ දඩය නොගෙවා තවදුරටත් මඟහරින්නේ නම්, ඊළඟ වාරික දිනය දක්වා හෝ තවත් මාසයක් ගතවන සෑම අමතර මාසයකටම <strong>රු. 300/- බැගින් අමතර දඩයක් (Monthly Surcharge)</strong> අඛණ්ඩව එකතු වේ.</div>
+            <div class="clause-item"><span class="clause-num">3.</span> <strong>දුරකථනය ලොක් වීම (Remote Lock) & අන්ලොක් වීමට දින 15ක්:</strong> මූලික ගෙවීම් හිඟය නොගෙවීම නිසා අප ආයතනය හෝ ෆිනෑන්ස් සමාගම (Intex Finance ඇතුළු) මඟින් දුරකථනය Remote Lock කරනු ලැබේ. ඉන්පසු හිඟ මුදල සහ දඩ සම්පූර්ණයෙන්ම ගෙවා අවසන් කළද, දුරකථනය නැවත Unlock කර යථා තත්ත්වයට පත් කරදීමට <strong>අවම වශයෙන් දින 15 ක කාලයක්</strong> ගතවන බවට එකඟ වෙමි.</div>
+            <div class="clause-item"><span class="clause-num">4.</span> <strong>වගකීම් සහතිකය & සේවාවන් අත්හිටුවීම:</strong> දුරකථනය ලොක් වූ පසු, හිඟ මුදල සහ සියලු දඩ මුදල් එකවර ගෙවා නිදහස් කරගන්නා තෙක් දුරකථනය සඳහා ආයතනයෙන් හෝ ෆිනෑන්ස් සමාගමෙන් කිසිදු Warranty හෝ අලුත්වැඩියා පාරිභෝගික සහයක් සපයනු නොලැබේ.</div>
+            <div class="clause-item"><span class="clause-num">5.</span> <strong>නෛතික අයිතිය සහ පොලිස් පැමිණිලි සීමා කිරීම:</strong> මූලික ගෙවීමේ අඩු මුදල සහ දඩ මුදල් සම්පූර්ණයෙන්ම ගෙවා නිදහස් කරගන්නා තෙක් මෙම දුරකථනයේ නෛතික හිමිකාරිත්වය ආයතනය සතු වේ. දුරකථනය නැතිවීමක් සිදුවුවද පොලිසියේ පැමිණිල්ලක් දැමීමේ අයිතියක් පාරිභෝගිකයාට නොමැති අතර, අස්ථානගත වුවද සම්පූර්ණ හිඟ මුදල් ගෙවීමට පාරිභෝගිකයා නීතියෙන් බැඳී සිටී.</div>
+            <div class="clause-item" style="margin-bottom:0;"><span class="clause-num">6.</span> <strong>නඩු පැවරීම & දුරකථනය යළි අත්පත් කරගැනීම:</strong> පොරොන්දු වූ පරිදි මුදල් නොගෙවා දිගින් දිගටම පැහැර හරින්නේ නම්, දුරකථනය යළි ආයතනය සන්තකයට ලබාගැනීමට සහ පාරිභෝගිකයාට එරෙහිව සිවිල් හා අපරාධ නඩු පැවරීමට මෙත්මි මොබයිල් ආයතනයට පූර්ණ නෛතික බලතල හිමිවේ.</div>
+          `}
+        </div>
+
+        <!-- Photos Gallery -->
+        <div class="photos-grid">
+          <div class="photo-card">
+            ${credit.customerPhoto ? `<img src="${credit.customerPhoto}">` : '<div style="height:90px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px;">No Photo</div>'}
+            <div class="photo-label">Customer Photo</div>
+          </div>
+          <div class="photo-card">
+            ${credit.devicePhoto ? `<img src="${credit.devicePhoto}">` : '<div style="height:90px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px;">No Photo</div>'}
+            <div class="photo-label">Phone & Box</div>
+          </div>
+          <div class="photo-card">
+            ${credit.nicFrontPhoto ? `<img src="${credit.nicFrontPhoto}">` : '<div style="height:90px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px;">No Photo</div>'}
+            <div class="photo-label">NIC Front</div>
+          </div>
+          <div class="photo-card">
+            ${credit.nicBackPhoto ? `<img src="${credit.nicBackPhoto}">` : '<div style="height:90px; background:#f1f5f9; display:flex; align-items:center; justify-content:center; color:#94a3b8; font-size:11px;">No Photo</div>'}
+            <div class="photo-label">NIC Back</div>
+          </div>
+        </div>
+
+        <div style="font-size:11px; color:#475569; font-style:italic; margin-top:8px;">
+          * ${isTa ? 'மேற்குறிப்பிட்ட அனைத்து நிபந்தனைகளையும் நான் தெளிவாக வாசித்து, முழுமையாகப் புரிந்துகொண்டு, அவற்றுக்கு உடன்பட்டு எனது டிஜிட்டல் கையொப்பத்தை இட்டுள்ளேன்.' : 'ඉහත සඳහන් සියලු නීතිමය කොන්දේසි මම හොඳින් කියවා බලා, සම්පූර්ණයෙන්ම තේරුම් ගෙන ඊට එකඟ වී මගේ ඩිජිටල් අත්සන තබා මෙම දුරකථනය ලබාගතිමි.'}
+        </div>
+
+        <div class="sig-section">
+          <div class="sig-box">
+            ${credit.signature ? `<img class="sig-img" src="${credit.signature}">` : '<div style="height:50px; color:#94a3b8;">Awaiting Signature</div>'}
+            <div class="sig-line">Customer Signature (පාරිභෝගික අත්සන)</div>
+            <div style="font-size:10px; color:#64748b;">${credit.customerName} ${credit.signedAt ? '(' + DB.formatDateTime(credit.signedAt) + ')' : ''}</div>
+          </div>
+          <div class="sig-box">
+            <div style="height:50px; display:flex; align-items:flex-end; justify-content:center; font-weight:700; color:#0f172a; font-size:12px;">${shopName}</div>
+            <div class="sig-line">Authorized Signature / Seal</div>
+            <div style="font-size:10px; color:#64748b;">Management Authorization</div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(printHtml);
+      win.document.close();
+    } else {
+      this.showToast('Please allow popups to print agreement', 'warning');
+    }
+  },
+
   showDeviceCreditDetailsModal(creditId) {
     const credit = DB.getDeviceCredits().find(c => c.id === creditId);
     if (!credit) return;
@@ -6549,6 +7050,40 @@ Thank you! - ${shopName}`;
           </div>
         </div>
 
+        <!-- Down Payment Agreement & Signature Status Card -->
+        <div style="background:var(--bg-card); border:1px solid ${credit.signature ? 'rgba(34,197,94,0.35)' : 'rgba(245,158,11,0.35)'}; border-radius:8px; padding:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <div style="font-size:0.85rem; font-weight:800; color:${credit.signature ? 'var(--accent-green)' : 'var(--accent-gold)'}; display:flex; align-items:center; gap:6px;">
+                <span>${credit.signature ? '✅' : '⚠️'}</span>
+                <span>${credit.signature ? 'Digitally Signed Agreement' : 'Down Payment Shortage Agreement (Unsigned)'}</span>
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">
+                ${credit.signature ? `Signed on ${DB.formatDateTime(credit.signedAt)} (${credit.agreementLanguage === 'ta' ? 'தமிழ்' : credit.agreementLanguage === 'en' ? 'English' : 'සිංහල'})` : '14-15 Days Grace Period & Late Penalty Agreement'}
+              </div>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn btn-xs ${credit.signature ? 'btn-ghost' : 'btn-warning'}" onclick="App.openCreditAgreementModal('${credit.id}', '${credit.agreementLanguage || 'si'}')" style="font-weight:700; font-size:0.75rem; padding:5px 10px;">
+                ✍️ ${credit.signature ? 'View / Re-sign' : 'Sign Agreement'}
+              </button>
+              <button type="button" class="btn btn-xs btn-success" onclick="App.sendWhatsAppAgreement('${credit.id}', '${credit.agreementLanguage || 'si'}')" style="font-weight:700; font-size:0.75rem; padding:5px 10px; background:#16a34a;">
+                📲 WhatsApp
+              </button>
+              <button type="button" class="btn btn-xs btn-primary" onclick="App.printCreditAgreement('${credit.id}', '${credit.agreementLanguage || 'si'}')" style="font-weight:700; font-size:0.75rem; padding:5px 10px;">
+                📄 Print Slip
+              </button>
+            </div>
+          </div>
+          ${credit.signature ? `
+            <div style="margin-top:10px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1); display:flex; align-items:center; gap:12px;">
+              <div style="border:1px solid rgba(255,255,255,0.2); border-radius:4px; padding:3px; background:#fff; height:45px; display:inline-flex; align-items:center;">
+                <img src="${credit.signature}" style="max-height:100%; max-width:140px; object-fit:contain;" alt="Signature">
+              </div>
+              <span style="font-size:0.75rem; color:var(--text-secondary);">Verified customer on-screen signature</span>
+            </div>
+          ` : ''}
+        </div>
+
         <!-- Installment History -->
         <div>
           <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:8px;">
@@ -6585,6 +7120,7 @@ Thank you! - ${shopName}`;
       bodyHtml,
       [
         { text: 'Close', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: '✍️ 📝 Agreement & Sign', class: 'btn-warning', onClick: () => this.openCreditAgreementModal(credit.id, credit.agreementLanguage || 'si') },
         !isSettled ? { text: '💬 WhatsApp Reminder', class: 'btn-success', onClick: () => this.sendWhatsAppReminder(credit.id) } : null,
         !isSettled ? { text: '💵 + Add Payment', class: 'btn-primary', onClick: () => { this.closeModal(); this.showAddDevicePaymentModal(credit.id); } } : null
       ].filter(Boolean)

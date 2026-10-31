@@ -2031,6 +2031,18 @@ const DB = {
     return newCredit;
   },
 
+  saveCreditSignature(id, signatureDataUrl, lang = 'si') {
+    const credits = this.getDeviceCredits();
+    const idx = credits.findIndex(c => c.id === id);
+    if (idx === -1) return null;
+    credits[idx].signature = signatureDataUrl;
+    credits[idx].signedAt = new Date().toISOString();
+    credits[idx].agreementLanguage = lang;
+    this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credits[idx], docType: 'device_credit' });
+    return credits[idx];
+  },
+
   updateDeviceCredit(id, creditData) {
     const credits = this.getDeviceCredits();
     const idx = credits.findIndex(c => c.id === id);
