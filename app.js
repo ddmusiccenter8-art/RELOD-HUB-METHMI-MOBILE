@@ -324,17 +324,21 @@ const App = {
   },
 
   // ---- Mobile Menu ----
+  toggleSidebarMenu() {
+    const sb = document.getElementById('sidebar');
+    const so = document.getElementById('sidebarOverlay');
+    if (sb) sb.classList.toggle('open');
+    if (so) so.classList.toggle('open');
+  },
+
   setupMobileMenu() {
-    const toggleMenu = () => {
-      const sb = document.getElementById('sidebar');
-      const so = document.getElementById('sidebarOverlay');
-      if (sb) sb.classList.toggle('open');
-      if (so) so.classList.toggle('open');
-    };
+    const toggleMenu = () => this.toggleSidebarMenu();
     const hb = document.getElementById('hamburgerBtn');
     if (hb) hb.addEventListener('click', toggleMenu);
     const mb = document.getElementById('mobileMenuBtn');
     if (mb) mb.addEventListener('click', toggleMenu);
+    const bnb = document.getElementById('bottomNavMenuBtn');
+    if (bnb) bnb.addEventListener('click', (e) => { e.preventDefault(); toggleMenu(); });
 
     const so = document.getElementById('sidebarOverlay');
     if (so) {
@@ -6705,6 +6709,24 @@ Thank you! - ${shopName}`;
 
     const bodyHtml = `
       <div style="display:flex; flex-direction:column; gap:12px;">
+        <!-- Corporate Letterhead Banner -->
+        <div style="background:linear-gradient(135deg, rgba(2,132,199,0.08), rgba(15,23,42,0.12)); border:1px solid rgba(2,132,199,0.3); border-radius:8px; padding:10px 14px; text-align:center;">
+          <div style="font-size:1.05rem; font-weight:900; color:var(--text-primary); letter-spacing:0.5px;">🏢 METHMI MOBILE (PVT) LTD</div>
+          <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px; display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+            <span>BR: <strong>PV-00352350</strong></span>
+            <span>•</span>
+            <span>Web: <strong>methmimobile.com</strong></span>
+            <span>•</span>
+            <span>Email: <strong>methmimobile2014@gmail.com</strong></span>
+          </div>
+          <div style="font-size:0.75rem; color:var(--accent-blue); font-weight:700; margin-top:2px;">
+            📞 0752 335 533 / 0753 028 100 / 0768 364 413
+          </div>
+          <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">
+            📍 Main St, Mutur | Batticaloa Rd, Periyapalam 3rd Cross, Mutur | Serunuwara
+          </div>
+        </div>
+
         <!-- Language Switcher Bar -->
         <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:6px; border:1px solid var(--border-glass);">
           <span style="font-size:0.8rem; font-weight:700; color:var(--text-secondary);">🌐 Select Language (භාෂාව තෝරන්න):</span>
@@ -6832,7 +6854,12 @@ Thank you! - ${shopName}`;
 
     let msg = '';
     if (isTa) {
-      msg = `📱 *${shopName.toUpperCase()} - ஆரம்பக் கொடுப்பනவு நிலுவைக்கான சட்ட ஒப்பந்தம்*\n`;
+      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+        `Mutur • Batticaloa Rd • Serunuwara\n` +
+        `---------------------------------\n` +
+        `📱 *ஆரம்பக் கொடுப்பனவு நிலுவைக்கான சட்ட ஒப்பந்தம்*\n`;
       msg += `(Down Payment Shortage Credit Agreement & Legal Terms)\n`;
       msg += `=================================\n\n`;
       msg += `👤 *வாடிக்கையாளர் விபரம்:*\n`;
@@ -6869,9 +6896,17 @@ Thank you! - ${shopName}`;
       msg += `\n📱 *மொபைல் மூலம் டிஜிட்டல் கையொப்பமிட (Sign via Mobile):*\n`;
       msg += `https://ddmusiccenter8-art.github.io/RELOD-HUB-METHMI-MOBILE/#sign?id=${credit.id}&lang=ta\n`;
       msg += `\n=================================\n`;
-      msg += `${shopName}`;
+      msg += `*METHMI MOBILE (PVT) LTD*\n`;
+      msg += `Head Office: Main Street, Mutur\n`;
+      msg += `Branches: Batticaloa Rd, Periyapalam 3rd Cross, Mutur | Serunuwara\n`;
+      msg += `📞 0752 335 533 / 0753 028 100 / 0768 364 413`;
     } else {
-      msg = `📱 *${shopName.toUpperCase()} - මූලික ගෙවීම් හිඟ ශේෂ ණය සහන ගිවිසුම*\n`;
+      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+        `Mutur • Batticaloa Rd • Serunuwara\n` +
+        `---------------------------------\n` +
+        `📱 *මූලික ගෙවීම් හිඟ ශේෂ ණය සහන ගිවිසුම*\n`;
       msg += `(Down Payment Shortage Credit Agreement & Legal Terms)\n`;
       msg += `=================================\n\n`;
       msg += `👤 *පාරිභෝගික විස්තර:*\n`;
@@ -6969,10 +7004,24 @@ Thank you! - ${shopName}`;
           </div>
         </div>
 
-        <div class="header">
-          <div class="shop-title">🏪 ${shopName}</div>
-          <div class="sub-title">${isTa ? 'ஆரம்பக் கொடுப்பனவு நிலுவைக்கான சட்ட ஒப்பந்தப் பத்திரம்' : 'මූලික ගෙවීම් හිඟ ශේෂය සඳහා වූ නෛතික ගිවිසුම් පත්‍රිකාව'}</div>
-          <div style="font-size:11px; color:#64748b; margin-top:4px;">Down Payment Shortage Credit Agreement & Promissory Bond</div>
+        <div class="header" style="text-align:center; border-bottom:2px solid #0f172a; padding-bottom:14px; margin-bottom:16px;">
+          <div class="shop-title" style="font-size:24px; font-weight:900; letter-spacing:0.5px; color:#0f172a;">🏢 METHMI MOBILE (PVT) LTD</div>
+          <div style="font-size:12px; font-weight:700; color:#334155; margin-top:3px;">
+            <span>Company Reg (BR): <strong>PV-00352350</strong></span> &nbsp;|&nbsp;
+            <span>Web: <strong>methmimobile.com</strong></span> &nbsp;|&nbsp;
+            <span>Email: <strong>methmimobile2014@gmail.com</strong></span>
+          </div>
+          <div style="font-size:12px; font-weight:700; color:#0284c7; margin-top:3px;">
+            📞 0752 335 533 &nbsp;|&nbsp; 0753 028 100 &nbsp;|&nbsp; 0768 364 413
+          </div>
+          <div style="font-size:11.5px; color:#475569; margin-top:4px; line-height:1.45;">
+            📍 <strong>Head Office:</strong> Main Street, Mutur<br>
+            📍 <strong>Branches:</strong> Batticaloa Road, Periyapalam 3rd Cross, Mutur &nbsp;|&nbsp; Serunuwara
+          </div>
+          <div class="sub-title" style="font-size:14px; font-weight:800; color:#0f172a; margin-top:9px; border-top:1px dashed #cbd5e1; padding-top:7px;">
+            ${isTa ? 'ஆரம்பக் கொடுப்பனவு நிலுவைக்கான சட்ட ஒப்பந்தப் பத்திரம்' : 'මූලික ගෙවීම් හිඟ ශේෂය සඳහා වූ නෛතික ගිවිසුම් පත්‍රිකාව'}
+          </div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px; font-weight:600;">Down Payment Shortage Credit Agreement & Promissory Bond</div>
         </div>
 
         <div class="grid-2">

@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1c23">
   
-  <link rel="stylesheet" href="style.css?v=29.0">
+  <link rel="stylesheet" href="style.css?v=30.0">
 </head>
 <body>
 
@@ -31,7 +31,7 @@
     <div class="mobile-header-center">
       <div class="mobile-shop-chip" onclick="App.showShopSwitcherModal()" title="Switch Branch / Shop">
         <span class="mobile-shop-icon">🏪</span>
-        <span class="mobile-shop-name" id="mobileActiveShopName">Main Shop</span>
+        <span class="mobile-shop-name" id="mobileActiveShopName">Methmi Mobile</span>
         <span class="mobile-shop-arrow">▾</span>
       </div>
       <div class="mobile-page-name" id="mobileCurrentPageTitle">Dashboard</div>
@@ -88,12 +88,13 @@
       <!-- Navigation -->
       <ul class="nav-links">
         <li><a href="#" data-page="dashboard" class="active" onclick="App.navigateTo('dashboard')"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
-        <li><a href="#" data-page="update" onclick="App.navigateTo('update')"><span class="nav-icon">📱</span> <span data-i18n="nav_update">Reload & Payments</span></a></li>
-        <li><a href="#" data-page="shifts" onclick="App.navigateTo('shifts')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
-        <li><a href="#" data-page="history" onclick="App.navigateTo('history')"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
+        <li><a href="#" data-page="update" onclick="App.navigateTo('update')"><span class="nav-icon">⚡</span> <span data-i18n="nav_update">Reload & Payments</span></a></li>
+        <li><a href="#" data-page="device-credits" onclick="App.navigateTo('device-credits')"><span class="nav-icon">✍️</span> <span data-i18n="nav_dev_credits">Phone Loans & Agreements</span></a></li>
+        <li><a href="#" data-page="shifts" onclick="App.navigateTo('shifts')"><span class="nav-icon">🌙</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
+        <li><a href="#" onclick="App.openDenominationModal(null, false); if (window.innerWidth <= 768) App.toggleSidebarMenu(); return false;"><span class="nav-icon">🧮</span> <span data-i18n="denom_title">Cash Notes Counter</span></a></li>
         <li><a href="#" data-page="credits" onclick="App.navigateTo('credits')"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
-        <li><a href="#" data-page="device-credits" onclick="App.navigateTo('device-credits')"><span class="nav-icon">📱</span> <span data-i18n="nav_dev_credits">Device Credits</span></a></li>
-        <li><a href="#" data-page="shops" onclick="App.navigateTo('shops')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops</span></a></li>
+        <li><a href="#" data-page="history" onclick="App.navigateTo('history')"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
+        <li><a href="#" data-page="shops" onclick="App.navigateTo('shops')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops & Branches</span></a></li>
         <li><a href="#" data-page="reports" onclick="App.navigateTo('reports')"><span class="nav-icon">📈</span> <span data-i18n="nav_reports">Reports</span></a></li>
       </ul>
 
@@ -155,10 +156,14 @@
             <span class="btn-text" data-i18n="top_btn_credit">+ Credit</span>
             <span class="top-bar-badge" id="topBarCreditBadge" style="display:none;">0</span>
           </button>
-          <button type="button" class="top-bar-btn dev-credit-btn" id="topBarDevCreditBtn" onclick="App.showAddDeviceCreditModal()" title="Add Short-Term Device Credit Agreement">
-            <span class="btn-icon">📱</span>
-            <span class="btn-text" data-i18n="top_btn_dev_credit">+ Device Credit</span>
+          <button type="button" class="top-bar-btn dev-credit-btn" id="topBarDevCreditBtn" onclick="App.showAddDeviceCreditModal()" title="Add Device Credit Agreement & Legal Terms" style="background:rgba(2,132,199,0.15); border:1px solid rgba(2,132,199,0.4); color:var(--accent-blue); font-weight:800;">
+            <span class="btn-icon">✍️</span>
+            <span class="btn-text" data-i18n="top_btn_dev_credit">+ Phone Agreement</span>
             <span class="top-bar-badge" id="topBarDevCreditBadge" style="display:none; background:var(--accent-red); color:#fff;">0</span>
+          </button>
+          <button type="button" class="top-bar-btn denom-btn" onclick="App.openDenominationModal(null, false)" title="Cash Drawer Note Counter" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); color:var(--accent-green); font-weight:700;">
+            <span class="btn-icon">🧮</span>
+            <span class="btn-text">Cash Counter</span>
           </button>
         </div>
         <div class="top-bar-right">
@@ -181,6 +186,9 @@
               <option value="bank" data-i18n="dash_view_bank">🏦 Bank Accounts & Rental</option>
               <option value="credits" data-i18n="dash_view_credits">📒 Customer Credits & Ledger</option>
             </select>
+            <button class="btn btn-primary btn-sm" onclick="App.showAddDeviceCreditModal()" title="New Phone Agreement & Signature" style="font-weight:700; background:linear-gradient(135deg, #0284c7, #2563eb); border:none; box-shadow:0 2px 8px rgba(2,132,199,0.3);">
+              <span>✍️</span> <span>+ Phone Agreement</span>
+            </button>
             <button class="btn btn-primary btn-sm" onclick="App.showQuickAddCreditModal()" title="Add Customer Credit" style="font-weight:700;">
               <span>📒</span> <span data-i18n="quick_add_credit">+ Add Credit</span>
             </button>
@@ -947,20 +955,20 @@
       <span class="bottom-nav-label" data-i18n="nav_dashboard">Dashboard</span>
     </a>
     <a href="#update" class="bottom-nav-item" data-page="update" onclick="App.navigateTo('update'); return false;">
-      <span class="bottom-nav-icon">📱</span>
-      <span class="bottom-nav-label" data-i18n="nav_reload">Reload</span>
-    </a>
-    <a href="#shifts" class="bottom-nav-item" data-page="shifts" onclick="App.navigateTo('shifts'); return false;">
-      <span class="bottom-nav-icon">🏪</span>
-      <span class="bottom-nav-label" data-i18n="nav_shifts">Shifts</span>
-    </a>
-    <a href="#credits" class="bottom-nav-item" data-page="credits" onclick="App.navigateTo('credits'); return false;">
-      <span class="bottom-nav-icon">📒</span>
-      <span class="bottom-nav-label" data-i18n="nav_credits">Ledger</span>
+      <span class="bottom-nav-icon">⚡</span>
+      <span class="bottom-nav-label" data-i18n="nav_reload">Reloads</span>
     </a>
     <a href="#device-credits" class="bottom-nav-item" data-page="device-credits" onclick="App.navigateTo('device-credits'); return false;">
-      <span class="bottom-nav-icon">💳</span>
-      <span class="bottom-nav-label" data-i18n="nav_dev_credits">Loans</span>
+      <span class="bottom-nav-icon">✍️</span>
+      <span class="bottom-nav-label" data-i18n="nav_dev_credits">Agreements</span>
+    </a>
+    <a href="#shifts" class="bottom-nav-item" data-page="shifts" onclick="App.navigateTo('shifts'); return false;">
+      <span class="bottom-nav-icon">🌙</span>
+      <span class="bottom-nav-label" data-i18n="nav_shifts">Shifts</span>
+    </a>
+    <a href="#" class="bottom-nav-item" id="bottomNavMenuBtn" onclick="App.toggleSidebarMenu(); return false;">
+      <span class="bottom-nav-icon">☰</span>
+      <span class="bottom-nav-label">Menu</span>
     </a>
   </nav>
 
@@ -973,10 +981,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=29.0"></script>
-  <script src="firebase-init.js?v=29.0"></script>
-  <script src="data.js?v=29.0"></script>
-  <script src="app.js?v=29.0"></script>
+  <script src="i18n.js?v=30.0"></script>
+  <script src="firebase-init.js?v=30.0"></script>
+  <script src="data.js?v=30.0"></script>
+  <script src="app.js?v=30.0"></script>
   
   <!-- Register Service Worker -->
   <script>
