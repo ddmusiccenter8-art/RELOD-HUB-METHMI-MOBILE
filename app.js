@@ -3858,85 +3858,119 @@ Thank you! - ${shopName}`;
       </div>
 
       <!-- 2-Track + Cash Category Breakdown -->
-      <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));">
-        <div class="card accent-blue">
-          <div class="card-header">
-            <span class="card-title">🔄 ${I18N.t('dash_reload_total') || 'Reload Track'}</span>
+      <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+        <!-- Reload Total Card -->
+        <div class="card accent-blue" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
+          <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
+              <span>🔄</span> <span>${I18N.t('dash_reload_total') || 'Reload Total'}</span>
+            </span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(59,130,246,0.12); color:var(--accent-blue);">Reload</span>
           </div>
-          <div style="display:flex;gap:12px;">
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('profit') || 'Profit'}</div>
-              <div style="font-weight:700;color:var(--accent-green);font-size:0.95rem;">+${DB.formatCurrency(reloadProfit)}</div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Balance</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${reloadNet >= 0 ? 'green' : 'red'}); line-height:1.2; word-break:break-all;">
+              ${reloadNet >= 0 ? '+' : ''}${DB.formatCurrency(reloadNet)}
             </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('loss') || 'Loss'}</div>
-              <div style="font-weight:700;color:var(--accent-red);font-size:0.95rem;">-${DB.formatCurrency(reloadLoss)}</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
+            <div style="min-width:0; overflow:hidden;">
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('profit') || 'Profit'} (+)</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="+${DB.formatCurrency(reloadProfit)}">
+                +${DB.formatCurrency(reloadProfit)}
+              </div>
             </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">Net</div>
-              <div style="font-weight:800;font-size:0.95rem;color:var(--accent-${reloadNet >= 0 ? 'green' : 'red'});">
-                ${reloadNet >= 0 ? '+' : ''}${DB.formatCurrency(reloadNet)}
+            <div style="min-width:0; overflow:hidden;">
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('loss') || 'Loss'} (-)</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="-${DB.formatCurrency(reloadLoss)}">
+                -${DB.formatCurrency(reloadLoss)}
               </div>
             </div>
           </div>
         </div>
 
-        <div class="card accent-purple">
-          <div class="card-header">
-            <span class="card-title">🏦 ${I18N.t('dash_bank_total') || 'Bank Track'}</span>
+        <!-- Bank Total Card -->
+        <div class="card accent-purple" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
+          <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
+              <span>🏦</span> <span>${I18N.t('dash_bank_total') || 'Bank Total'}</span>
+            </span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(139,92,246,0.12); color:var(--accent-purple);">Bank</span>
           </div>
-          <div style="display:flex;gap:12px;">
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('profit') || 'Profit'}</div>
-              <div style="font-weight:700;color:var(--accent-green);font-size:0.95rem;">+${DB.formatCurrency(bankProfit)}</div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Balance</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${bankNet >= 0 ? 'green' : 'red'}); line-height:1.2; word-break:break-all;">
+              ${bankNet >= 0 ? '+' : ''}${DB.formatCurrency(bankNet)}
             </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('loss') || 'Loss'}</div>
-              <div style="font-weight:700;color:var(--accent-red);font-size:0.95rem;">-${DB.formatCurrency(bankLoss)}</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
+            <div style="min-width:0; overflow:hidden;">
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('profit') || 'Profit'} (+)</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="+${DB.formatCurrency(bankProfit)}">
+                +${DB.formatCurrency(bankProfit)}
+              </div>
             </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">Net</div>
-              <div style="font-weight:800;font-size:0.95rem;color:var(--accent-${bankNet >= 0 ? 'green' : 'red'});">
-                ${bankNet >= 0 ? '+' : ''}${DB.formatCurrency(bankNet)}
+            <div style="min-width:0; overflow:hidden;">
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('loss') || 'Loss'} (-)</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="-${DB.formatCurrency(bankLoss)}">
+                -${DB.formatCurrency(bankLoss)}
               </div>
             </div>
           </div>
         </div>
 
-        <div class="card accent-yellow">
-          <div class="card-header">
-            <span class="card-title">💵 ${I18N.t('dash_cash_total') || 'Cash Drawer'}</span>
+        <!-- Cash Drawer Card -->
+        <div class="card accent-yellow" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
+          <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
+              <span>💵</span> <span>${I18N.t('dash_cash_total') || 'Cash Drawer'}</span>
+            </span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(245,158,11,0.12); color:var(--accent-gold);">Cash Drawer</span>
           </div>
-          <div style="display:flex;gap:12px;">
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('profit') || 'Profit'}</div>
-              <div style="font-weight:700;color:var(--accent-green);font-size:0.95rem;">+${DB.formatCurrency(cashProfit)}</div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Balance</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${cashNet >= 0 ? 'green' : 'red'}); line-height:1.2; word-break:break-all;">
+              ${cashNet >= 0 ? '+' : ''}${DB.formatCurrency(cashNet)}
             </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${I18N.t('loss') || 'Loss'}</div>
-              <div style="font-weight:700;color:var(--accent-red);font-size:0.95rem;">-${DB.formatCurrency(cashLoss)}</div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
+            <div style="min-width:0; overflow:hidden;">
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('profit') || 'Profit'} (+)</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="+${DB.formatCurrency(cashProfit)}">
+                +${DB.formatCurrency(cashProfit)}
+              </div>
             </div>
-            <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">Net</div>
-              <div style="font-weight:800;font-size:0.95rem;color:var(--accent-${cashNet >= 0 ? 'green' : 'red'});">
-                ${cashNet >= 0 ? '+' : ''}${DB.formatCurrency(cashNet)}
+            <div style="min-width:0; overflow:hidden;">
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('loss') || 'Loss'} (-)</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="-${DB.formatCurrency(cashLoss)}">
+                -${DB.formatCurrency(cashLoss)}
               </div>
             </div>
           </div>
         </div>
 
-        <div class="card accent-green">
-          <div class="card-header">
-            <span class="card-title">📌 ${I18N.t('stat_total_updates') || 'Summary'}</span>
+        <!-- Total Updates / Summary Card -->
+        <div class="card accent-green" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
+          <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+            <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
+              <span>📌</span> <span>${I18N.t('stat_total_updates') || 'Summary'}</span>
+            </span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:var(--accent-green);">Activity</span>
           </div>
-          <div style="display:flex;gap:20px;">
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Total Activity</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-green); line-height:1.2;">
+              ${updates.length} Records
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
             <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">Updates</div>
-              <div style="font-weight:800;font-size:1.3rem;">${updates.length}</div>
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Updates</div>
+              <div style="font-weight:800; font-size:0.95rem; color:var(--text-primary);">${updates.length}</div>
             </div>
             <div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">Days</div>
-              <div style="font-weight:800;font-size:1.3rem;">${uniqueDates.length}</div>
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Active Days</div>
+              <div style="font-weight:800; font-size:0.95rem; color:var(--text-primary);">${uniqueDates.length} Days</div>
             </div>
           </div>
         </div>

@@ -422,7 +422,7 @@ body::after {
 /* Summary Cards Grid */
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
 }
@@ -1886,7 +1886,7 @@ select option {
 }
 .denom-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 6px;
   max-height: 55vh;
   overflow-y: auto;
@@ -2666,4 +2666,18 @@ select option {
   border-radius: 50%;
   background: var(--bg-glass);
   border: 1px solid var(--border-glass);
+}
+
+/* Auto-fit card overflow guard */
+.card {
+  box-sizing: border-box;
+}
+.summary-grid .card {
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.card-value {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
 }
