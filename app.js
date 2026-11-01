@@ -11,6 +11,7 @@ const App = {
   topupCounter: 0,
   currentLedgerTab: 'credits',
   ledgerSearchTerm: '',
+  creditStatusFilter: 'all',
   editingUpdateId: null,
 
   // V14 Shift, Expense & Denomination State
@@ -2787,6 +2788,18 @@ const App = {
     }
   },
 
+    filterCreditStatus(status) {
+    this.creditStatusFilter = status;
+    document.querySelectorAll('.credit-status-pill').forEach(btn => {
+      if (btn.getAttribute('data-status') === status) {
+        btn.className = 'btn btn-xs btn-primary credit-status-pill';
+      } else {
+        btn.className = 'btn btn-xs btn-ghost credit-status-pill';
+      }
+    });
+    this.renderCreditsTable();
+  },
+
   renderCreditsPage() {
     this.updateTopBarBadges();
     const shopId = DB.getActiveShopId();
@@ -2843,6 +2856,21 @@ const App = {
 
     if (this.currentLedgerTab === 'credits') {
       let list = DB.getCredits(shopId, true);
+      const now = Date.now();
+
+      // Apply Status Filter
+      if (this.creditStatusFilter === 'pending') {
+        list = list.filter(c => c.status !== 'paid');
+      } else if (this.creditStatusFilter === 'settled') {
+        list = list.filter(c => c.status === 'paid');
+      } else if (this.creditStatusFilter === 'overdue') {
+        list = list.filter(c => {
+          if (c.status === 'paid') return false;
+          const days = Math.floor((now - new Date(c.timestamp).getTime()) / 86400000);
+          return days >= 3;
+        });
+      }
+
       if (term) {
         list = list.filter(c =>
           (c.customerName && c.customerName.toLowerCase().includes(term)) ||
@@ -2882,9 +2910,23 @@ const App = {
       list.forEach(c => {
         const isPaid = c.status === 'paid';
         const dateStr = DB.formatDateTime(c.timestamp);
-        const statusBadge = isPaid
-          ? `<span class="status-badge paid">✅ ${I18N.t('cred_status_paid') || 'Settled'}</span>`
-          : `<span class="status-badge pending">⏳ ${I18N.t('cred_status_pending') || 'Pending'}</span>`;
+        const elapsedDays = Math.floor((Date.now() - new Date(c.timestamp).getTime()) / 86400000);
+        let statusBadge = '';
+        if (isPaid) {
+          statusBadge = `<span class="status-badge paid">✅ ${I18N.t('cred_status_paid') || 'Settled'}</span>`;
+        } else if (elapsedDays >= 3) {
+          statusBadge = `<div style="display:flex; flex-direction:column; gap:3px; align-items:center;">
+            <span class="status-badge pending">⏳ ${I18N.t('cred_status_pending') || 'Pending'}</span>
+            <span style="font-size:0.72rem; font-weight:800; color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 6px; border-radius:4px; border:1px solid rgba(239,68,68,0.35); white-space:nowrap;">
+              ⚠️ දින ${elapsedDays} ක් ප්‍රමාදයි
+            </span>
+          </div>`;
+        } else {
+          statusBadge = `<div style="display:flex; flex-direction:column; gap:2px; align-items:center;">
+            <span class="status-badge pending">⏳ ${I18N.t('cred_status_pending') || 'Pending'}</span>
+            <span style="font-size:0.7rem; color:var(--text-muted);">(${elapsedDays === 0 ? 'Today' : elapsedDays + 'd ago'})</span>
+          </div>`;
+        }
 
         let settleInfo = '';
         if (isPaid && c.settledAt) {
@@ -4733,7 +4775,12 @@ Thank you! - ${shopName}`;
     const posCheque = s.posChequeSales || 0;
     const posTotal = s.posGrossSales || s.posSales || (posCash + posCard + posCheque);
 
-    let msg = `🏪 *${shopName.toUpperCase()} - DAILY CASHIER SHIFT TALLY*\n`;
+    let msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+      `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+      `Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+      `Mutur • Batticaloa Rd • Serunuwara\n` +
+      `---------------------------------\n` +
+      `🌙 *DAILY CASHIER SHIFT SETTLEMENT SLIP*\n`;
     msg += `📅 Date: ${DB.formatDate(s.date)}\n`;
     msg += `⏰ Time: ${DB.formatTime(s.timestamp)}\n`;
     msg += `🧑‍💼 Cashier: ${s.cashier || s.cashierName || 'Staff'}\n`;
@@ -4847,6 +4894,42 @@ Thank you! - ${shopName}`;
     const verdictText = s.status === 'balanced' ? 'BALANCED (Rs. 0.00)' : s.status === 'excess' ? `CASH EXCESS (+${DB.formatCurrency(diff)})` : `CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})`;
     const verdictColor = s.status === 'balanced' ? '#16a34a' : s.status === 'excess' ? '#0284c7' : '#e4002b';
 
+    const notesArr = DB.formatDenominationsText(s.denominations, true) || [];
+    const notesBlock = notesArr.length > 0 ? "🧮 *ලාච්චුවේ ගැණූ මුදල් නෝට්ටු විස්තරය (NOTES BREAKDOWN):*\n" + notesArr.join("\n") + "\n\n" : "";
+    const specialNoteStr = (s.specialNotes || s.cashNote || '').replace(/\r?\n/g, ' ').replace(/"/g, "'");
+    const specialNoteBlock = specialNoteStr ? "📝 *SPECIAL NOTE:* " + specialNoteStr + "\n\n" : "";
+
+    const waMsgSlip = "🏢 *METHMI MOBILE (PVT) LTD*\n" +
+      "(Reg BR: PV-00352350 | Web: methmimobile.com)\n" +
+      "Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n" +
+      "Mutur • Batticaloa Rd • Serunuwara\n" +
+      "---------------------------------\n" +
+      "🌙 *DAILY CASHIER SHIFT SETTLEMENT SLIP*\n" +
+      "📅 Date: " + DB.formatDate(s.date) + "\n" +
+      "⏰ Time: " + DB.formatTime(s.timestamp) + "\n" +
+      "🧑‍💼 Cashier: " + (s.cashier || s.cashierName || 'Staff') + "\n" +
+      "🔖 Shift: " + (s.shiftType || 'EVENING').toUpperCase() + "\n" +
+      "=================================\n\n" +
+      "🛒 *POS MACHINE SALES:*\n" +
+      "• Cash Sales: " + DB.formatCurrency(posCash) + "\n" +
+      "• Card Sales: " + DB.formatCurrency(posCard) + "\n" +
+      "• Gross POS Sales: " + DB.formatCurrency(posTotal) + "\n\n" +
+      "💵 *DRAWER CASH FLOW:*\n" +
+      "• 1. Opening Float: " + DB.formatCurrency(s.openingFloat || 0) + "\n" +
+      "• 2. (+) POS Cash: " + DB.formatCurrency(posCash) + "\n" +
+      "• 3. (-) Expenses: " + DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0) + "\n" +
+      "• *Expected Cash: " + DB.formatCurrency(s.expectedCash || 0) + "*\n" +
+      "• *Actual Counted: " + DB.formatCurrency(s.countedCash || s.actualCountedCash || 0) + "*\n" +
+      "• *Status: " + (Math.abs(s.difference || 0) < 0.01 ? '✅ Balanced (Rs.0.00)' : ((s.difference || 0) > 0 ? '🟢 Excess (+' + DB.formatCurrency(s.difference) + ')' : '🔴 Shortage (-' + DB.formatCurrency(Math.abs(s.difference)) + ')')) + "*\n\n" +
+      notesBlock +
+      specialNoteBlock +
+      "=================================\n" +
+      "*METHMI MOBILE (PVT) LTD*\n" +
+      "Main Street, Mutur\n" +
+      "Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413";
+
+    const waSlipUrl = "https://api.whatsapp.com/send?text=" + encodeURIComponent(waMsgSlip);
+
     const printHtml = `
       <!DOCTYPE html>
       <html>
@@ -4874,26 +4957,26 @@ Thank you! - ${shopName}`;
         </style>
       </head>
       <body>
-        <div class="no-print" style="display:flex; justify-content:space-between; align-items:center; background:#0f172a; color:#fff; padding:12px 18px; margin-bottom:20px; border-radius:8px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);">
-          <div style="font-weight:700; font-size:1rem; display:flex; align-items:center; gap:8px;">
-            <span>📄</span> <span>Shop Cashier Settlement Slip</span>
-          </div>
-          <div style="display:flex; gap:10px;">
-            <button onclick="window.print()" style="background:#2563eb; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:700; cursor:pointer;">🖨️ Print / Save as PDF</button>
-            <button onclick="window.opener ? window.opener.App.shareShiftViaWhatsApp('${s.id}') : null" style="background:#16a34a; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-weight:700; cursor:pointer;">📲 WhatsApp Share</button>
-            <button onclick="window.close()" style="background:#475569; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:700; cursor:pointer;">✖ Close</button>
-          </div>
+        <div class="no-print" style="margin-bottom: 16px; display: flex; gap: 10px; background: #1e293b; padding: 12px; border-radius: 8px; justify-content: flex-end; align-items: center;">
+          <span style="color:#f8fafc; font-weight:700; margin-right:auto; font-size:1.05rem;">📄 Shop Cashier Settlement Slip</span>
+          <button onclick="window.print()" style="padding: 8px 16px; background: #3b82f6; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 700;">🖨️ Print / Save as PDF</button>
+          <button onclick="shareSlipWhatsAppDirect()" style="padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 700;">📲 WhatsApp Share</button>
+          <button onclick="window.close()" style="padding: 8px 16px; background: #475569; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 700;">✖ Close</button>
         </div>
+
         <div class="header">
-          <div class="shop-title">🏪 ${shopName}</div>
-          <div class="sub-title">Daily Evening Shift Reconciliation & Cash Flow Settlement</div>
+          <div style="font-size: 1.3rem; font-weight: 900; letter-spacing: 0.5px; color: #0f172a; text-transform: uppercase;">METHMI MOBILE (PVT) LTD</div>
+          <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-top: 2px;">Reg BR: PV-00352350 | Web: <a href="https://methmimobile.com" target="_blank" style="color: #0284c7; text-decoration: none;">methmimobile.com</a> | Email: methmimobile2014@gmail.com</div>
+          <div style="font-size: 0.8rem; font-weight: 600; color: #334155; margin-top: 2px;">📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413</div>
+          <div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">Head Office: Main Street, Mutur | Branch: Batticaloa Rd, Periyapalam 3rd Cross, Mutur | Serunuwara</div>
+          <div style="font-size: 0.95rem; font-weight: 800; color: #1e293b; margin-top: 8px; border-top: 1px dashed #cbd5e1; padding-top: 6px; text-transform: uppercase; letter-spacing: 0.5px;">Daily Evening Shift Reconciliation & Cash Flow Settlement</div>
         </div>
 
         <div class="meta-grid">
           <div><strong>Date:</strong> ${DB.formatDate(s.date)}</div>
           <div><strong>Closing Time:</strong> ${DB.formatTime(s.timestamp)}</div>
           <div><strong>Cashier:</strong> ${s.cashier || s.cashierName || 'Staff'}</div>
-          <div><strong>Shift:</strong> ${s.shiftType ? s.shiftType.toUpperCase() : 'EVENING'}</div>
+          <div><strong>Shift:</strong> ${(s.shiftType || 'EVENING').toUpperCase()}</div>
         </div>
 
         <div class="section-head">🛒 POS Machine Sales Breakdown</div>
@@ -4901,7 +4984,7 @@ Thank you! - ${shopName}`;
           <tr><td>POS Cash Sales (In Drawer)</td><td style="text-align:right; font-weight:700;">${DB.formatCurrency(posCash)}</td></tr>
           <tr><td>POS Card / Credit Sales (Bank)</td><td style="text-align:right;">${DB.formatCurrency(posCard)}</td></tr>
           <tr><td>POS Cheque / Bank Transfer</td><td style="text-align:right;">${DB.formatCurrency(posCheque)}</td></tr>
-          <tr style="background:#f3f4f6; font-weight:800;"><td>Total POS Machine Gross Sales</td><td style="text-align:right;">${DB.formatCurrency(posTotal)}</td></tr>
+          <tr style="background:#f9fafb; font-weight:800;"><td>Total POS Machine Gross Sales</td><td style="text-align:right;">${DB.formatCurrency(posTotal)}</td></tr>
         </table>
 
         <div class="section-head">💵 Shop Cash Drawer Flow Reconciliation</div>
@@ -4944,10 +5027,15 @@ Thank you! - ${shopName}`;
           <div class="sig-line">Prepared by (Cashier)<br><small>${s.cashier || s.cashierName || 'Staff'}</small></div>
           <div class="sig-line">Verified & Approved by<br><small>Manager / Owner</small></div>
         </div>
+        <script>
+          function shareSlipWhatsAppDirect() {
+            var url = ${JSON.stringify(waSlipUrl)};
+            window.open(url, '_blank');
+          }
+        </script>
       </body>
       </html>
     `;
-
     const printWin = window.open('', '_blank', 'width=700,height=800');
     if (printWin) {
       printWin.document.open();
@@ -5011,7 +5099,7 @@ Thank you! - ${shopName}`;
           🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
         </div>
         <div style="background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-purple);">
-          💡 ලාච්චුවේ මුදල් බැංකුවට තැන්පත් කළ විට (Deposit) මෙහි සටහන් කරන්න.
+          💡 ලාච්චුවේ මුදල් බැංකුවට යවා තැන්පත් කිරීමේදී (Deposit) මුදල සහ CDM මැෂිමෙන්/බැංකුවෙන් ප්‍රතික්ෂේප වී ආපසු ගෙනා නෝට්ටු ඇත්නම් එය අඩු කර සත්‍ය තැන්පතු මුදල (Net Deposit) සටහන් වේ.
         </div>
         <div class="form-group">
           <label class="form-label">🏦 ${I18N.t('upd_bank_name_lbl') || 'Select Bank'}</label>
@@ -5025,13 +5113,25 @@ Thank you! - ${shopName}`;
             <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
           </select>
         </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight:700; color:var(--accent-purple);">💰 Deposit Amount (Rs.)</label>
-          <input type="number" step="0.01" min="1" class="form-input" id="quickDepositAmount" placeholder="0.00" style="font-size:1.3rem; font-weight:800; color:var(--accent-purple);" required>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group">
+            <label class="form-label" style="font-weight:700; color:var(--accent-purple);">📤 Sent Amount (Rs.)</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="quickDepositSentAmount" placeholder="0.00" oninput="App.recalcBankDepositNet()" style="font-size:1.15rem; font-weight:700;" required>
+            <small style="font-size:0.75rem; color:var(--text-secondary);">කඩෙන් බැංකුවට යැවූ මුදල</small>
+          </div>
+          <div class="form-group">
+            <label class="form-label" style="font-weight:700; color:#ef4444;">↩️ Return / Reject Cash</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="quickDepositReturnAmount" placeholder="0.00" oninput="App.recalcBankDepositNet()" style="font-size:1.15rem; font-weight:700;">
+            <small style="font-size:0.75rem; color:var(--text-secondary);">නැවත ගෙන ආ නෝට්ටු</small>
+          </div>
+        </div>
+        <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:var(--radius-sm); padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:0.9rem; font-weight:600; color:#059669;">💰 Actual Net Deposited:</span>
+          <span id="quickDepositNetDisplay" style="font-size:1.25rem; font-weight:800; color:#059669;">Rs. 0.00</span>
         </div>
         <div class="form-group">
           <label class="form-label">📝 Remarks / Reference</label>
-          <input type="text" class="form-input" id="quickDepositNote" placeholder="e.g. CDM Deposit, Cashier slip ref">
+          <input type="text" class="form-input" id="quickDepositNote" placeholder="e.g. CDM Deposit ref, Cashier name">
         </div>
       </form>
     `;
@@ -5046,28 +5146,48 @@ Thank you! - ${shopName}`;
     );
   },
 
+  recalcBankDepositNet() {
+    const sent = parseFloat(document.getElementById('quickDepositSentAmount')?.value) || 0;
+    const returned = parseFloat(document.getElementById('quickDepositReturnAmount')?.value) || 0;
+    const net = Math.max(0, sent - returned);
+    const disp = document.getElementById('quickDepositNetDisplay');
+    if (disp) {
+      disp.textContent = `Rs. ${DB.formatCurrency(net)}`;
+    }
+  },
+
   saveQuickBankDeposit() {
     const shopId = DB.getActiveShopId();
     if (!shopId) return;
     const bank = document.getElementById('quickDepositBank')?.value || 'HNB Bank';
-    const amount = parseFloat(document.getElementById('quickDepositAmount')?.value) || 0;
-    const note = document.getElementById('quickDepositNote')?.value || '';
+    const sent = parseFloat(document.getElementById('quickDepositSentAmount')?.value) || 0;
+    const returned = parseFloat(document.getElementById('quickDepositReturnAmount')?.value) || 0;
+    const net = Math.max(0, sent - returned);
+    const userNote = document.getElementById('quickDepositNote')?.value?.trim() || '';
 
-    if (amount <= 0) {
-      this.showToast('කරුණාකර නිවැරදි මුදලක් ඇතුළත් කරන්න (Please enter a valid amount)', 'error');
+    if (sent <= 0) {
+      this.showToast('කරුණාකර යැවූ මුදල (Sent Amount) ඇතුළත් කරන්න', 'error');
       return;
+    }
+
+    let noteText = userNote;
+    if (returned > 0) {
+      const returnTag = `(Sent: Rs. ${DB.formatCurrency(sent)}, Returned: Rs. ${DB.formatCurrency(returned)})`;
+      noteText = noteText ? `${noteText} ${returnTag}` : returnTag;
     }
 
     DB.addBankTransaction({
       shopId,
       type: 'deposit',
       bank,
-      amount,
-      note
+      amount: net > 0 ? net : sent,
+      note: noteText,
+      sentAmount: sent,
+      returnAmount: returned
     });
 
     this.closeModal();
-    this.showToast(`✅ ${DB.formatCurrency(amount)} බැංකුවට තැන්පත් කිරීම සාර්ථකයි!`, 'success');
+    this.showToast(`✅ Rs. ${DB.formatCurrency(net > 0 ? net : sent)} බැංකුවට තැන්පත් කිරීම සාර්ථකයි!`, 'success');
     this.refreshPage(this.currentPage);
   },
 
@@ -5266,7 +5386,7 @@ Thank you! - ${shopName}`;
   showAddExpenseModal() {
     const shopId = DB.getActiveShopId();
     if (!shopId) { this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error'); return; }
-    const categories = ['Staff Salary', 'Electricity', 'Rent', 'Internet', 'Supplies', 'Owner Drawing', 'Maintenance', 'Other'];
+    const categories = ['Shop Wi-Fi / Router Reload', 'Staff / Shop Mobile Reload', 'Staff Salary', 'Electricity', 'Rent', 'Internet', 'Supplies', 'Owner Drawing', 'Maintenance', 'Other'];
     const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
     this.showModal(
       '💸 Add Expense / Drawing',

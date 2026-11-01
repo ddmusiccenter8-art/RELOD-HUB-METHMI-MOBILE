@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1c23">
   
-  <link rel="stylesheet" href="style.css?v=30.0">
+  <link rel="stylesheet" href="style.css?v=31.0">
 </head>
 <body>
 
@@ -91,7 +91,6 @@
         <li><a href="#" data-page="update" onclick="App.navigateTo('update')"><span class="nav-icon">⚡</span> <span data-i18n="nav_update">Reload & Payments</span></a></li>
         <li><a href="#" data-page="device-credits" onclick="App.navigateTo('device-credits')"><span class="nav-icon">✍️</span> <span data-i18n="nav_dev_credits">Phone Loans & Agreements</span></a></li>
         <li><a href="#" data-page="shifts" onclick="App.navigateTo('shifts')"><span class="nav-icon">🌙</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
-        <li><a href="#" onclick="App.openDenominationModal(null, false); if (window.innerWidth <= 768) App.toggleSidebarMenu(); return false;"><span class="nav-icon">🧮</span> <span data-i18n="denom_title">Cash Notes Counter</span></a></li>
         <li><a href="#" data-page="credits" onclick="App.navigateTo('credits')"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
         <li><a href="#" data-page="history" onclick="App.navigateTo('history')"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
         <li><a href="#" data-page="shops" onclick="App.navigateTo('shops')"><span class="nav-icon">🏪</span> <span data-i18n="nav_shops">Shops & Branches</span></a></li>
@@ -123,53 +122,41 @@
     <!-- Main Content -->
     <main class="main-content">
 
-      <!-- Top Quick Action Bar -->
-      <div class="top-action-bar" id="topActionBar">
-        <div class="top-bar-left">
-          <span style="font-size:0.75rem; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;" data-i18n="top_actions">⚡ Quick Actions:</span>
-          <button type="button" class="top-bar-btn reload-btn" onclick="App.navigateTo('update')" title="Open Reload & Payments" style="background:linear-gradient(135deg, rgba(59,130,246,0.18), rgba(37,99,235,0.1)); border:1px solid rgba(59,130,246,0.4); color:var(--accent-blue); font-weight:800;">
-            <span class="btn-icon">📱</span>
-            <span class="btn-text" data-i18n="top_btn_reload">Reload & Payments</span>
-          </button>
-          <button type="button" class="top-bar-btn bank-dep-btn" onclick="App.showQuickAddBankDepositModal()" title="Record Bank Deposit" style="background:rgba(139,92,246,0.12); border:1px solid rgba(139,92,246,0.3); color:var(--accent-purple); font-weight:700;">
-            <span class="btn-icon">🏦</span>
-            <span class="btn-text" data-i18n="top_btn_bank_deposit">+ Bank Deposit</span>
-          </button>
-          <button type="button" class="top-bar-btn cashout-btn" onclick="App.showQuickAddCashOutModal()" title="Record Cash Out" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); color:var(--accent-green); font-weight:700;">
-            <span class="btn-icon">💵</span>
-            <span class="btn-text" data-i18n="top_btn_cash_out">+ Cash Out</span>
-          </button>
-          <button type="button" class="top-bar-btn morning-btn" onclick="App.showMorningShiftModal()" title="Morning Shift Open (Cash Drawer Float)" style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); color:var(--accent-gold); font-weight:700;">
-            <span class="btn-icon">🌅</span>
-            <span class="btn-text" data-i18n="top_btn_morning_shift">Morning Shift</span>
-          </button>
-          <button type="button" class="top-bar-btn shift-btn" onclick="App.showShiftSummaryModal()" title="Evening Shift Closing & POS Tally">
-            <span class="btn-icon">🌇</span>
-            <span class="btn-text" data-i18n="top_btn_evening_shift">Evening Shift</span>
-          </button>
-          <button type="button" class="top-bar-btn expense-btn" onclick="App.showAddExpenseModal()" title="Add Daily Expense / Owner Drawing">
-            <span class="btn-icon">💸</span>
-            <span class="btn-text" data-i18n="top_btn_expense">+ Expense</span>
-          </button>
-          <button type="button" class="top-bar-btn credit-btn" onclick="App.showQuickAddCreditModal()" title="Add Customer Credit Reload">
-            <span class="btn-icon">👤</span>
-            <span class="btn-text" data-i18n="top_btn_credit">+ Credit</span>
-            <span class="top-bar-badge" id="topBarCreditBadge" style="display:none;">0</span>
-          </button>
-          <button type="button" class="top-bar-btn dev-credit-btn" id="topBarDevCreditBtn" onclick="App.showAddDeviceCreditModal()" title="Add Device Credit Agreement & Legal Terms" style="background:rgba(2,132,199,0.15); border:1px solid rgba(2,132,199,0.4); color:var(--accent-blue); font-weight:800;">
-            <span class="btn-icon">✍️</span>
-            <span class="btn-text" data-i18n="top_btn_dev_credit">+ Phone Agreement</span>
-            <span class="top-bar-badge" id="topBarDevCreditBadge" style="display:none; background:var(--accent-red); color:#fff;">0</span>
-          </button>
-          <button type="button" class="top-bar-btn denom-btn" onclick="App.openDenominationModal(null, false)" title="Cash Drawer Note Counter" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); color:var(--accent-green); font-weight:700;">
-            <span class="btn-icon">🧮</span>
-            <span class="btn-text">Cash Counter</span>
-          </button>
+      <!-- Top Quick Action Card Box (Neat, unified layout) -->
+      <div class="card" id="topQuickActionCard" style="margin-bottom: 20px; padding: 14px 18px; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: 0 4px 18px rgba(0,0,0,0.06);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 8px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:1.15rem;">⚡</span>
+            <span style="font-weight:800; font-size:0.92rem; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.5px;">Quick Shop Actions (ක්ෂණික මෙහෙයුම්)</span>
+          </div>
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">1-Tap Operations</span>
         </div>
-        <div class="top-bar-right">
-          <button type="button" class="top-bar-btn ledger-btn" onclick="App.navigateTo('credits')" title="Open Credits & Expenses Ledger">
-            <span class="btn-icon">📒</span>
-            <span class="btn-text" data-i18n="top_btn_ledger">Ledger & Settle</span>
+
+        <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+          <button type="button" class="btn btn-sm" onclick="App.navigateTo('update')" style="font-weight:700; padding:8px 14px; background:linear-gradient(135deg, #0284c7, #2563eb); color:#fff; border:none; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>⚡</span> <span>Reload & Payments</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showAddDeviceCreditModal()" style="font-weight:700; padding:8px 14px; background:linear-gradient(135deg, #0d9488, #059669); color:#fff; border:none; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>✍️</span> <span>+ Phone Agreement</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showQuickAddBankDepositModal()" style="font-weight:700; padding:8px 14px; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.4); color:var(--accent-purple); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>🏦</span> <span>+ Bank Deposit</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal()" style="font-weight:700; padding:8px 14px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4); color:var(--accent-gold); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>🌅</span> <span>Morning Shift</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showShiftSummaryModal()" style="font-weight:700; padding:8px 14px; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); color:var(--accent-red); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>🌙</span> <span>Close Shift</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showQuickAddCreditModal()" style="font-weight:700; padding:8px 14px; background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.35); color:var(--accent-blue); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>👤</span> <span>+ Credit Reload</span>
+            <span class="top-bar-badge" id="topBarCreditBadge" style="display:none; margin-left:4px;">0</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showAddExpenseModal()" style="font-weight:700; padding:8px 14px; background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); color:#f43f5e; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>💸</span> <span>+ Daily Expense</span>
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="App.navigateTo('credits')" style="font-weight:700; padding:8px 14px; border:1px solid var(--border-glass); margin-left:auto; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>📒</span> <span>Ledger & Settle</span>
           </button>
         </div>
       </div>
@@ -675,14 +662,23 @@
         <!-- Filter & Search Bar -->
         <div class="card" style="margin-bottom:20px; padding:16px;">
           <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
-            <div style="display:flex; gap:8px;" id="ledgerTabButtons">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;" id="ledgerTabButtons">
               <button class="btn btn-primary btn-sm ledger-tab-btn active" data-tab="credits" data-i18n="tab_credits">👤 Customer Credits</button>
               <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="routers" data-i18n="tab_routers">📶 Router Expenses</button>
               <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="topups" data-i18n="tab_topups">📥 Distributor Top-ups</button>
             </div>
-            <div style="display:flex; gap:8px; flex:1; max-width:360px;">
-              <input type="text" class="form-input" id="ledgerSearchInput" placeholder="Search customer name or phone..." data-i18n="cred_search_ph">
+            <div style="display:flex; gap:8px; flex:1; min-width:240px; max-width:400px;">
+              <input type="text" class="form-input" id="ledgerSearchInput" placeholder="🔍 Search name, phone or note..." data-i18n="cred_search_ph">
             </div>
+          </div>
+
+          <!-- Customer Credit Status Filter Bar -->
+          <div id="creditStatusFilterRow" style="display:flex; gap:8px; margin-top:12px; padding-top:12px; border-top:1px dashed rgba(255,255,255,0.08); flex-wrap:wrap; align-items:center;">
+            <span style="font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Filter Status:</span>
+            <button type="button" class="btn btn-xs btn-primary credit-status-pill" data-status="all" onclick="App.filterCreditStatus('all')" style="font-weight:700;">All (සියල්ල)</button>
+            <button type="button" class="btn btn-xs btn-ghost credit-status-pill" data-status="pending" onclick="App.filterCreditStatus('pending')" style="font-weight:700; border:1px solid rgba(245,158,11,0.35); color:var(--accent-gold);">⏳ Pending (නොගෙවූ)</button>
+            <button type="button" class="btn btn-xs btn-ghost credit-status-pill" data-status="overdue" onclick="App.filterCreditStatus('overdue')" style="font-weight:700; border:1px solid rgba(239,68,68,0.4); color:var(--accent-red);">⚠️ Overdue > 3 Days (ප්‍රමාද වූ)</button>
+            <button type="button" class="btn btn-xs btn-ghost credit-status-pill" data-status="settled" onclick="App.filterCreditStatus('settled')" style="font-weight:700; border:1px solid rgba(34,197,94,0.35); color:var(--accent-green);">✅ Settled (පියවූ)</button>
           </div>
         </div>
 
@@ -981,10 +977,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=30.0"></script>
-  <script src="firebase-init.js?v=30.0"></script>
-  <script src="data.js?v=30.0"></script>
-  <script src="app.js?v=30.0"></script>
+  <script src="i18n.js?v=31.0"></script>
+  <script src="firebase-init.js?v=31.0"></script>
+  <script src="data.js?v=31.0"></script>
+  <script src="app.js?v=31.0"></script>
   
   <!-- Register Service Worker -->
   <script>
