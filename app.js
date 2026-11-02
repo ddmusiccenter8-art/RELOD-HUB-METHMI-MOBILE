@@ -511,12 +511,50 @@ const App = {
       overallType.textContent = type === 'profit' ? (I18N.currentLang === 'si' ? '✅ PROFIT (ලාභ)' : '✅ PROFIT') : type === 'loss' ? (I18N.currentLang === 'si' ? '❌ LOSS (අලාභ)' : '❌ LOSS') : '➖ NO CHANGE';
       overallType.style.color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
       overallCard.className = `card overall-card ${type === 'profit' ? 'profit-card' : type === 'loss' ? 'loss-card' : 'neutral-card'}`;
+
+      // Independent Margins Strip on Dashboard
+      const rd = comp.reload || { diff: 0, type: 'neutral' };
+      const bd = comp.bank || { diff: 0, type: 'neutral' };
+      const cd = comp.cash || { diff: 0, type: 'neutral' };
+
+      const rEl = document.getElementById('dashReloadMarginDiff');
+      if (rEl) {
+        const sign = rd.diff >= 0 ? '+' : '';
+        const icon = rd.type === 'profit' ? '▲ ' : rd.type === 'loss' ? '▼ ' : '➖ ';
+        const color = rd.type === 'profit' ? 'var(--accent-green)' : rd.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+        rEl.textContent = `${icon}${sign}Rs.${DB.formatCurrency(rd.diff)}`;
+        rEl.style.color = color;
+      }
+      const bEl = document.getElementById('dashBankMarginDiff');
+      if (bEl) {
+        const sign = bd.diff >= 0 ? '+' : '';
+        const icon = bd.type === 'profit' ? '▲ ' : bd.type === 'loss' ? '▼ ' : '➖ ';
+        const color = bd.type === 'profit' ? 'var(--accent-green)' : bd.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+        bEl.textContent = `${icon}${sign}Rs.${DB.formatCurrency(bd.diff)}`;
+        bEl.style.color = color;
+      }
+      const cEl = document.getElementById('dashCashMarginDiff');
+      if (cEl) {
+        const sign = cd.diff >= 0 ? '+' : '';
+        const icon = cd.type === 'profit' ? '▲ ' : cd.type === 'loss' ? '▼ ' : '➖ ';
+        const color = cd.type === 'profit' ? 'var(--accent-green)' : cd.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+        cEl.textContent = `${icon}${sign}Rs.${DB.formatCurrency(cd.diff)}`;
+        cEl.style.color = color;
+      }
     } else {
       overallValue.textContent = DB.formatCurrency(0);
       overallValue.className = 'overall-value neutral';
       overallType.textContent = I18N.currentLang === 'si' ? 'පළමු UPDATE (FIRST UPDATE)' : 'FIRST UPDATE';
       overallType.style.color = 'var(--text-muted)';
       overallCard.className = 'card overall-card neutral-card';
+
+      ['dashReloadMarginDiff', 'dashBankMarginDiff', 'dashCashMarginDiff'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.textContent = '➖ Rs.0.00';
+          el.style.color = 'var(--text-muted)';
+        }
+      });
     }
 
     const vals = DB.extractValues(lastUpdate);
@@ -579,6 +617,25 @@ const App = {
       dashCreditDiffEl.className = creditStats.totalPending > 0 ? 'card-diff loss' : 'card-diff neutral';
     }
 
+    // 6. Device Credit Loans Card
+    const devCreditStats = DB.getDeviceCreditStats(shopId);
+    const dashDevCreditEl = document.getElementById('dashDevCreditTotal');
+    const dashDevCreditDiffEl = document.getElementById('dashDevCreditDiff');
+    if (dashDevCreditEl) {
+      dashDevCreditEl.textContent = DB.formatCurrency(devCreditStats.totalOutstanding);
+    }
+    if (dashDevCreditDiffEl) {
+      const activeLabel = I18N.t('devcred_active') || 'Active Loans';
+      const dueCount = devCreditStats.dueTodayCount + devCreditStats.overdueCount;
+      if (dueCount > 0) {
+        dashDevCreditDiffEl.textContent = `⚠️ ${dueCount} Due / ${devCreditStats.activeCount} ${activeLabel}`;
+        dashDevCreditDiffEl.className = 'card-diff loss';
+      } else {
+        dashDevCreditDiffEl.textContent = `${devCreditStats.activeCount} ${activeLabel}`;
+        dashDevCreditDiffEl.className = devCreditStats.activeCount > 0 ? 'card-diff neutral' : 'card-diff profit';
+      }
+    }
+
     // Comparison Table
     this.renderComparisonTable(lastUpdate);
 
@@ -615,6 +672,22 @@ const App = {
       dashCreditDiffEl.textContent = '0 Pending';
       dashCreditDiffEl.className = 'card-diff neutral';
     }
+
+    const dashDevCreditEl = document.getElementById('dashDevCreditTotal');
+    const dashDevCreditDiffEl = document.getElementById('dashDevCreditDiff');
+    if (dashDevCreditEl) dashDevCreditEl.textContent = 'Rs.0.00';
+    if (dashDevCreditDiffEl) {
+      dashDevCreditDiffEl.textContent = '0 Active Loans';
+      dashDevCreditDiffEl.className = 'card-diff neutral';
+    }
+
+    ['dashReloadMarginDiff', 'dashBankMarginDiff', 'dashCashMarginDiff'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = '➖ Rs.0.00';
+        el.style.color = 'var(--text-muted)';
+      }
+    });
 
     const compTable = document.getElementById('dashComparisonTable');
     if (compTable) {
@@ -657,6 +730,14 @@ const App = {
         prev: prevUpdate ? prev.bankTotal : 0,
         diff: comp && !comp.isFirst ? comp.bank.diff : 0,
         type: comp && !comp.isFirst ? comp.bank.type : 'neutral'
+      },
+      {
+        icon: '💵',
+        name: I18N.t('comp_track_cash') || 'Total Cash in Drawer (Reload + Bank Cash)',
+        curr: curr.totalCash,
+        prev: prevUpdate ? prev.totalCash : 0,
+        diff: comp && !comp.isFirst ? comp.cash.diff : 0,
+        type: comp && !comp.isFirst ? comp.cash.type : 'neutral'
       }
     ];
 
@@ -1481,12 +1562,13 @@ const App = {
       setHint('prevAirtelHint', 'Prev', prevVals.airtel);
       setHint('prevHutchHint', 'Prev', prevVals.hutch);
       setHint('prevEzcashHint', 'Prev', prevVals.ezcash);
-      setHint('prevReloadCashHint', I18N.t('upd_prev_cash_hint') || (I18N.currentLang === 'si' ? 'කලින් ලාච්චුවේ මුදල' : 'Previous Cash Drawer'), prevVals.totalCash || prevVals.reloadCash);
+      setHint('prevReloadCashHint', I18N.t('upd_prev_cash_hint') || (I18N.currentLang === 'si' ? 'කලින් ලාච්චුවේ මුදල' : 'Previous Cash Drawer'), prevVals.reloadCash);
+      setHint('prevHubCashHint', I18N.t('upd_prev_hub_hint') || (I18N.currentLang === 'si' ? 'කලින් හබ් මුදල' : 'Previous Hub Cash'), prevVals.hubCash || 0);
       this.renderDenomsSummaryChip(this.lastReloadDenominations);
     } else {
       const prevInfo = document.getElementById('prevUpdateInfo');
       if (prevInfo) prevInfo.style.display = 'none';
-      ['prevDialogHint', 'prevMobitelHint', 'prevAirtelHint', 'prevHutchHint', 'prevEzcashHint', 'prevReloadCashHint'].forEach(id => {
+      ['prevDialogHint', 'prevMobitelHint', 'prevAirtelHint', 'prevHutchHint', 'prevEzcashHint', 'prevReloadCashHint', 'prevHubCashHint'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = '';
       });
@@ -1622,9 +1704,13 @@ const App = {
 
     const prevVals = DB.extractValues(prevUpdate);
     const simsDiff = reloadSimTotal - prevVals.simTotal;
-    const drawerCashDiff = reloadDrawerTotal - (prevVals.totalCash || 0);
-    const reloadFullDiff = reloadFullTotal - (prevVals.reloadTotal || (prevVals.simTotal + prevVals.totalCash));
+    const prevReloadDrawer = (prevVals.reloadDrawerTotal !== undefined)
+      ? prevVals.reloadDrawerTotal
+      : (prevVals.reloadCash || 0);
+    const drawerCashDiff = reloadDrawerTotal - prevReloadDrawer;
+    const reloadFullDiff = reloadFullTotal - (prevVals.reloadTotal || (prevVals.simTotal + prevReloadDrawer));
     const bankDiff = bankGrandTotal - prevVals.bankTotal;
+    const cashFlowDiff = totalCashInDrawer - (prevVals.totalCash || 0);
     const physicalDiff = physicalCapital - prevVals.totalCapital;
     const adjustedDiff = (physicalCapital + creditsTotal + routersTotal) - (prevVals.totalCapital + topupsTotal);
 
@@ -1641,23 +1727,89 @@ const App = {
     if (bankDiffBadge) bankDiffBadge.innerHTML = formatBadge(bankDiff);
     if (overallDiffBadge) overallDiffBadge.innerHTML = formatBadge(adjustedDiff);
 
-    const overallType = adjustedDiff > 0 ? 'profit' : adjustedDiff < 0 ? 'loss' : 'neutral';
-    const overallColor = overallType === 'profit' ? 'var(--accent-green)' : overallType === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
-
     if (container) {
       container.style.display = 'block';
+
+      const getCardInfo = (diff) => {
+        const type = diff > 0 ? 'profit' : diff < 0 ? 'loss' : 'neutral';
+        const icon = diff > 0 ? '▲ +' : diff < 0 ? '▼ -' : '➖ ';
+        const color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+        const bg = type === 'profit' ? 'rgba(16,185,129,0.08)' : type === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)';
+        const border = type === 'profit' ? 'rgba(16,185,129,0.3)' : type === 'loss' ? 'rgba(239,68,68,0.3)' : 'rgba(100,116,139,0.25)';
+        const textVal = `${icon}Rs.${DB.formatCurrency(Math.abs(diff))}`;
+        const statusLabel = type === 'profit' ? 'Profit (ලාභ)' : type === 'loss' ? 'Loss (අලාභ)' : 'Balanced (සමබරයි)';
+        return { type, icon, color, bg, border, textVal, statusLabel };
+      };
+
+      const rCard = getCardInfo(reloadFullDiff);
+      const bCard = getCardInfo(bankDiff);
+      const cCard = getCardInfo(cashFlowDiff);
+      const netCard = getCardInfo(adjustedDiff);
+
       container.innerHTML = `
-        <div style="padding:16px 20px; background:${overallType === 'profit' ? 'rgba(16,185,129,0.08)' : overallType === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'}; border:2px solid ${overallType === 'profit' ? 'rgba(16,185,129,0.2)' : overallType === 'loss' ? 'rgba(239,68,68,0.2)' : 'rgba(100,116,139,0.2)'}; border-radius:var(--radius-lg);">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <div style="font-size:0.82rem; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:0.5px;">PROFIT / LOSS PREVIEW</div>
-              <div style="font-size:1.4rem; font-weight:900; color:${overallColor}; margin-top:2px;">
-                ${adjustedDiff >= 0 ? '+' : ''}${DB.formatCurrency(adjustedDiff)}
+        <div style="background:var(--bg-glass-card); border:1.5px solid var(--border-glass); border-radius:var(--radius-md); padding:16px 18px; box-shadow:0 4px 16px rgba(0,0,0,0.04);">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid rgba(0,0,0,0.08);">
+            <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.5px;">
+              📊 INDEPENDENT MARGINS & OPERATING RESULTS (තනි තනි මාර්ජින්)
+            </div>
+            <span style="font-size:0.75rem; font-weight:600; color:var(--text-muted);">Vs Previous Update</span>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+            <!-- 1. Reload Track Margin -->
+            <div style="padding:12px 14px; border-radius:var(--radius-sm); background:${rCard.bg}; border:1.5px solid ${rCard.border};">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--accent-blue); text-transform:uppercase;">🔄 Reload Margin</span>
+                <span style="font-size:0.68rem; font-weight:700; color:${rCard.color};">${rCard.statusLabel}</span>
+              </div>
+              <div style="font-size:1.15rem; font-weight:900; color:${rCard.color}; margin-top:3px;">
+                ${rCard.textVal}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                Reload Total: Rs.${DB.formatCurrency(reloadFullTotal)}
               </div>
             </div>
-            <div style="text-align:right; font-size:0.85rem; font-weight:700;">
-              <span style="color:var(--accent-blue);">Reload: ${reloadFullDiff >= 0 ? '+' : ''}${DB.formatCurrency(reloadFullDiff)}</span><br>
-              <span style="color:var(--accent-purple);">Bank: ${bankDiff >= 0 ? '+' : ''}${DB.formatCurrency(bankDiff)}</span>
+
+            <!-- 2. Bank Track Margin -->
+            <div style="padding:12px 14px; border-radius:var(--radius-sm); background:${bCard.bg}; border:1.5px solid ${bCard.border};">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--accent-purple); text-transform:uppercase;">🏦 Bank Margin</span>
+                <span style="font-size:0.68rem; font-weight:700; color:${bCard.color};">${bCard.statusLabel}</span>
+              </div>
+              <div style="font-size:1.15rem; font-weight:900; color:${bCard.color}; margin-top:3px;">
+                ${bCard.textVal}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                Bank Total: Rs.${DB.formatCurrency(bankGrandTotal)}
+              </div>
+            </div>
+
+            <!-- 3. Drawer Cash Flow -->
+            <div style="padding:12px 14px; border-radius:var(--radius-sm); background:${cCard.bg}; border:1.5px solid ${cCard.border};">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:700; color:var(--accent-gold); text-transform:uppercase;">💵 Drawer Cash Flow</span>
+                <span style="font-size:0.68rem; font-weight:700; color:${cCard.color};">${cCard.statusLabel}</span>
+              </div>
+              <div style="font-size:1.15rem; font-weight:900; color:${cCard.color}; margin-top:3px;">
+                ${cCard.textVal}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                Drawer Cash: Rs.${DB.formatCurrency(totalCashInDrawer)}
+              </div>
+            </div>
+
+            <!-- 4. Net Operating Margin -->
+            <div style="padding:12px 14px; border-radius:var(--radius-sm); background:${netCard.bg}; border:2px solid ${netCard.border};">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:0.75rem; font-weight:800; color:var(--text-primary); text-transform:uppercase;">⚖️ Net Operating Margin</span>
+                <span style="font-size:0.68rem; font-weight:800; color:${netCard.color};">${netCard.statusLabel}</span>
+              </div>
+              <div style="font-size:1.25rem; font-weight:900; color:${netCard.color}; margin-top:3px;">
+                ${netCard.textVal}
+              </div>
+              <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                Grand Capital: Rs.${DB.formatCurrency(physicalCapital)}
+              </div>
             </div>
           </div>
         </div>
@@ -1919,23 +2071,41 @@ const App = {
     msg += `=================================\n\n`;
 
     // 1. Reload SIMs Track
-    msg += `🔄 *RELOAD SIMS BALANCE:*\n`;
-    msg += `• Dialog SIM: ${DB.formatCurrency(vals.dialog)}\n`;
-    msg += `• Mobitel SIM: ${DB.formatCurrency(vals.mobitel)}\n`;
-    msg += `• Airtel SIM: ${DB.formatCurrency(vals.airtel)}\n`;
-    msg += `• Hutch SIM: ${DB.formatCurrency(vals.hutch)}\n`;
-    msg += `👉 *Total SIMs Balance:* *${DB.formatCurrency(vals.simTotal)}*\n\n`;
+    msg += `🔄 *1. RELOAD SIMS BALANCE:*\n`;
+    msg += `• Dialog SIM: Rs. ${DB.formatCurrency(vals.dialog)}\n`;
+    msg += `• Mobitel SIM: Rs. ${DB.formatCurrency(vals.mobitel)}\n`;
+    msg += `• Airtel SIM: Rs. ${DB.formatCurrency(vals.airtel)}\n`;
+    msg += `• Hutch SIM: Rs. ${DB.formatCurrency(vals.hutch)}\n`;
+    if (vals.ezcash > 0) {
+      msg += `• eZ Cash: Rs. ${DB.formatCurrency(vals.ezcash)}\n`;
+    }
+    msg += `👉 *Total SIMs Balance:* *Rs. ${DB.formatCurrency(vals.simTotal)}*\n\n`;
 
-    // 2. Cash in Drawer
-    msg += `💵 *CASH IN DRAWER:*\n`;
-    msg += `• Reload Physical Cash: ${DB.formatCurrency(vals.reloadCash)}\n`;
-    if (u.reload && u.reload.hubCash > 0) {
-      msg += `• Hub / Floating Cash: ${DB.formatCurrency(u.reload.hubCash)}\n`;
+    // 2. Reload Cash Drawer
+    msg += `💵 *2. RELOAD CASH DRAWER:*\n`;
+    msg += `• Reload Physical Cash: Rs. ${DB.formatCurrency(vals.reloadCash)}\n`;
+    if (vals.hubCash > 0) {
+      msg += `• Hub / Floating Cash: Rs. ${DB.formatCurrency(vals.hubCash)}\n`;
     }
-    if (vals.totalBankCash > 0) {
-      msg += `• Bank Drawer Cash: ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    msg += `👉 *Reload Drawer Total:* *Rs. ${DB.formatCurrency(vals.reloadDrawerTotal)}*\n`;
+    msg += `👉 *Combined Reload Track (SIMs + Drawer Cash):* *Rs. ${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
+
+    // 3. Bank Track
+    msg += `🏦 *3. BANK PAYMENTS & ACCOUNTS:*\n`;
+    if (vals.banks && vals.banks.length > 0) {
+      vals.banks.forEach(b => {
+        msg += `• ${b.bank}: Acct Rs. ${DB.formatCurrency(b.accountAmount)} | Cash Rs. ${DB.formatCurrency(b.cashInDrawer)}\n`;
+      });
     }
-    msg += `👉 *Total Cash in Drawer:* *${DB.formatCurrency(vals.totalCash)}*\n`;
+    msg += `• Total Bank Accounts: Rs. ${DB.formatCurrency(vals.totalBankAcct)}\n`;
+    msg += `• Total Bank Cash in Drawer: Rs. ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    msg += `👉 *Total Bank Track:* *Rs. ${DB.formatCurrency(vals.bankTotal)}*\n\n`;
+
+    // 4. Combined Physical Cash in Drawer
+    msg += `💼 *4. TOTAL PHYSICAL CASH IN DRAWER:*\n`;
+    msg += `• Reload Drawer Cash: Rs. ${DB.formatCurrency(vals.reloadDrawerTotal)}\n`;
+    msg += `• Bank Drawer Cash: Rs. ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    msg += `👉 *Total Cash in Drawer:* *Rs. ${DB.formatCurrency(vals.totalCash)}*\n`;
 
     // Note denomination breakdown if present
     const denoms = u.reload?.denominations;
@@ -1954,44 +2124,38 @@ const App = {
         msg += `🧮 *Notes Breakdown:* ${parts.join(', ')}\n`;
       }
     }
-    msg += `👉 *Combined Reload Track (SIMs + Cash):* *${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
+    msg += `\n`;
 
-    // 3. Bank Track
-    msg += `🏦 *BANK PAYMENTS & ACCOUNTS:*\n`;
-    if (vals.banks && vals.banks.length > 0) {
-      vals.banks.forEach(b => {
-        msg += `• ${b.bank}: Acct ${DB.formatCurrency(b.accountAmount)} | Cash ${DB.formatCurrency(b.cashInDrawer)}\n`;
-      });
-    }
-    msg += `👉 *Total Bank Track:* *${DB.formatCurrency(vals.bankTotal)}*\n\n`;
-
-    // 4. Grand Total Capital
+    // 5. Grand Total Capital
     msg += `=================================\n`;
-    msg += `💰 *GRAND TOTAL CAPITAL:* *${DB.formatCurrency(vals.totalCapital)}*\n`;
+    msg += `💰 *GRAND TOTAL CAPITAL:* *Rs. ${DB.formatCurrency(vals.totalCapital)}*\n`;
+    msg += `(SIMs: ${DB.formatCurrency(vals.simTotal)} + Total Cash: ${DB.formatCurrency(vals.totalCash)} + Banks: ${DB.formatCurrency(vals.totalBankAcct)})\n`;
     msg += `=================================\n\n`;
 
-    // 5. Comparison / Profit & Loss vs Previous / Morning Update
+    // 6. Independent Margins & Operating Results vs Previous Update
     if (comp && !comp.isFirst) {
       const oDiff = comp.overall?.diff ?? 0;
       const oType = comp.overall?.type ?? 'neutral';
       const rDiff = comp.reload?.diff ?? 0;
       const bDiff = comp.bank?.diff ?? 0;
+      const cDiff = comp.cash?.diff ?? 0;
       const prevTime = comp.previousUpdateTime ? DB.formatTime(comp.previousUpdateTime) : 'Previous';
 
-      msg += `📊 *P&L COMPARISON (VS ${prevTime.toUpperCase()}):*\n`;
-      msg += `• Reload Track Change: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}\n`;
-      msg += `• Bank Track Change: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}\n`;
+      msg += `📊 *INDEPENDENT MARGINS (VS ${prevTime.toUpperCase()}):*\n`;
+      msg += `• 🔄 Reload Track Margin: ${rDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(rDiff)}\n`;
+      msg += `• 🏦 Bank Track Margin: ${bDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(bDiff)}\n`;
+      msg += `• 💵 Cash Drawer Flow: ${cDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(cDiff)}\n`;
 
       if (oType === 'profit') {
-        msg += `• *NET OPERATING PROFIT: +${DB.formatCurrency(oDiff)}* ✅\n`;
+        msg += `👉 *NET OPERATING PROFIT: +Rs. ${DB.formatCurrency(oDiff)}* ✅\n`;
       } else if (oType === 'loss') {
-        msg += `• *NET OPERATING LOSS: -${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
+        msg += `👉 *NET OPERATING LOSS: -Rs. ${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
       } else {
-        msg += `• *NET OPERATING BALANCE: Rs. 0.00* ➖\n`;
+        msg += `👉 *NET OPERATING BALANCE: Rs. 0.00* ➖ (Balanced)\n`;
       }
 
       if (u.adjustments && (u.adjustments.creditsTotal > 0 || u.adjustments.routersTotal > 0 || u.adjustments.topupsTotal > 0)) {
-        msg += `⚖️ *Adjustments:* Credits +${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
+        msg += `⚖️ *Adjustments:* Credits +Rs. ${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +Rs. ${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -Rs. ${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
       }
     } else {
       msg += `📌 *Status:* First Opening Capital Recorded\n`;
@@ -2397,6 +2561,7 @@ const App = {
     setVal('simHutch', vals.hutch);
     setVal('simEzcash', vals.ezcash);
     setVal('reloadCashInput', vals.reloadCash);
+    setVal('reloadHubCashInput', vals.hubCash);
     this.lastReloadDenominations = vals.reloadDenominations || null;
     this.renderDenomsSummaryChip(this.lastReloadDenominations);
 

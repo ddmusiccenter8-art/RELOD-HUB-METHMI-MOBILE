@@ -565,15 +565,16 @@ const DB = {
     if (!u) {
       return {
         dialog: 0, mobitel: 0, airtel: 0, hutch: 0, ezcash: 0,
-        simTotal: 0, reloadCash: 0, reloadTotal: 0,
+        simTotal: 0, reloadCash: 0, hubCash: 0, reloadDrawerTotal: 0, reloadTotal: 0,
         banks: [], totalBankAcct: 0, totalBankCash: 0, bankTotal: 0,
-        totalCash: 0, cashInDrawer: 0, totalCapital: 0
+        totalCash: 0, cashInDrawer: 0, totalCapital: 0,
+        reloadDenominations: null, hubDenominations: null
       };
     }
 
     // Reload extraction
     let dialog = 0, mobitel = 0, airtel = 0, hutch = 0, ezcash = 0;
-    let reloadCash = 0, simTotal = 0, reloadTotal = 0;
+    let reloadCash = 0, hubCash = 0, reloadDrawerTotal = 0, simTotal = 0, reloadTotal = 0;
 
     if (u.reload && typeof u.reload === 'object') {
       dialog = parseFloat(u.reload.dialog) || 0;
@@ -582,14 +583,22 @@ const DB = {
       hutch = parseFloat(u.reload.hutch) || 0;
       ezcash = parseFloat(u.reload.ezcash) || 0;
       reloadCash = parseFloat(u.reload.cashInDrawer) || 0;
+      hubCash = parseFloat(u.reload.hubCash) || 0;
+      reloadDrawerTotal = (u.reload.drawerTotal !== undefined)
+        ? (parseFloat(u.reload.drawerTotal) || 0)
+        : (reloadCash + hubCash);
       simTotal = dialog + mobitel + airtel + hutch + ezcash;
       if (simTotal === 0 && u.reload.simTotal !== undefined) {
         simTotal = parseFloat(u.reload.simTotal) || 0;
       }
-      reloadTotal = (u.reload.total !== undefined) ? (parseFloat(u.reload.total) || 0) : (simTotal + reloadCash);
+      reloadTotal = (u.reload.total !== undefined)
+        ? (parseFloat(u.reload.total) || 0)
+        : (simTotal + reloadDrawerTotal);
     } else if (u.simTotal !== undefined) {
       simTotal = parseFloat(u.simTotal) || 0;
       reloadCash = parseFloat(u.cashInDrawer) || 0;
+      hubCash = 0;
+      reloadDrawerTotal = reloadCash;
       reloadTotal = simTotal + reloadCash;
     }
 
@@ -620,12 +629,14 @@ const DB = {
       bankTotal = parseFloat(u.bankTotal) || 0;
     }
 
-    const totalCash = reloadCash + totalBankCash;
-    const totalCapital = (u.totalCapital !== undefined && u.reload && u.reload.total !== undefined) ? (parseFloat(u.totalCapital) || 0) : (reloadTotal + bankTotal);
+    const totalCash = reloadDrawerTotal + totalBankCash;
+    const totalCapital = (u.totalCapital !== undefined && u.reload && u.reload.total !== undefined)
+      ? (parseFloat(u.totalCapital) || 0)
+      : (reloadTotal + bankTotal);
 
     return {
       dialog, mobitel, airtel, hutch, ezcash,
-      simTotal, reloadCash, reloadTotal,
+      simTotal, reloadCash, hubCash, reloadDrawerTotal, reloadTotal,
       banks, totalBankAcct, totalBankCash, bankTotal,
       totalCash, cashInDrawer: totalCash, totalCapital,
       reloadDenominations: (u.reload && u.reload.denominations) ? u.reload.denominations : null,
@@ -1551,6 +1562,12 @@ const DB = {
           diff: 0,
           type: 'neutral'
         },
+        reloadDrawer: {
+          current: curr.reloadDrawerTotal,
+          previous: 0,
+          diff: 0,
+          type: 'neutral'
+        },
         mobileRental: {
           current: curr.bankTotal,
           previous: 0,
@@ -1598,6 +1615,7 @@ const DB = {
     const prev = this.extractValues(previousUpdate);
 
     const reloadDiff = curr.reloadTotal - prev.reloadTotal;
+    const reloadDrawerDiff = curr.reloadDrawerTotal - prev.reloadDrawerTotal;
     const bankDiff = curr.bankTotal - prev.bankTotal;
     const physicalDiff = curr.totalCapital - prev.totalCapital;
     const cashDiff = curr.totalCash - prev.totalCash;
@@ -1617,6 +1635,12 @@ const DB = {
         previous: prev.reloadTotal,
         diff: reloadDiff,
         type: getType(reloadDiff)
+      },
+      reloadDrawer: {
+        current: curr.reloadDrawerTotal,
+        previous: prev.reloadDrawerTotal,
+        diff: reloadDrawerDiff,
+        type: getType(reloadDrawerDiff)
       },
       mobileRental: {
         current: curr.bankTotal,

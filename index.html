@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1c23">
   
-  <link rel="stylesheet" href="style.css?v=31.1">
+  <link rel="stylesheet" href="style.css?v=32.0">
 </head>
 <body>
 
@@ -236,6 +236,21 @@
           <div style="margin-top:10px; padding-top:10px; border-top:1px solid rgba(0,0,0,0.1);">
             <div style="font-size:0.95rem; color:var(--text-secondary); font-weight:700;"><span data-i18n="total_balance_lbl">Total Balance</span>: <span id="overallTotalCapital" style="color:var(--text-primary); font-size:1.1rem;">Rs.0.00</span></div>
           </div>
+          <!-- Independent Track Margins Strip -->
+          <div id="dashIndependentMargins" style="margin-top:14px; padding-top:14px; border-top:1px solid rgba(0,0,0,0.08); display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
+            <div style="background:var(--bg-glass-card); padding:8px 12px; border-radius:var(--radius-sm); border-left:3px solid var(--accent-blue); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; font-weight:700; color:var(--accent-blue);" data-i18n="dash_margin_reload">🔄 Reload Margin</span>
+              <span id="dashReloadMarginDiff" style="font-size:0.88rem; font-weight:800; color:var(--text-muted);">➖ Rs.0.00</span>
+            </div>
+            <div style="background:var(--bg-glass-card); padding:8px 12px; border-radius:var(--radius-sm); border-left:3px solid var(--accent-purple); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; font-weight:700; color:var(--accent-purple);" data-i18n="dash_margin_bank">🏦 Bank Margin</span>
+              <span id="dashBankMarginDiff" style="font-size:0.88rem; font-weight:800; color:var(--text-muted);">➖ Rs.0.00</span>
+            </div>
+            <div style="background:var(--bg-glass-card); padding:8px 12px; border-radius:var(--radius-sm); border-left:3px solid var(--accent-gold); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; font-weight:700; color:var(--accent-gold);" data-i18n="dash_margin_cash">💵 Cash Drawer Flow</span>
+              <span id="dashCashMarginDiff" style="font-size:0.88rem; font-weight:800; color:var(--text-muted);">➖ Rs.0.00</span>
+            </div>
+          </div>
         </div>
 
         <!-- Period Summary Card -->
@@ -300,6 +315,15 @@
             </div>
             <div class="card-value" id="dashCreditTotal" style="color:var(--accent-gold);">Rs.0.00</div>
             <div class="card-diff neutral" id="dashCreditDiff">0 Pending</div>
+          </div>
+          <!-- Device Credit Loans Card -->
+          <div class="card accent-blue animate-slide-up" style="cursor:pointer;" onclick="App.navigateTo('device-credits')" title="View Device Credit Agreements">
+            <div class="card-header">
+              <span class="card-title" data-i18n="dash_device_credits">📱 Device Credit Loans</span>
+              <div class="card-icon">📱</div>
+            </div>
+            <div class="card-value" id="dashDevCreditTotal" style="color:var(--accent-blue);">Rs.0.00</div>
+            <div class="card-diff neutral" id="dashDevCreditDiff">0 Active Loans</div>
           </div>
         </div>
 
@@ -977,10 +1001,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=31.1"></script>
-  <script src="firebase-init.js?v=31.1"></script>
-  <script src="data.js?v=31.1"></script>
-  <script src="app.js?v=31.1"></script>
+  <script src="i18n.js?v=32.0"></script>
+  <script src="firebase-init.js?v=32.0"></script>
+  <script src="data.js?v=32.0"></script>
+  <script src="app.js?v=32.0"></script>
   
   <!-- Register Service Worker -->
   <script>
