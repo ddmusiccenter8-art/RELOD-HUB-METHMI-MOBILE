@@ -23,18 +23,19 @@ const App = {
   currentDenoms: null,
   lastReloadDenominations: null,
 
-  // ---- Initialize ----
-  async init() {
-    // Initialize dual storage (localStorage + IndexedDB)
-    await DB.initialize();
-
-    // Initialize Localization
+  // ---- Initialize (Instant Sub-100ms Render) ----
+  init() {
+    // 1. Initialize Localization immediately (synchronous)
     I18N.translatePage();
-    document.getElementById('langSelector').value = I18N.currentLang;
-    document.getElementById('langSelector').addEventListener('change', (e) => {
-      I18N.setLanguage(e.target.value);
-    });
+    const langSel = document.getElementById('langSelector');
+    if (langSel) {
+      langSel.value = I18N.currentLang;
+      langSel.addEventListener('change', (e) => {
+        I18N.setLanguage(e.target.value);
+      });
+    }
 
+    // 2. Setup all UI controls and navigation immediately (instant local render)
     this.setupNavigation();
     this.setupShopSelector();
     this.setupUpdateForm();
@@ -49,26 +50,46 @@ const App = {
     this.setupCloudListeners();
 
     // Quick Add Shop
-    document.getElementById('quickAddShopBtn').addEventListener('click', () => {
-      this.showAddShopModal();
-    });
+    const quickAddBtn = document.getElementById('quickAddShopBtn');
+    if (quickAddBtn) {
+      quickAddBtn.addEventListener('click', () => {
+        this.showAddShopModal();
+      });
+    }
 
     // Dash Period Selector
-    document.getElementById('dashPeriodSelector').addEventListener('change', () => {
-      this.updatePeriodSummary(DB.getActiveShopId());
-    });
+    const dashPeriodSel = document.getElementById('dashPeriodSelector');
+    if (dashPeriodSel) {
+      dashPeriodSel.addEventListener('change', () => {
+        this.updatePeriodSummary(DB.getActiveShopId());
+      });
+    }
 
-    // Show dashboard
+    // Render dashboard immediately with cached local data
     this.navigateTo('dashboard');
     this.updateTodayDate();
     this.updateBackupStatus();
     this.updateTopBarBadges();
 
-    // Auto-prompt shop creation if none
-    const shops = DB.getShops();
-    if (shops.length === 0) {
-      setTimeout(() => this.showAddShopModal(), 300);
-    }
+    // 3. Background DB & Firebase Initialization (Non-blocking, sub-100ms startup)
+    DB.initialize().then(() => {
+      this.refreshShopSelector();
+      this.updateBackupStatus();
+      this.updateTopBarBadges();
+      if (this.currentPage === 'dashboard') {
+        this.renderDashboard();
+      }
+    }).catch(err => {
+      console.warn('DB.initialize background error:', err);
+    });
+
+    // Auto-prompt shop creation ONLY if no shops exist after cloud sync had time to resolve (2.5s)
+    setTimeout(() => {
+      const shops = DB.getShops();
+      if (shops.length === 0) {
+        this.showAddShopModal();
+      }
+    }, 2500);
 
     // Check if backup is overdue (> 2 days)
     this.checkBackupReminder();

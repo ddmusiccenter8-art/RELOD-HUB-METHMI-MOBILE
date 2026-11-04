@@ -203,7 +203,7 @@ const DB = {
     this._setupBeforeUnload();
 
     // Initialize Firebase Sync
-    await this._setupFirebaseSync();
+    this._setupFirebaseSync();
   },
 
   // ---- Firebase Sync System ----
@@ -212,55 +212,37 @@ const DB = {
     if (!window.FS) return;
 
     try {
-      // 1. One-time upload if cloud is empty but local has data
-      const shopsSnapshot = await window.FS.collection('payment_tracker_shops').limit(1).get();
-      if (shopsSnapshot.empty) {
-        const localShops = this.getShops();
-        const localUpdates = this.getUpdates();
-        
-        if (localShops.length > 0 || localUpdates.length > 0) {
-          console.log('☁️ Uploading local data to empty Firebase...');
-          const batch = window.FS.batch();
-          
-          localShops.forEach(shop => {
-            const ref = window.FS.collection('payment_tracker_shops').doc(shop.id);
-            batch.set(ref, shop);
-          });
-          
-          localUpdates.forEach(update => {
-            const ref = window.FS.collection('payment_tracker_updates').doc(update.id);
-            batch.set(ref, update);
-          });
-          
-          await batch.commit();
-          console.log('✅ Initial cloud upload complete!');
-        }
-      }
-
-      // Upload any local device credits, shifts, and customer credits to 'payment_tracker_updates' so all devices can see them!
-      const localDevCredits = this.getDeviceCredits();
-      if (localDevCredits.length > 0) {
-        const batch = window.FS.batch();
-        localDevCredits.forEach(credit => {
-          const ref = window.FS.collection('payment_tracker_updates').doc('devcred_' + credit.id);
-          batch.set(ref, { ...credit, docType: 'device_credit' }, { merge: true });
-        });
-        await batch.commit().catch(e => console.warn('Cloud sync error for device credits:', e));
-      }
-
-      const localCredits = this.getCredits(null, true);
-      if (localCredits.length > 0) {
-        const batch = window.FS.batch();
-        localCredits.forEach(credit => {
-          const ref = window.FS.collection('payment_tracker_updates').doc('cred_' + credit.id);
-          batch.set(ref, { ...credit, docType: 'credit' }, { merge: true });
-        });
-        await batch.commit().catch(e => console.warn('Cloud sync error for credits:', e));
-      }
-
-      // 2. Setup listeners for real-time cloud sync
+      // 1. Immediately setup real-time cloud listeners (Non-blocking, instant data streaming)
       this._setupFirebaseListeners();
-      
+
+      // 2. One-time seeding / cloud check, guarded by a local flag so it NEVER runs repeatedly or blocks
+      const hasSeeded = localStorage.getItem('spt_cloud_seeded_v33');
+      if (!hasSeeded) {
+        const shopsSnapshot = await window.FS.collection('payment_tracker_shops').limit(1).get().catch(() => null);
+        if (shopsSnapshot && shopsSnapshot.empty) {
+          const localShops = this.getShops();
+          const localUpdates = this.getUpdates();
+          
+          if (localShops.length > 0 || localUpdates.length > 0) {
+            console.log('☁️ One-time seeding of local data to empty Firebase...');
+            const batch = window.FS.batch();
+            
+            localShops.forEach(shop => {
+              const ref = window.FS.collection('payment_tracker_shops').doc(shop.id);
+              batch.set(ref, shop);
+            });
+            
+            localUpdates.forEach(update => {
+              const ref = window.FS.collection('payment_tracker_updates').doc(update.id);
+              batch.set(ref, update);
+            });
+            
+            await batch.commit().catch(e => console.warn('Cloud seed error:', e));
+            console.log('✅ Initial cloud upload complete!');
+          }
+        }
+        localStorage.setItem('spt_cloud_seeded_v33', 'true');
+      }
     } catch (e) {
       console.error('Firebase sync setup failed:', e);
     }
@@ -269,8 +251,8 @@ const DB = {
   _setupFirebaseListeners() {
     if (!window.FS) return;
 
-    let isFirstShopsLoad = true;
     window.FS.collection('payment_tracker_shops').onSnapshot(snapshot => {
+      this.setCloudStatus(true);
       if (snapshot.metadata.hasPendingWrites) return; // Ignore local writes (already handled)
       
       const shops = [];
@@ -279,16 +261,21 @@ const DB = {
       // Sort by createdAt just in case
       shops.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       
-      this._dualSave(this.SHOPS_KEY, shops);
-      
-      if (!isFirstShopsLoad) {
+      if (shops.length > 0) {
+        this._dualSave(this.SHOPS_KEY, shops);
+        // Ensure active shop is set if missing or invalid
+        let activeId = this.getActiveShopId();
+        if (!activeId || !shops.some(s => s.id === activeId)) {
+          this.setActiveShop(shops[0].id);
+        }
         if (window.App && window.App.refreshShopSelector) window.App.refreshShopSelector();
         if (window.App && window.App.refreshPage) window.App.refreshPage(window.App.currentPage);
       }
-      isFirstShopsLoad = false;
+    }, err => {
+      console.warn('Firebase shops error:', err);
+      this.setCloudStatus(false);
     });
 
-    let isFirstUpdatesLoad = true;
     window.FS.collection('payment_tracker_updates').onSnapshot(snapshot => {
       // Set cloud status online when snapshot arrives!
       this.setCloudStatus(true);
@@ -319,13 +306,10 @@ const DB = {
         this._dualSave(this.CREDITS_KEY, credits);
       }
 
-      if (!isFirstUpdatesLoad) {
-        if (window.App) {
-          window.App.updateTopBarBadges();
-          window.App.refreshPage(window.App.currentPage);
-        }
+      if (window.App) {
+        window.App.updateTopBarBadges();
+        window.App.refreshPage(window.App.currentPage);
       }
-      isFirstUpdatesLoad = false;
     }, err => {
       console.warn('Firebase payment_tracker_updates error:', err);
       this.setCloudStatus(false);
