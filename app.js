@@ -6027,12 +6027,14 @@ Thank you! - ${shopName}`;
     // Populate Device Credit shop filter dropdown
     const shopFilterEl = document.getElementById('devCreditShopFilter');
     const shops = DB.getShops(false);
+    const allShopsList = DB.getShops(true);
     const activeShopId = DB.getActiveShopId();
-    const selectedShopFilter = this.devCreditShopFilter || (activeShopId || 'all');
+    // Default to 'all' so all branches' agreements are visible with their branch badge, or user-selected filter
+    const selectedShopFilter = this.devCreditShopFilter !== undefined ? this.devCreditShopFilter : 'all';
     this.devCreditShopFilter = selectedShopFilter;
 
     if (shopFilterEl) {
-      shopFilterEl.innerHTML = `<option value="all">🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Shops)' : 'All Shops'}</option>`;
+      shopFilterEl.innerHTML = `<option value="all" ${selectedShopFilter === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
       shops.forEach(s => {
         const opt = document.createElement('option');
         opt.value = s.id;
@@ -6101,17 +6103,20 @@ Thank you! - ${shopName}`;
       credits = credits.filter(c => c.balanceDue <= 0.01 || c.status === 'settled');
     }
 
-    // 2. Search Query
+    // 2. Search Query (Name, Phone, NIC, Model, IMEI, and Branch Name)
     const searchVal = document.getElementById('devCreditSearchInput')?.value?.trim().toLowerCase();
     if (searchVal) {
       credits = credits.filter(c => {
+        const cShop = allShopsList.find(s => s.id === c.shopId);
+        const sName = (cShop ? cShop.name : (c.shopName || '')).toLowerCase();
         return (c.customerName && c.customerName.toLowerCase().includes(searchVal)) ||
                (c.primaryPhone && c.primaryPhone.toLowerCase().includes(searchVal)) ||
                (c.secondaryPhone && c.secondaryPhone.toLowerCase().includes(searchVal)) ||
                (c.nicNumber && c.nicNumber.toLowerCase().includes(searchVal)) ||
                (c.phoneModel && c.phoneModel.toLowerCase().includes(searchVal)) ||
                (c.imeiNumber && c.imeiNumber.toLowerCase().includes(searchVal)) ||
-               (c.imeiNumber2 && c.imeiNumber2.toLowerCase().includes(searchVal));
+               (c.imeiNumber2 && c.imeiNumber2.toLowerCase().includes(searchVal)) ||
+               sName.includes(searchVal);
       });
     }
 
@@ -6138,6 +6143,8 @@ Thank you! - ${shopName}`;
 
     let cardsHtml = '';
     credits.forEach(c => {
+      const foundShop = allShopsList.find(s => s.id === c.shopId);
+      const branchName = foundShop ? foundShop.name : (c.shopName || (allShopsList.length > 0 ? allShopsList[0].name : 'Main Shop'));
       const isSettled = c.balanceDue <= 0.01 || c.status === 'settled';
       const isDueToday = !isSettled && c.dueDate === today;
       const isOverdue = !isSettled && c.dueDate && c.dueDate < today;
@@ -6182,8 +6189,11 @@ Thank you! - ${shopName}`;
             <div style="display:flex; align-items:center; gap:12px;">
               ${avatarHtml}
               <div>
-                <div style="font-size:1.05rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                <div style="font-size:1.05rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                   <span>${c.customerName}</span>
+                  <span class="branch-pill-badge" title="Branch / Shop">
+                    <span>🏪</span> <span>${branchName}</span>
+                  </span>
                   ${docsCount > 0 ? `<span style="font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:10px; background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">📷 ${docsCount} Docs</span>` : ''}
                 </div>
                 <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
@@ -6297,7 +6307,9 @@ Thank you! - ${shopName}`;
 
     const today = DB.getTodayDate();
     let rowsHtml = '';
+    const allShopsListRemind = DB.getShops(true);
     dueCredits.slice(0, 4).forEach(c => {
+      const cShop = allShopsListRemind.find(s => s.id === c.shopId);
       const isDueToday = c.dueDate === today;
       const daysLate = Math.max(0, Math.round((new Date(today) - new Date(c.dueDate)) / (1000 * 60 * 60 * 24)));
       const badgeText = isDueToday
@@ -6307,8 +6319,9 @@ Thank you! - ${shopName}`;
       rowsHtml += `
         <div style="background:var(--bg-glass-card); padding:10px 12px; border-radius:var(--radius-sm); border:1px solid rgba(239,68,68,0.25); display:flex; justify-content:space-between; align-items:center; gap:8px;">
           <div>
-            <div style="font-weight:800; font-size:0.92rem; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+            <div style="font-weight:800; font-size:0.92rem; color:var(--text-primary); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
               <span>${c.customerName}</span>
+              <span style="font-size:0.68rem; font-weight:700; padding:1px 6px; border-radius:10px; background:rgba(99,102,241,0.15); color:#6366f1; border:1px solid rgba(99,102,241,0.3);">🏪 ${cShop ? cShop.name : (c.shopName || 'Main Shop')}</span>
               <span class="tally-badge shortage" style="font-size:0.7rem; padding:1px 5px;">${badgeText}</span>
             </div>
             <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:2px;">
@@ -6334,15 +6347,16 @@ Thank you! - ${shopName}`;
   },
 
   showAddDeviceCreditModal(editCreditId = null) {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) {
-      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර පළමුව Shop එකක් තෝරන්න' : 'Please select a shop first', 'error');
+    const shops = DB.getShops(false);
+    const activeShopId = DB.getActiveShopId();
+    if (shops.length === 0) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර පළමුව Shop එකක් සාදන්න' : 'Please create a shop first', 'error');
       return;
     }
 
     let existing = null;
     if (editCreditId) {
-      existing = DB.getDeviceCredits(shopId).find(c => c.id === editCreditId);
+      existing = DB.getDeviceCredits().find(c => c.id === editCreditId);
     }
 
     this.tempDevCreditPhotos = {
@@ -6370,6 +6384,23 @@ Thank you! - ${shopName}`;
 
     const bodyHtml = `
       <form id="devCreditForm" style="display:flex; flex-direction:column; gap:16px;">
+        <!-- 0. Branch / Shop Selection -->
+        <div class="form-group" style="margin-bottom:0; background:rgba(99,102,241,0.06); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(99,102,241,0.25);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label class="form-label" style="margin-bottom:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+              <span>🏪</span> <span>${I18N.currentLang === 'si' ? 'ශාඛාව / Shop (Branch)' : 'Shop / Branch'} *</span>
+            </label>
+            <span style="font-size:0.75rem; color:var(--text-muted);">${I18N.currentLang === 'si' ? 'ණය නිකුත් කරන ශාඛාව' : 'Branch issuing credit'}</span>
+          </div>
+          <select class="form-select" id="devShopId" required style="font-weight:700; font-size:0.95rem;">
+            ${shops.map(s => `
+              <option value="${s.id}" ${(existing?.shopId === s.id || (!existing && s.id === (this.devCreditShopFilter !== 'all' ? this.devCreditShopFilter : activeShopId))) ? 'selected' : ''}>
+                🏪 ${s.name}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
         <!-- 1. Customer Section -->
         <div class="section-divider blue" style="margin-top:0;">
           <div class="divider-icon">👤</div>
@@ -6692,9 +6723,14 @@ Thank you! - ${shopName}`;
       return;
     }
 
-    const currentActiveShopId = DB.getActiveShopId() || (DB.getShops(false)[0]?.id || 'main');
+    const selectedShopId = document.getElementById('devShopId')?.value || DB.getActiveShopId() || (DB.getShops(false)[0]?.id || 'main');
+    const allShops = DB.getShops(true);
+    const targetShop = allShops.find(s => s.id === selectedShopId);
+    const selectedShopName = targetShop ? targetShop.name : 'Main Shop';
+
     const payload = {
-      shopId: currentActiveShopId,
+      shopId: selectedShopId,
+      shopName: selectedShopName,
       customerName: custName,
       nicNumber,
       primaryPhone: phone1,
@@ -7474,6 +7510,10 @@ Thank you! - ${shopName}`;
     const credit = DB.getDeviceCredits().find(c => c.id === creditId);
     if (!credit) return;
 
+    const shops = DB.getShops(true);
+    const foundShop = shops.find(s => s.id === credit.shopId);
+    const branchName = foundShop ? foundShop.name : (credit.shopName || (shops.length > 0 ? shops[0].name : 'Main Shop'));
+
     const isSettled = credit.balanceDue <= 0.01 || credit.status === 'settled';
     const totalPaid = credit.totalPrice - credit.balanceDue;
 
@@ -7512,7 +7552,12 @@ Thank you! - ${shopName}`;
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; background:var(--bg-glass-card); padding:16px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
           <div>
             <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Customer Details</div>
-            <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-top:2px;">${credit.customerName}</div>
+            <div style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span>${credit.customerName}</span>
+              <span class="branch-pill-badge">
+                <span>🏪</span> <span>${branchName}</span>
+              </span>
+            </div>
             <div style="font-size:0.85rem; color:var(--text-secondary); margin-top:4px;">
               📞 <a href="tel:${credit.primaryPhone}" style="color:var(--text-primary); font-weight:700;">${credit.primaryPhone}</a>
               ${credit.secondaryPhone ? ` / ☎️ ${credit.secondaryPhone}` : ''}

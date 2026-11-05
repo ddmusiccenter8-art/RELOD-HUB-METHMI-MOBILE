@@ -2007,9 +2007,15 @@ const DB = {
     const balanceDue = Math.max(0, totalPrice - downPayment);
     const status = balanceDue <= 0.01 ? 'settled' : 'active';
 
+    const targetShopId = creditData.shopId || this.getActiveShopId();
+    const allShops = this.getShops(true);
+    const targetShop = allShops.find(s => s.id === targetShopId);
+    const targetShopName = creditData.shopName || (targetShop ? targetShop.name : 'Main Shop');
+
     const newCredit = {
       id,
-      shopId: creditData.shopId || this.getActiveShopId(),
+      shopId: targetShopId,
+      shopName: targetShopName,
       customerName: creditData.customerName?.trim() || '',
       primaryPhone: creditData.primaryPhone?.trim() || '',
       secondaryPhone: creditData.secondaryPhone?.trim() || '',

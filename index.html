@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=33.0">
+  <link rel="stylesheet" href="style.css?v=34.0">
 </head>
 <body>
 
@@ -872,9 +872,6 @@
             <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="dev_cred_subtitle">Track in-house mobile phone loans, customer NICs, IMEI & repayments</p>
           </div>
           <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <select id="devCreditShopFilter" class="form-select" onchange="App.setDevCreditShopFilter(this.value)" style="font-weight:700; width:auto; padding:6px 12px; font-size:0.85rem; height:auto; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
-              <option value="all">🏪 All Shops</option>
-            </select>
             <button type="button" class="btn btn-primary" id="devCreditAddBtn" onclick="App.showAddDeviceCreditModal()">
               <span>📱</span> <span data-i18n="btn_add_device_credit">+ New Device Credit Agreement</span>
             </button>
@@ -926,10 +923,17 @@
         <!-- Filter & Search Bar -->
         <div class="card" style="margin-bottom:24px; padding:16px 20px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
-            <!-- Search Box -->
-            <div style="flex:1; min-width:260px; position:relative;">
-              <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:1.1rem; opacity:0.6;">🔍</span>
-              <input type="text" id="devCreditSearchInput" class="form-input" placeholder="Search by Name, Phone, NIC, Model, or IMEI..." style="padding-left:38px; width:100%; border-radius:var(--radius-sm);" data-i18n="dev_cred_search_ph">
+            <!-- Branch Filter + Search Box Container -->
+            <div style="display:flex; gap:10px; align-items:center; flex:1; min-width:280px; flex-wrap:wrap;">
+              <div style="min-width:180px; max-width:240px; flex:0 0 auto;">
+                <select id="devCreditShopFilter" class="form-select" onchange="App.setDevCreditShopFilter(this.value)" style="font-weight:700; width:100%; padding:9px 12px; font-size:0.88rem; border-radius:var(--radius-sm); border:1px solid var(--border-glass); background:var(--bg-glass);">
+                  <option value="all">🏪 All Branches (සියලු ශාඛා)</option>
+                </select>
+              </div>
+              <div style="flex:1; min-width:220px; position:relative;">
+                <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:1.1rem; opacity:0.6;">🔍</span>
+                <input type="text" id="devCreditSearchInput" class="form-input" placeholder="Search by Name, Phone, NIC, Model, IMEI, or Branch..." style="padding-left:38px; width:100%; border-radius:var(--radius-sm);" data-i18n="dev_cred_search_ph">
+              </div>
             </div>
 
             <!-- Filter Tabs -->
@@ -1008,10 +1012,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=33.0"></script>
-  <script src="firebase-init.js?v=33.0"></script>
-  <script src="data.js?v=33.0"></script>
-  <script src="app.js?v=33.0"></script>
+  <script src="i18n.js?v=34.0"></script>
+  <script src="firebase-init.js?v=34.0"></script>
+  <script src="data.js?v=34.0"></script>
+  <script src="app.js?v=34.0"></script>
   
   <!-- Register Service Worker -->
   <script>

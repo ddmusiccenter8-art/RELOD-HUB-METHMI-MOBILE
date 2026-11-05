@@ -1,12 +1,12 @@
-const CACHE_NAME = 'shop-tracker-v33.0';
+const CACHE_NAME = 'shop-tracker-v34.0';
 const ASSETS = [
   './',
   './index.html',
-  './style.css?v=33.0',
-  './app.js?v=33.0',
-  './data.js?v=33.0',
-  './i18n.js?v=33.0',
-  './firebase-init.js?v=33.0',
+  './style.css?v=34.0',
+  './app.js?v=34.0',
+  './data.js?v=34.0',
+  './i18n.js?v=34.0',
+  './firebase-init.js?v=34.0',
   './manifest.json',
   './icon.png',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',

@@ -2680,3 +2680,17 @@ select option {
   word-break: break-word;
   max-width: 100%;
 }
+
+/* Branch Badge in Device Credits */
+.branch-pill-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: rgba(99, 102, 241, 0.15);
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
