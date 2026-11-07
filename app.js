@@ -402,6 +402,40 @@ const App = {
     }
   },
 
+  updateCloudSyncingUI(isSyncing, isSuccess, errorMsg) {
+    const textEl = document.getElementById('cloudStatusText');
+    const dotEls = document.querySelectorAll('.cloud-dot');
+    const pillEl = document.getElementById('mobileCloudStatusPill');
+
+    if (isSyncing) {
+      if (textEl) {
+        textEl.textContent = I18N.currentLang === 'si' ? '☁️ Cloud වෙත Upload වෙමින්...' : '☁️ Uploading to Cloud...';
+        textEl.style.color = '#38bdf8';
+      }
+      dotEls.forEach(d => { d.className = 'cloud-dot syncing'; });
+      if (pillEl) { pillEl.classList.add('syncing'); pillEl.title = 'Uploading to Cloud...'; }
+    } else if (isSuccess) {
+      if (textEl) {
+        textEl.textContent = I18N.currentLang === 'si' ? '☁️ Cloud වෙත සුරැකිණි ✅' : '☁️ Cloud Synced ✅';
+        textEl.style.color = 'var(--accent-green)';
+      }
+      dotEls.forEach(d => { d.className = 'cloud-dot online'; });
+      if (pillEl) { pillEl.classList.remove('syncing'); pillEl.title = 'Cloud: Live & Synced'; }
+      setTimeout(() => {
+        if (textEl && DB.cloudStatus === 'online') {
+          textEl.textContent = I18N.currentLang === 'si' ? '☁️ Cloud: සක්‍රීයයි (Online)' : '☁️ Cloud: Online';
+        }
+      }, 3000);
+    } else {
+      if (textEl) {
+        textEl.textContent = I18N.currentLang === 'si' ? '⚠️ Cloud Upload දෝෂයක්!' : '⚠️ Cloud Sync Failed!';
+        textEl.style.color = 'var(--accent-red)';
+      }
+      dotEls.forEach(d => { d.className = 'cloud-dot offline'; });
+      if (pillEl) { pillEl.classList.remove('syncing'); pillEl.title = 'Cloud Sync Failed: ' + (errorMsg || ''); }
+    }
+  },
+
   setupCloudListeners() {
     window.addEventListener('online', () => {
       DB.setCloudStatus(true);
@@ -5945,19 +5979,36 @@ Thank you! - ${shopName}`;
   devCreditActiveFilter: 'all',
   tempDevCreditPhotos: {},
 
-  compressImageFile(file, maxWidth = 800, maxHeight = 800, quality = 0.65) {
+  compressImageFile(file, maxWidth = 640, maxHeight = 640, initialQuality = 0.6) {
     return new Promise((resolve, reject) => {
-      if (!file || !file.type.startsWith('image/')) {
-        return reject(new Error('Invalid image file'));
-      }
+      if (!file) return reject(new Error('No file provided'));
+
       const originalSize = file.size;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
+      const img = new Image();
+      let objectUrl = null;
+
+      try {
+        objectUrl = URL.createObjectURL(file);
+      } catch (err) {
+        const reader = new FileReader();
+        reader.onload = (e) => { img.src = e.target.result; };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      }
+
+      const cleanup = () => {
+        if (objectUrl) {
+          try { URL.revokeObjectURL(objectUrl); } catch(e) {}
+        }
+      };
+
+      img.onload = () => {
+        cleanup();
+        try {
           let width = img.width;
           let height = img.height;
 
+          // Proportional scale down to max 640x640 (crystal clear text/faces, lightweight <35KB)
           if (width > height) {
             if (width > maxWidth) {
               height = Math.round((height * maxWidth) / width);
@@ -5974,9 +6025,21 @@ Thank you! - ${shopName}`;
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+          
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
 
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          let quality = initialQuality;
+          let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+          // Progressive reduction so base64 string stays under 45,000 characters (~33KB)
+          // Guarantees entire agreement document never approaches Firestore 1MB limit!
+          while (dataUrl.length > 45000 && quality > 0.25) {
+            quality -= 0.08;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+
           const head = 'data:image/jpeg;base64,';
           const compressedSize = Math.round((dataUrl.length - head.length) * 3 / 4);
           const savedPercent = Math.max(0, Math.round(((originalSize - compressedSize) / originalSize) * 100));
@@ -5987,12 +6050,19 @@ Thank you! - ${shopName}`;
             compressedSize,
             savedPercent
           });
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
+        } catch (canvasErr) {
+          reject(canvasErr);
+        }
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+
+      img.onerror = () => {
+        cleanup();
+        reject(new Error('Failed to load image from camera or gallery'));
+      };
+
+      if (objectUrl) {
+        img.src = objectUrl;
+      }
     });
   },
 
@@ -6195,6 +6265,9 @@ Thank you! - ${shopName}`;
                     <span>🏪</span> <span>${branchName}</span>
                   </span>
                   ${docsCount > 0 ? `<span style="font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:10px; background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">📷 ${docsCount} Docs</span>` : ''}
+                  ${c.signature 
+                    ? `<span style="font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:10px; background:rgba(34,197,94,0.15); color:var(--accent-green); border:1px solid rgba(34,197,94,0.3);">✍️ Signed</span>`
+                    : `<span style="font-size:0.7rem; font-weight:700; padding:2px 6px; border-radius:10px; background:rgba(245,158,11,0.15); color:var(--accent-gold); border:1px solid rgba(245,158,11,0.3);">⚠️ Unsigned</span>`}
                 </div>
                 <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                   <span>📞 <a href="tel:${c.primaryPhone}" style="color:var(--text-primary); font-weight:700; text-decoration:none;">${c.primaryPhone}</a></span>
@@ -6258,6 +6331,9 @@ Thank you! - ${shopName}`;
                   <span>🎉</span> <span>${I18N.currentLang === 'si' ? 'සම්පූර්ණ මුදල පියවා ඇත' : 'Fully Settled Agreement'}</span>
                 </span>
               `}
+              <button type="button" class="btn btn-sm ${c.signature ? 'btn-ghost' : 'btn-warning'}" onclick="App.openCreditAgreementModal('${c.id}', '${c.agreementLanguage || 'si'}')" style="font-weight:700; padding:6px 12px; ${!c.signature ? 'background:var(--accent-gold); color:#000; border:none; box-shadow:0 2px 6px rgba(245,158,11,0.3);' : 'border:1px solid rgba(34,197,94,0.4); color:var(--accent-green);'}">
+                <span>${c.signature ? '✅' : '✍️'}</span> <span>${c.signature ? (I18N.currentLang === 'si' ? 'අත්සන බලන්න' : 'View Sign') : (I18N.currentLang === 'si' ? 'එවෙලෙම අත්සන් කරන්න' : 'Sign Agreement')}</span>
+              </button>
               <a href="tel:${c.primaryPhone}" class="btn btn-sm btn-ghost" style="border:1px solid rgba(255,255,255,0.15); padding:6px 12px; font-weight:600; text-decoration:none;">
                 <span>📞</span> <span>${I18N.t('btn_call_cust') || 'Call'}</span>
               </a>
@@ -6554,6 +6630,36 @@ Thank you! - ${shopName}`;
           </div>
         </div>
 
+        <!-- 5. On-the-Spot Digital Customer Signature -->
+        <div class="section-divider purple">
+          <div class="divider-icon">✍️</div>
+          <div class="divider-text">${I18N.currentLang === 'si' ? 'පාරිභෝගික ඩිජිටල් අත්සන (Digital Signature)' : 'Customer Digital Signature'}</div>
+          <div class="divider-line"></div>
+        </div>
+
+        <div style="background:var(--bg-glass-card); padding:12px; border-radius:var(--radius-sm); border:1px solid rgba(99,102,241,0.25);">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+            <span style="font-size:0.83rem; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+              <span>✍️</span> <span>${I18N.currentLang === 'si' ? 'පාරිභෝගිකයා මෙහි අත්සන් කරන්න:' : 'Customer Sign Here (Finger / Stylus):'}</span>
+            </span>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.clearModalSignaturePad()" style="font-size:0.75rem; padding:3px 8px; border:1px solid rgba(255,255,255,0.2);">
+                🔄 ${I18N.currentLang === 'si' ? 'මකන්න' : 'Clear'}
+              </button>
+            </div>
+          </div>
+          
+          <div style="position:relative; background:#ffffff; border-radius:6px; border:2px dashed #6366f1; overflow:hidden;">
+            <canvas id="devModalSignatureCanvas" width="450" height="130" style="width:100%; height:130px; display:block; touch-action:none; cursor:crosshair;"></canvas>
+            <div id="devModalSignaturePlaceholder" style="position:absolute; left:0; top:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; color:#94a3b8; font-size:0.85rem; font-weight:600;">
+              ✍️ ${I18N.currentLang === 'si' ? 'මෙහි ඇඟිල්ලෙන් අත්සන් කරන්න (Sign Here)' : 'Sign Across This Box (Finger / Stylus)'}
+            </div>
+          </div>
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-top:6px; display:flex; align-items:center; gap:6px;">
+            <span>🔒</span> <span>${I18N.currentLang === 'si' ? 'මෙම අත්සන ගිවිසුමට නීත්‍යානුකූලව සටහන් වේ.' : 'This signature is legally stamped onto the device credit agreement.'}</span>
+          </div>
+        </div>
+
         <div class="form-group" style="margin-bottom:0; margin-top:6px;">
           <label class="form-label">Notes & Guarantor Details (Optional)</label>
           <textarea class="form-input" id="devNotes" rows="2" placeholder="e.g. Guarantor: Kamal (0777123456), Accessories included, warranty terms...">${existing?.notes || ''}</textarea>
@@ -6566,11 +6672,105 @@ Thank you! - ${shopName}`;
       bodyHtml,
       [
         { text: I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        { text: I18N.t('btn_save_agreement') || '💾 Save Agreement', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId) }
+        { text: I18N.t('btn_save_agreement') || '💾 Save Agreement', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId, false) },
+        { text: I18N.currentLang === 'si' ? '✍️ එවෙලෙම අත්සන් කරන්න' : '✍️ Save & Sign Now', class: 'btn-warning', onClick: () => this.saveDeviceCreditAgreement(editCreditId, true) }
       ]
     );
 
     this.calcDevCreditFormBalance();
+    setTimeout(() => {
+      this.initModalSignaturePad(existing?.signature || '');
+    }, 120);
+  },
+
+  // ---- Agreement Creation Modal Signature Pad ----
+  _modalSigCanvas: null,
+  _modalSigCtx: null,
+  _modalSigDrawing: false,
+  _hasDrawnModalSig: false,
+
+  initModalSignaturePad(existingSigUrl = '') {
+    const canvas = document.getElementById('devModalSignatureCanvas');
+    const placeholder = document.getElementById('devModalSignaturePlaceholder');
+    if (!canvas) return;
+
+    this._modalSigCanvas = canvas;
+    this._modalSigCtx = canvas.getContext('2d');
+    this._modalSigDrawing = false;
+    this._hasDrawnModalSig = false;
+
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const width = rect.width || 450;
+    const height = 130;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    this._modalSigCtx.scale(dpr, dpr);
+    this._modalSigCtx.strokeStyle = '#0f172a';
+    this._modalSigCtx.lineWidth = 2.5;
+    this._modalSigCtx.lineCap = 'round';
+    this._modalSigCtx.lineJoin = 'round';
+
+    if (existingSigUrl) {
+      const img = new Image();
+      img.onload = () => {
+        this._modalSigCtx.drawImage(img, 0, 0, width, height);
+        this._hasDrawnModalSig = true;
+        if (placeholder) placeholder.style.display = 'none';
+      };
+      img.src = existingSigUrl;
+    }
+
+    const getPos = (e) => {
+      const r = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return { x: clientX - r.left, y: clientY - r.top };
+    };
+
+    const startDraw = (e) => {
+      e.preventDefault();
+      this._modalSigDrawing = true;
+      this._hasDrawnModalSig = true;
+      if (placeholder) placeholder.style.display = 'none';
+      const pos = getPos(e);
+      this._modalSigCtx.beginPath();
+      this._modalSigCtx.moveTo(pos.x, pos.y);
+    };
+
+    const draw = (e) => {
+      if (!this._modalSigDrawing) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      this._modalSigCtx.lineTo(pos.x, pos.y);
+      this._modalSigCtx.stroke();
+    };
+
+    const stopDraw = () => {
+      this._modalSigDrawing = false;
+    };
+
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', draw);
+    window.addEventListener('mouseup', stopDraw);
+
+    canvas.addEventListener('touchstart', startDraw, { passive: false });
+    canvas.addEventListener('touchmove', draw, { passive: false });
+    window.addEventListener('touchend', stopDraw);
+  },
+
+  clearModalSignaturePad() {
+    if (this._modalSigCanvas && this._modalSigCtx) {
+      this._modalSigCtx.clearRect(0, 0, this._modalSigCanvas.width, this._modalSigCanvas.height);
+      this._hasDrawnModalSig = false;
+      const placeholder = document.getElementById('devModalSignaturePlaceholder');
+      if (placeholder) placeholder.style.display = 'flex';
+    }
+  },
+
+  getModalSignatureDataUrl() {
+    if (!this._hasDrawnModalSig || !this._modalSigCanvas) return '';
+    return this._modalSigCanvas.toDataURL('image/png');
   },
 
   calcDevCreditFormBalance() {
@@ -6603,17 +6803,22 @@ Thank you! - ${shopName}`;
   },
 
   async handleDevCreditPhotoUpload(inputEl, key, containerId, badgeId) {
-    const file = inputEl.files[0];
+    const file = inputEl.files && inputEl.files[0];
     if (!file) return;
 
     try {
-      this.showToast('Compressing photo...', 'info');
-      const res = await this.compressImageFile(file, 800, 800, 0.65);
+      this.showToast('📷 ' + (I18N.currentLang === 'si' ? 'ඡායාරූපය සකසමින් පවතී...' : 'Compressing photo...'), 'info');
+      const res = await this.compressImageFile(file, 640, 640, 0.6);
       this.tempDevCreditPhotos[key] = res.dataUrl;
 
       const container = document.getElementById(containerId + 'Container');
       if (container) {
-        container.innerHTML = `<img src="${res.dataUrl}" class="photo-upload-preview" alt="Preview">`;
+        container.innerHTML = `
+          <div style="position:relative; display:inline-block; width:100%; height:100%;">
+            <img src="${res.dataUrl}" class="photo-upload-preview" alt="Preview">
+            <button type="button" class="btn btn-xs" onclick="event.stopPropagation(); App.removeDevCreditPhoto('${key}', '${containerId}', '${badgeId}')" title="Remove" style="position:absolute; top:4px; right:4px; background:rgba(239,68,68,0.9); color:#fff; border:none; border-radius:50%; width:22px; height:22px; padding:0; display:flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:bold; cursor:pointer; box-shadow:0 2px 4px rgba(0,0,0,0.3); z-index:10;">✕</button>
+          </div>
+        `;
       }
 
       const badge = document.getElementById(badgeId);
@@ -6621,10 +6826,26 @@ Thank you! - ${shopName}`;
         badge.style.display = 'inline-block';
         badge.textContent = `✅ ${Math.round(res.compressedSize / 1024)} KB (-${res.savedPercent}%)`;
       }
-      this.showToast(`✅ Photo compressed to ${Math.round(res.compressedSize / 1024)} KB!`, 'success');
+      this.showToast(`✅ ${I18N.currentLang === 'si' ? 'ඡායාරූපය සාර්ථකව අමුණන ලදී' : 'Photo attached'} (${Math.round(res.compressedSize / 1024)} KB)`, 'success');
     } catch (err) {
       console.error(err);
-      this.showToast('Failed to compress image', 'error');
+      this.showToast(I18N.currentLang === 'si' ? 'ඡායාරූපය කියවීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.' : 'Failed to process image. Please try again.', 'error');
+    }
+  },
+
+  removeDevCreditPhoto(key, containerId, badgeId) {
+    if (this.tempDevCreditPhotos) {
+      this.tempDevCreditPhotos[key] = '';
+    }
+    const container = document.getElementById(containerId + 'Container');
+    if (container) {
+      const icon = key === 'customerPhoto' ? '👤' : key === 'devicePhoto' ? '📱' : '🪪';
+      container.innerHTML = `<div style="font-size:2rem; margin-bottom:4px;">${icon}</div>`;
+    }
+    const badge = document.getElementById(badgeId);
+    if (badge) {
+      badge.style.display = 'none';
+      badge.textContent = '';
     }
   },
 
@@ -6670,7 +6891,7 @@ Thank you! - ${shopName}`;
     }
   },
 
-  saveDeviceCreditAgreement(editCreditId = null) {
+  async saveDeviceCreditAgreement(editCreditId = null, openSignImmediately = false) {
     const custName = document.getElementById('devCustName')?.value.trim();
     const nicNumber = document.getElementById('devCustNic')?.value.trim();
     const phone1 = document.getElementById('devCustPhone1')?.value.trim();
@@ -6728,6 +6949,7 @@ Thank you! - ${shopName}`;
     const targetShop = allShops.find(s => s.id === selectedShopId);
     const selectedShopName = targetShop ? targetShop.name : 'Main Shop';
 
+    const modalSig = this.getModalSignatureDataUrl();
     const payload = {
       shopId: selectedShopId,
       shopName: selectedShopName,
@@ -6747,15 +6969,20 @@ Thank you! - ${shopName}`;
       customerPhoto: this.tempDevCreditPhotos.customerPhoto || '',
       devicePhoto: this.tempDevCreditPhotos.devicePhoto || '',
       nicFrontPhoto: this.tempDevCreditPhotos.nicFrontPhoto || '',
-      nicBackPhoto: this.tempDevCreditPhotos.nicBackPhoto || ''
+      nicBackPhoto: this.tempDevCreditPhotos.nicBackPhoto || '',
+      signature: modalSig || '',
+      signedAt: modalSig ? new Date().toISOString() : '',
+      agreementLanguage: 'si'
     };
 
+    this.showToast('☁️ ' + (I18N.currentLang === 'si' ? 'Cloud වෙත Upload වෙමින් පවතී...' : 'Syncing to Cloud...'), 'info');
+    let savedRecord = null;
     if (editCreditId) {
-      DB.updateDeviceCredit(editCreditId, payload);
+      savedRecord = DB.updateDeviceCredit(editCreditId, payload);
       this.showToast(I18N.currentLang === 'si' ? '✅ ගිවිසුම සාර්ථකව යාවත්කාලීන විය!' : '✅ Agreement updated successfully!', 'success');
     } else {
-      DB.addDeviceCredit(payload);
-      this.showToast(I18N.currentLang === 'si' ? '✅ නව දුරකථන ණය ගිවිසුම සුරැකිණි!' : '✅ New device credit agreement recorded!', 'success');
+      savedRecord = DB.addDeviceCredit(payload);
+      this.showToast(I18N.currentLang === 'si' ? '✅ නව දුරකථන ණය ගිවිසුම සාර්ථකව සුරැකිණි!' : '✅ New device credit agreement recorded!', 'success');
     }
 
     this.closeModal();
@@ -6765,6 +6992,12 @@ Thank you! - ${shopName}`;
     }
     if (this.currentPage === 'dashboard') {
       this.renderDashboard();
+    }
+
+    if (openSignImmediately && savedRecord) {
+      setTimeout(() => {
+        this.openCreditAgreementModal(savedRecord.id, 'si');
+      }, 250);
     }
   },
 

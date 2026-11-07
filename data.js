@@ -215,6 +215,15 @@ const DB = {
       // 1. Immediately setup real-time cloud listeners (Non-blocking, instant data streaming)
       this._setupFirebaseListeners();
 
+      // Real-time synchronization: ensure all local device credits exist in payment_tracker_device_credits
+      const localDevCredits = this.getDeviceCredits();
+      if (localDevCredits.length > 0) {
+        localDevCredits.forEach(credit => {
+          window.FS.collection('payment_tracker_device_credits').doc(credit.id).set(credit, { merge: true }).catch(() => {});
+          window.FS.collection('payment_tracker_updates').doc('devcred_' + credit.id).set({ ...credit, docType: 'device_credit' }, { merge: true }).catch(() => {});
+        });
+      }
+
       // 2. One-time seeding / cloud check, guarded by a local flag so it NEVER runs repeatedly or blocks
       const hasSeeded = localStorage.getItem('spt_cloud_seeded_v33');
       if (!hasSeeded) {
@@ -297,9 +306,14 @@ const DB = {
       });
 
       this._dualSave(this.UPDATES_KEY, updates);
-      if (devCredits.length > 0 || !localStorage.getItem(this.DEVICE_CREDITS_KEY)) {
-        devCredits.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
-        this._dualSave(this.DEVICE_CREDITS_KEY, devCredits);
+      if (devCredits.length > 0) {
+        const currentDev = this.getDeviceCredits();
+        const devMap = new Map();
+        currentDev.forEach(c => devMap.set(c.id, c));
+        devCredits.forEach(c => devMap.set(c.id, { ...(devMap.get(c.id) || {}), ...c }));
+        const mergedDev = Array.from(devMap.values());
+        mergedDev.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
+        this._dualSave(this.DEVICE_CREDITS_KEY, mergedDev);
       }
       if (credits.length > 0 || !localStorage.getItem(this.CREDITS_KEY)) {
         credits.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -349,14 +363,18 @@ const DB = {
       if (snapshot.metadata.hasPendingWrites) return;
       const list = [];
       snapshot.forEach(doc => list.push(doc.data()));
-      list.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
-      this._dualSave(this.DEVICE_CREDITS_KEY, list);
-      console.log('📱 Real-time sync: Received ' + list.length + ' device credits from Firebase');
-      if (window.App) {
-        window.App.updateTopBarBadges();
-        if (window.App.currentPage === 'device-credits') window.App.renderDeviceCreditsPage();
-        if (window.App.currentPage === 'dashboard') window.App.renderDashboard();
+      if (list.length > 0) {
+        list.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
+        this._dualSave(this.DEVICE_CREDITS_KEY, list);
+        console.log('📱 Real-time sync: Received ' + list.length + ' device credits from Firebase');
+        if (window.App) {
+          window.App.updateTopBarBadges();
+          if (window.App.currentPage === 'device-credits') window.App.renderDeviceCreditsPage();
+          if (window.App.currentPage === 'dashboard') window.App.renderDashboard();
+        }
       }
+    }, err => {
+      console.warn('payment_tracker_device_credits snapshot error:', err);
     });
 
     // Real-time Cloud Sync for Customer Ledger Credits
@@ -370,9 +388,31 @@ const DB = {
     });
   },
 
-  _syncToFirebase(collection, docId, data) {
-    if (window.FS) {
-      window.FS.collection(collection).doc(docId).set(data).catch(e => console.error("Firebase set error", e));
+  async _syncToFirebase(collection, docId, data) {
+    if (!window.FS) return false;
+    try {
+      this.setCloudSyncing(true);
+      await window.FS.collection(collection).doc(docId).set(data);
+      this.setCloudSyncing(false, true);
+      return true;
+    } catch (e) {
+      console.error("Firebase set error", collection, docId, e);
+      this.setCloudSyncing(false, false, e.message);
+      if (window.App && window.App.showToast) {
+        const isSizeErr = e.message && e.message.includes('exceeds maximum allowed size');
+        if (isSizeErr) {
+          window.App.showToast('❌ ඡායාරූප ප්‍රමාණය වැඩියි! කරුණාකර නැවත උත්සාහ කරන්න', 'error');
+        } else {
+          window.App.showToast('⚠️ Cloud Upload Error: ' + (e.message || 'Network issue'), 'error');
+        }
+      }
+      return false;
+    }
+  },
+
+  setCloudSyncing(isSyncing, isSuccess = true, errorMsg = '') {
+    if (window.App && window.App.updateCloudSyncingUI) {
+      window.App.updateCloudSyncingUI(isSyncing, isSuccess, errorMsg);
     }
   },
 
@@ -2037,10 +2077,14 @@ const DB = {
       status,
       payments: creditData.payments || [],
       notes: creditData.notes?.trim() || '',
-      createdAt: new Date().toISOString()
+      signature: creditData.signature || '',
+      signedAt: creditData.signedAt || (creditData.signature ? new Date().toISOString() : ''),
+      agreementLanguage: creditData.agreementLanguage || 'si',
+      createdAt: creditData.createdAt || new Date().toISOString()
     };
     credits.unshift(newCredit);
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', newCredit.id, newCredit);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + newCredit.id, { ...newCredit, docType: 'device_credit' });
     return newCredit;
   },
@@ -2053,6 +2097,7 @@ const DB = {
     credits[idx].signedAt = new Date().toISOString();
     credits[idx].agreementLanguage = lang;
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', id, credits[idx]);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credits[idx], docType: 'device_credit' });
     return credits[idx];
   },
@@ -2081,6 +2126,7 @@ const DB = {
       updatedAt: new Date().toISOString()
     };
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', id, credits[idx]);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credits[idx], docType: 'device_credit' });
     return credits[idx];
   },
@@ -2113,6 +2159,7 @@ const DB = {
     }
 
     this.saveDeviceCredits(credits);
+    this._syncToFirebase('payment_tracker_device_credits', id, credit);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credit, docType: 'device_credit' });
     return credit;
   },
@@ -2121,6 +2168,7 @@ const DB = {
     const credits = this.getDeviceCredits();
     const filtered = credits.filter(c => c.id !== id);
     this.saveDeviceCredits(filtered);
+    this._deleteFromFirebase('payment_tracker_device_credits', id);
     this._deleteFromFirebase('payment_tracker_updates', 'devcred_' + id);
     return true;
   },
