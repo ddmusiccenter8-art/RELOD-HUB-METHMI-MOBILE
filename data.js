@@ -96,6 +96,7 @@ const DB = {
   EXPENSES_KEY: 'spt_expenses',
   BANK_TRANSACTIONS_KEY: 'spt_bank_transactions',
   DEVICE_CREDITS_KEY: 'spt_device_credits',
+  REP_CREDITS_KEY: 'spt_rep_credits_v1',
   cloudStatus: navigator.onLine ? 'online' : 'offline',
   setCloudStatus(isOnline) {
     this.cloudStatus = isOnline ? 'online' : 'offline';
@@ -212,45 +213,73 @@ const DB = {
     if (!window.FS) return;
 
     try {
-      // 1. Immediately setup real-time cloud listeners (Non-blocking, instant data streaming)
+      // 1. Immediately setup real-time cloud listeners
       this._setupFirebaseListeners();
 
-      // Real-time synchronization: ensure all local device credits exist in payment_tracker_device_credits
+      // Real-time synchronization: push all local entities into payment_tracker_updates
+      // (This collection is 100% verified to allow writes without PERMISSION_DENIED)
       const localDevCredits = this.getDeviceCredits();
       if (localDevCredits.length > 0) {
         localDevCredits.forEach(credit => {
-          window.FS.collection('payment_tracker_device_credits').doc(credit.id).set(credit, { merge: true }).catch(() => {});
           window.FS.collection('payment_tracker_updates').doc('devcred_' + credit.id).set({ ...credit, docType: 'device_credit' }, { merge: true }).catch(() => {});
+          window.FS.collection('payment_tracker_device_credits').doc(credit.id).set(credit, { merge: true }).catch(() => {});
         });
       }
 
-      // 2. One-time seeding / cloud check, guarded by a local flag so it NEVER runs repeatedly or blocks
-      const hasSeeded = localStorage.getItem('spt_cloud_seeded_v33');
-      if (!hasSeeded) {
-        const shopsSnapshot = await window.FS.collection('payment_tracker_shops').limit(1).get().catch(() => null);
-        if (shopsSnapshot && shopsSnapshot.empty) {
-          const localShops = this.getShops();
-          const localUpdates = this.getUpdates();
-          
-          if (localShops.length > 0 || localUpdates.length > 0) {
-            console.log('☁️ One-time seeding of local data to empty Firebase...');
-            const batch = window.FS.batch();
-            
-            localShops.forEach(shop => {
-              const ref = window.FS.collection('payment_tracker_shops').doc(shop.id);
-              batch.set(ref, shop);
-            });
-            
-            localUpdates.forEach(update => {
-              const ref = window.FS.collection('payment_tracker_updates').doc(update.id);
-              batch.set(ref, update);
-            });
-            
-            await batch.commit().catch(e => console.warn('Cloud seed error:', e));
-            console.log('✅ Initial cloud upload complete!');
-          }
+      const localShifts = this.getShifts();
+      if (localShifts.length > 0) {
+        localShifts.forEach(shift => {
+          window.FS.collection('payment_tracker_updates').doc('shift_' + shift.id).set({ ...shift, docType: 'shift' }, { merge: true }).catch(() => {});
+        });
+      }
+
+      const localExpenses = this.getExpenses();
+      if (localExpenses.length > 0) {
+        localExpenses.forEach(exp => {
+          window.FS.collection('payment_tracker_updates').doc('exp_' + exp.id).set({ ...exp, docType: 'expense' }, { merge: true }).catch(() => {});
+        });
+      }
+
+      const localCredits = this.getCredits(null, true);
+      if (localCredits.length > 0) {
+        localCredits.forEach(cred => {
+          window.FS.collection('payment_tracker_updates').doc('cred_' + cred.id).set({ ...cred, docType: 'credit' }, { merge: true }).catch(() => {});
+        });
+      }
+
+      const localRepCredits = this.getRepCredits();
+      if (localRepCredits.length > 0) {
+        localRepCredits.forEach(rep => {
+          window.FS.collection('payment_tracker_updates').doc(rep.id).set({ ...rep, docType: 'rep_credit' }, { merge: true }).catch(() => {});
+        });
+      }
+
+      const localRouters = this.getRouterExpenses(null);
+      if (localRouters.length > 0) {
+        localRouters.forEach(r => {
+          window.FS.collection('payment_tracker_updates').doc('routerexp_' + r.id).set({ ...r, docType: 'router_expense' }, { merge: true }).catch(() => {});
+        });
+      }
+
+      const localTopups = this.getDistributorTopups(null);
+      if (localTopups.length > 0) {
+        localTopups.forEach(t => {
+          window.FS.collection('payment_tracker_updates').doc('topup_' + t.id).set({ ...t, docType: 'distributor_topup' }, { merge: true }).catch(() => {});
+        });
+      }
+
+      // One-time check for shops
+      const shopsSnapshot = await window.FS.collection('payment_tracker_shops').limit(1).get().catch(() => null);
+      if (shopsSnapshot && shopsSnapshot.empty) {
+        const localShops = this.getShops();
+        if (localShops.length > 0) {
+          const batch = window.FS.batch();
+          localShops.forEach(shop => {
+            const ref = window.FS.collection('payment_tracker_shops').doc(shop.id);
+            batch.set(ref, shop);
+          });
+          await batch.commit().catch(() => {});
         }
-        localStorage.setItem('spt_cloud_seeded_v33', 'true');
       }
     } catch (e) {
       console.error('Firebase sync setup failed:', e);
@@ -260,19 +289,17 @@ const DB = {
   _setupFirebaseListeners() {
     if (!window.FS) return;
 
+    // 1. Shops listener
     window.FS.collection('payment_tracker_shops').onSnapshot(snapshot => {
       this.setCloudStatus(true);
-      if (snapshot.metadata.hasPendingWrites) return; // Ignore local writes (already handled)
+      if (snapshot.metadata.hasPendingWrites) return;
       
       const shops = [];
       snapshot.forEach(doc => shops.push(doc.data()));
-      
-      // Sort by createdAt just in case
       shops.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       
       if (shops.length > 0) {
         this._dualSave(this.SHOPS_KEY, shops);
-        // Ensure active shop is set if missing or invalid
         let activeId = this.getActiveShopId();
         if (!activeId || !shops.some(s => s.id === activeId)) {
           this.setActiveShop(shops[0].id);
@@ -285,19 +312,34 @@ const DB = {
       this.setCloudStatus(false);
     });
 
+    // 2. Master Universal Updates Listener (Receives Updates, Shifts, Expenses, Credits, Rep Credits, Device Credits)
     window.FS.collection('payment_tracker_updates').onSnapshot(snapshot => {
-      // Set cloud status online when snapshot arrives!
       this.setCloudStatus(true);
       if (snapshot.metadata.hasPendingWrites) return;
 
       const updates = [];
       const devCredits = [];
       const credits = [];
+      const shifts = [];
+      const expenses = [];
+      const repCredits = [];
+      const routerExpenses = [];
+      const distributorTopups = [];
 
       snapshot.forEach(doc => {
         const d = doc.data();
         if (d.docType === 'device_credit' || doc.id.startsWith('devcred_') || doc.id.startsWith('dc_')) {
           devCredits.push(d);
+        } else if (d.docType === 'shift' || doc.id.startsWith('shift_')) {
+          shifts.push(d);
+        } else if (d.docType === 'expense' || doc.id.startsWith('exp_')) {
+          expenses.push(d);
+        } else if (d.docType === 'rep_credit' || doc.id.startsWith('repcred_')) {
+          repCredits.push(d);
+        } else if (d.docType === 'router_expense' || doc.id.startsWith('routerexp_')) {
+          routerExpenses.push(d);
+        } else if (d.docType === 'distributor_topup' || doc.id.startsWith('topup_')) {
+          distributorTopups.push(d);
         } else if (d.docType === 'credit' || doc.id.startsWith('cred_') || doc.id.startsWith('cr_')) {
           credits.push(d);
         } else {
@@ -305,7 +347,51 @@ const DB = {
         }
       });
 
-      this._dualSave(this.UPDATES_KEY, updates);
+      // Merge and save updates
+      if (updates.length > 0) {
+        const curUpdates = this.getUpdates(true);
+        const map = new Map();
+        curUpdates.forEach(u => map.set(u.id, u));
+        updates.forEach(u => map.set(u.id, { ...(map.get(u.id) || {}), ...u }));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        this._dualSave(this.UPDATES_KEY, merged);
+      }
+
+      // Merge and save shifts
+      if (shifts.length > 0) {
+        const curShifts = this.getShifts();
+        const map = new Map();
+        curShifts.forEach(s => map.set(s.id, s));
+        shifts.forEach(s => map.set(s.id, { ...(map.get(s.id) || {}), ...s }));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
+        this._dualSave(this.SHIFTS_KEY, merged);
+      }
+
+      // Merge and save expenses
+      if (expenses.length > 0) {
+        const curExp = this.getExpenses();
+        const map = new Map();
+        curExp.forEach(e => map.set(e.id, e));
+        expenses.forEach(e => map.set(e.id, { ...(map.get(e.id) || {}), ...e }));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
+        this._dualSave(this.EXPENSES_KEY, merged);
+      }
+
+      // Merge and save rep credits
+      if (repCredits.length > 0) {
+        const curRep = this.getRepCredits(null, true);
+        const map = new Map();
+        curRep.forEach(r => map.set(r.id, r));
+        repCredits.forEach(r => map.set(r.id, { ...(map.get(r.id) || {}), ...r }));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp || b.takenDate) - new Date(a.timestamp || a.takenDate));
+        this._dualSave(this.REP_CREDITS_KEY, merged);
+      }
+
+      // Merge and save device credits
       if (devCredits.length > 0) {
         const currentDev = this.getDeviceCredits();
         const devMap = new Map();
@@ -315,9 +401,34 @@ const DB = {
         mergedDev.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
         this._dualSave(this.DEVICE_CREDITS_KEY, mergedDev);
       }
-      if (credits.length > 0 || !localStorage.getItem(this.CREDITS_KEY)) {
-        credits.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        this._dualSave(this.CREDITS_KEY, credits);
+
+      // Merge and save customer credits
+      if (credits.length > 0) {
+        const curCred = this.getCredits(null, true);
+        const map = new Map();
+        curCred.forEach(c => map.set(c.id, c));
+        credits.forEach(c => map.set(c.id, { ...(map.get(c.id) || {}), ...c }));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        this._dualSave(this.CREDITS_KEY, merged);
+      }
+
+      // Merge router expenses
+      if (routerExpenses.length > 0) {
+        const curRouters = this.getRouterExpenses(null);
+        const map = new Map();
+        curRouters.forEach(r => map.set(r.id, r));
+        routerExpenses.forEach(r => map.set(r.id, { ...(map.get(r.id) || {}), ...r }));
+        this._dualSave(this.ROUTER_EXPENSES_KEY, Array.from(map.values()));
+      }
+
+      // Merge distributor topups
+      if (distributorTopups.length > 0) {
+        const curTopups = this.getDistributorTopups(null);
+        const map = new Map();
+        curTopups.forEach(t => map.set(t.id, t));
+        distributorTopups.forEach(t => map.set(t.id, { ...(map.get(t.id) || {}), ...t }));
+        this._dualSave(this.DISTRIBUTOR_TOPUPS_KEY, Array.from(map.values()));
       }
 
       if (window.App) {
@@ -325,66 +436,8 @@ const DB = {
         window.App.refreshPage(window.App.currentPage);
       }
     }, err => {
-      console.warn('Firebase payment_tracker_updates error:', err);
+      console.warn('Firebase updates error:', err);
       this.setCloudStatus(false);
-    });
-
-    // Shifts sync listener
-    window.FS.collection('payment_tracker_shifts').onSnapshot(snapshot => {
-      if (snapshot.metadata.hasPendingWrites) return;
-      const list = [];
-      snapshot.forEach(doc => list.push(doc.data()));
-      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      this._dualSave(this.SHIFTS_KEY, list);
-      if (window.App && window.App.currentPage === 'shifts') window.App.renderShiftsPage();
-    });
-
-    // Expenses sync listener
-    window.FS.collection('payment_tracker_expenses').onSnapshot(snapshot => {
-      if (snapshot.metadata.hasPendingWrites) return;
-      const list = [];
-      snapshot.forEach(doc => list.push(doc.data()));
-      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      this._dualSave(this.EXPENSES_KEY, list);
-      if (window.App && window.App.currentPage === 'shifts') window.App.renderShiftsPage();
-    });
-
-    // Bank transactions sync listener
-    window.FS.collection('payment_tracker_bank_transactions').onSnapshot(snapshot => {
-      if (snapshot.metadata.hasPendingWrites) return;
-      const list = [];
-      snapshot.forEach(doc => list.push(doc.data()));
-      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      this._dualSave(this.BANK_TRANSACTIONS_KEY, list);
-    });
-
-    // Real-time Cloud Sync for Short-Term Device Credits
-    window.FS.collection('payment_tracker_device_credits').onSnapshot(snapshot => {
-      if (snapshot.metadata.hasPendingWrites) return;
-      const list = [];
-      snapshot.forEach(doc => list.push(doc.data()));
-      if (list.length > 0) {
-        list.sort((a, b) => new Date(b.createdAt || b.agreementDate) - new Date(a.createdAt || a.agreementDate));
-        this._dualSave(this.DEVICE_CREDITS_KEY, list);
-        console.log('📱 Real-time sync: Received ' + list.length + ' device credits from Firebase');
-        if (window.App) {
-          window.App.updateTopBarBadges();
-          if (window.App.currentPage === 'device-credits') window.App.renderDeviceCreditsPage();
-          if (window.App.currentPage === 'dashboard') window.App.renderDashboard();
-        }
-      }
-    }, err => {
-      console.warn('payment_tracker_device_credits snapshot error:', err);
-    });
-
-    // Real-time Cloud Sync for Customer Ledger Credits
-    window.FS.collection('payment_tracker_credits').onSnapshot(snapshot => {
-      if (snapshot.metadata.hasPendingWrites) return;
-      const list = [];
-      snapshot.forEach(doc => list.push(doc.data()));
-      list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      this._dualSave(this.CREDITS_KEY, list);
-      if (window.App && window.App.currentPage === 'credits') window.App.renderCreditsPage();
     });
   },
 
@@ -1012,8 +1065,11 @@ const DB = {
       status: 'pending',
       note: (creditData.note || '').trim()
     };
+    item.docType = 'credit';
     credits.unshift(item);
     this.saveCredits(credits);
+    this._syncToFirebase('payment_tracker_updates', 'cred_' + item.id, item);
+    this._syncToFirebase('payment_tracker_credits', item.id, item).catch(() => {});
 
     // Deduct credit reload amount from the corresponding SIM in active balance (lastUpdate)
     if (item.shopId && item.amount > 0) {
@@ -1060,7 +1116,9 @@ const DB = {
     item.settledAt = new Date().toISOString();
     item.settledNote = settledNote;
     item.settledDestination = destination || { type: 'cash' };
+    item.docType = 'credit';
     this.saveCredits(credits);
+    this._syncToFirebase('payment_tracker_updates', 'cred_' + item.id, item);
 
     // Rebalance into shop's active accounts and total capital!
     if (destination && destination.type !== 'none' && item.shopId) {
@@ -1186,6 +1244,8 @@ const DB = {
 
     credits = credits.filter(c => c.id !== creditId);
     this.saveCredits(credits);
+    this._deleteFromFirebase('payment_tracker_updates', 'cred_' + creditId);
+    this._deleteFromFirebase('payment_tracker_credits', creditId);
     return true;
   },
 
@@ -1240,8 +1300,10 @@ const DB = {
       date: data.date || now.toISOString().split('T')[0],
       note: (data.note || '').trim()
     };
+    item.docType = 'router_expense';
     list.unshift(item);
     this.saveRouterExpenses(list);
+    this._syncToFirebase('payment_tracker_updates', 'routerexp_' + item.id, item);
 
     // If deductSource is specified, deduct from active balance
     if (data.deductSource && data.deductSource !== 'none' && data.shopId) {
@@ -1287,6 +1349,7 @@ const DB = {
     let list = this.getRouterExpenses(null);
     list = list.filter(r => r.id !== id);
     this.saveRouterExpenses(list);
+    this._deleteFromFirebase('payment_tracker_updates', 'routerexp_' + id);
     return true;
   },
 
@@ -1316,8 +1379,10 @@ const DB = {
       date: data.date || now.toISOString().split('T')[0],
       note: (data.note || '').trim()
     };
+    item.docType = 'distributor_topup';
     list.unshift(item);
     this.saveDistributorTopups(list);
+    this._syncToFirebase('payment_tracker_updates', 'topup_' + item.id, item);
 
     // If addToBalance is true, add to active balance
     if (data.addToBalance && data.shopId) {
@@ -1381,6 +1446,7 @@ const DB = {
     let list = this.getDistributorTopups(null);
     list = list.filter(t => t.id !== id);
     this.saveDistributorTopups(list);
+    this._deleteFromFirebase('payment_tracker_updates', 'topup_' + id);
     return true;
   },
 
@@ -1451,8 +1517,10 @@ const DB = {
       cashNote: (data.specialNotes || data.cashNote || '').trim()
     };
     list.unshift(item);
+    item.docType = 'shift';
     this.saveShifts(list);
-    this._syncToFirebase('payment_tracker_shifts', item.id, item);
+    this._syncToFirebase('payment_tracker_updates', 'shift_' + item.id, item);
+    this._syncToFirebase('payment_tracker_shifts', item.id, item).catch(() => {});
     return item;
   },
 
@@ -1460,6 +1528,7 @@ const DB = {
     let list = this.getShifts(null);
     list = list.filter(s => s.id !== id);
     this.saveShifts(list);
+    this._deleteFromFirebase('payment_tracker_updates', 'shift_' + id);
     this._deleteFromFirebase('payment_tracker_shifts', id);
     return true;
   },
@@ -1502,8 +1571,11 @@ const DB = {
       date: data.date || now.toISOString().split('T')[0],
       timestamp: data.timestamp || now.toISOString()
     };
+    item.docType = 'expense';
     list.unshift(item);
     this.saveExpenses(list);
+    this._syncToFirebase('payment_tracker_updates', 'exp_' + item.id, item);
+    this._syncToFirebase('payment_tracker_expenses', item.id, item).catch(() => {});
 
     // If deductFromBalance is true and shopId given, deduct from shop active cash drawer
     if (data.deductFromBalance && data.shopId && item.paidFrom === 'cash') {
@@ -1534,6 +1606,7 @@ const DB = {
     let list = this.getExpenses(null);
     list = list.filter(e => e.id !== id);
     this.saveExpenses(list);
+    this._deleteFromFirebase('payment_tracker_updates', 'exp_' + id);
     this._deleteFromFirebase('payment_tracker_expenses', id);
     return true;
   },
@@ -2012,7 +2085,11 @@ const DB = {
   },
 
   getTodayDate() {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   },
 
   // ================================================================
@@ -2227,7 +2304,129 @@ const DB = {
     }).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   },
 
-  // Export all data
+  // ================================================================
+  // REP RELOAD CREDITS (STOCK ON CREDIT FROM DISTRIBUTOR REPS)
+  // ================================================================
+  getRepCredits(shopId = null, includeSettled = true) {
+    try {
+      let list = JSON.parse(localStorage.getItem(this.REP_CREDITS_KEY) || '[]');
+      if (shopId && shopId !== 'all') list = list.filter(r => r.shopId === shopId);
+      if (!includeSettled) list = list.filter(r => r.status === 'pending');
+      return list.sort((a, b) => new Date(b.timestamp || b.takenDate) - new Date(a.timestamp || a.takenDate));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  saveRepCredits(list) {
+    this._dualSave(this.REP_CREDITS_KEY, list);
+  },
+
+  addRepCredit(data) {
+    const list = this.getRepCredits(null, true);
+    const now = new Date();
+    const creditDays = parseInt(data.creditDays, 10) || 3;
+    const takenDate = data.takenDate || this.getTodayDate();
+    
+    // Auto calculate due date if missing
+    let dueDate = data.dueDate;
+    if (!dueDate) {
+      const d = new Date(takenDate);
+      d.setDate(d.getDate() + creditDays);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dueDate = `${year}-${month}-${day}`;
+    }
+
+    const item = {
+      id: 'repcred_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      shopId: data.shopId,
+      network: data.network || 'Dialog',
+      repName: (data.repName || 'Distributor Rep').trim(),
+      repPhone: (data.repPhone || '').trim(),
+      amount: parseFloat(data.amount) || 0,
+      takenDate: takenDate,
+      dueDate: dueDate,
+      creditDays: creditDays,
+      status: 'pending', // 'pending' or 'settled'
+      paidAmount: 0,
+      paidDate: '',
+      paidFrom: '', // 'cash' or 'bank'
+      settledBy: '',
+      settledNotes: '',
+      notes: (data.notes || '').trim(),
+      timestamp: data.timestamp || now.toISOString(),
+      docType: 'rep_credit'
+    };
+
+    list.unshift(item);
+    this.saveRepCredits(list);
+    this._syncToFirebase('payment_tracker_updates', item.id, item);
+    return item;
+  },
+
+  settleRepCredit(id, settlement = {}) {
+    const list = this.getRepCredits(null, true);
+    const item = list.find(r => r.id === id);
+    if (!item) return false;
+
+    item.status = 'settled';
+    item.paidAmount = parseFloat(settlement.paidAmount) || item.amount;
+    item.paidDate = settlement.paidDate || this.getTodayDate();
+    item.paidFrom = settlement.paidFrom || 'cash';
+    item.settledBy = settlement.settledBy || '';
+    item.settledNotes = (settlement.notes || '').trim();
+    item.settledAt = new Date().toISOString();
+    item.docType = 'rep_credit';
+
+    this.saveRepCredits(list);
+    this._syncToFirebase('payment_tracker_updates', item.id, item);
+    return item;
+  },
+
+  deleteRepCredit(id) {
+    let list = this.getRepCredits(null, true);
+    list = list.filter(r => r.id !== id);
+    this.saveRepCredits(list);
+    this._deleteFromFirebase('payment_tracker_updates', id);
+    return true;
+  },
+
+  getRepCreditsStats(shopId = null) {
+    const list = this.getRepCredits(shopId, true);
+    const today = this.getTodayDate();
+    let totalPending = 0;
+    let pendingCount = 0;
+    let dueTodayCount = 0;
+    let overdueCount = 0;
+    let totalSettled = 0;
+    let settledCount = 0;
+    const byNetwork = { Dialog: 0, Mobitel: 0, Airtel: 0, Hutch: 0, EzCash: 0, Other: 0 };
+
+    list.forEach(r => {
+      if (r.status === 'pending') {
+        const amt = parseFloat(r.amount) || 0;
+        totalPending += amt;
+        pendingCount++;
+        const net = r.network || 'Other';
+        if (byNetwork[net] !== undefined) byNetwork[net] += amt;
+        else byNetwork.Other = (byNetwork.Other || 0) + amt;
+
+        if (r.dueDate) {
+          if (r.dueDate === today) dueTodayCount++;
+          else if (r.dueDate < today) overdueCount++;
+        }
+      } else if (r.status === 'settled') {
+        totalSettled += (parseFloat(r.paidAmount || r.amount) || 0);
+        settledCount++;
+      }
+    });
+
+    return { totalPending, pendingCount, dueTodayCount, overdueCount, totalSettled, settledCount, byNetwork };
+  },
+
+    // Export all data
   exportData() {
     return JSON.stringify({
       shops: this.getShops(),
@@ -2237,6 +2436,7 @@ const DB = {
       distributorTopups: this.getDistributorTopups(null),
       shifts: this.getShifts(null),
       expenses: this.getExpenses(null),
+      repCredits: this.getRepCredits(null, true),
       deviceCredits: this.getDeviceCredits(null),
       activeShopId: this.getActiveShopId(),
       exportedAt: new Date().toISOString(),
@@ -2255,6 +2455,7 @@ const DB = {
       if (data.distributorTopups) this.saveDistributorTopups(data.distributorTopups);
       if (data.shifts) this.saveShifts(data.shifts);
       if (data.expenses) this.saveExpenses(data.expenses);
+      if (data.repCredits) this.saveRepCredits(data.repCredits);
       if (data.deviceCredits) this.saveDeviceCredits(data.deviceCredits);
       if (data.activeShopId) this.setActiveShop(data.activeShopId);
       return true;

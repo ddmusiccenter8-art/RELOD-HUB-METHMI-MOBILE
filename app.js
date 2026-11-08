@@ -188,8 +188,10 @@ const App = {
         const btn = document.createElement('button');
         btn.className = `btn ${action.class || 'btn-ghost'}`;
         btn.textContent = action.text;
+        if (action.style) btn.style.cssText = action.style;
         btn.onclick = () => {
-          action.onClick();
+          if (typeof action.onClick === 'function') action.onClick();
+          else if (typeof action.onclick === 'function') action.onclick();
         };
         actionsEl.appendChild(btn);
       });
@@ -1400,6 +1402,36 @@ const App = {
     acctInput.addEventListener('input', updateRow);
     cashInput.addEventListener('input', updateRow);
     select.addEventListener('change', () => this.calculateLiveBalances());
+
+    // Check and render Rep Credits alert banner
+    const repStats = DB.getRepCreditsStats ? DB.getRepCreditsStats(shopId) : { totalPending: 0 };
+    const repBanner = document.getElementById('reloadRepCreditBanner');
+    if (repBanner) {
+      if (repStats.totalPending > 0) {
+        repBanner.style.display = 'block';
+        repBanner.innerHTML = `
+          <div style="background:linear-gradient(135deg, rgba(234,88,12,0.12) 0%, rgba(234,88,12,0.04) 100%); border:1.5px solid rgba(234,88,12,0.4); border-radius:var(--radius-md); padding:12px 16px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+              <div>
+                <div style="font-weight:800; font-size:0.95rem; color:#ea580c; display:flex; align-items:center; gap:6px;">
+                  <span>🤝</span> <span>රෙෆ්ලට ගෙවීමට ඇති ණය (Rep Credits Due): <strong>${DB.formatCurrency(repStats.totalPending)}</strong></span>
+                </div>
+                <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                  💡 <em>රෙෆ්ලගෙන් ණයට ගත් රීලෝඩ් තොග නිසා SIM Balances වැඩි වී ඇත. රෙෆ්ට මුදල් ගෙවූ විට Settle කරන්න.</em>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <button type="button" class="btn btn-xs" onclick="App.showAddRepCreditModal()" style="font-weight:700; background:#ea580c; color:#fff; border:none; padding:4px 10px;">+ Add Rep Credit</button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.navigateTo('credits'); App.switchLedgerTab('rep_credits');" style="font-weight:700; border:1px solid rgba(234,88,12,0.4); color:#ea580c; padding:4px 10px;">View Ledger</button>
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        repBanner.style.display = 'none';
+        repBanner.innerHTML = '';
+      }
+    }
 
     this.calculateLiveBalances();
   },
@@ -3063,6 +3095,12 @@ const App = {
     const settledCountEl = document.getElementById('kpiSettledCreditsCount');
     if (settledCountEl) settledCountEl.textContent = `${settledCreditsCount} ${I18N.currentLang === 'si' ? 'පියවූ' : 'Paid'}`;
 
+    const repStats = DB.getRepCreditsStats ? DB.getRepCreditsStats(shopId) : { totalPending: 0, pendingCount: 0 };
+    const repEl = document.getElementById('kpiRepCredits');
+    if (repEl) repEl.textContent = DB.formatCurrency(repStats.totalPending);
+    const repCountEl = document.getElementById('kpiRepCreditsCount');
+    if (repCountEl) repCountEl.textContent = `${repStats.pendingCount} ${I18N.currentLang === 'si' ? 'ගෙවීමට ඇති' : 'Pending'}`;
+
     this.renderCreditsTable();
   },
 
@@ -3333,7 +3371,356 @@ const App = {
 
       html += `</tbody></table>`;
       container.innerHTML = html;
+    } else if (this.currentLedgerTab === 'rep_credits') {
+      let list = DB.getRepCredits ? DB.getRepCredits(shopId, true) : [];
+      const today = DB.getTodayDate();
+
+      if (term) {
+        list = list.filter(r =>
+          (r.repName && r.repName.toLowerCase().includes(term)) ||
+          (r.network && r.network.toLowerCase().includes(term)) ||
+          (r.repPhone && r.repPhone.toLowerCase().includes(term)) ||
+          (r.notes && r.notes.toLowerCase().includes(term))
+        );
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state" style="padding:30px;">
+            <div class="empty-icon">🤝</div>
+            <div class="empty-text">${isSi ? 'රෙෆ්ලගෙන් ණයට ගත් රීලෝඩ් තොග වාර්තා නැත' : 'No rep reload credit records found'}</div>
+            <div class="empty-sub">${isSi ? 'අලුත් රෙෆ් ණයක් සටහන් කිරීමට "+ Rep Reload Credit" ඔබන්න.' : 'Click "+ Rep Reload Credit" to record reload taken on credit from company reps.'}</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = `
+        <table class="ledger-table">
+          <thead>
+            <tr>
+              <th>${isSi ? 'ගත්ත දිනය' : 'Date Taken'}</th>
+              <th>${isSi ? 'නෙට්වර්ක්' : 'Network'}</th>
+              <th>${isSi ? 'රෙෆ් නම / දුරකථන' : 'Rep Name & Phone'}</th>
+              <th style="text-align:right;">${isSi ? 'මුදල (Rs.)' : 'Amount'}</th>
+              <th style="text-align:center;">${isSi ? 'ගෙවිය යුතු දිනය' : 'Due Date'}</th>
+              <th style="text-align:center;">${isSi ? 'තත්ත්වය' : 'Status'}</th>
+              <th style="text-align:center;">${isSi ? 'ක්‍රියාමාර්ග' : 'Action'}</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      list.forEach(r => {
+        const isSettled = r.status === 'settled';
+        let dueBadge = '';
+        if (isSettled) {
+          dueBadge = `<span style="font-size:0.75rem; color:var(--accent-green); font-weight:700;">✅ Paid: ${r.paidDate || ''} (${r.paidFrom || 'cash'})${r.settledBy ? ' - ' + r.settledBy : ''}</span>`;
+        } else if (r.dueDate) {
+          if (r.dueDate < today) {
+            dueBadge = `<span style="font-size:0.75rem; font-weight:800; color:#ef4444; background:rgba(239,68,68,0.12); padding:2px 6px; border-radius:4px; border:1px solid rgba(239,68,68,0.35);">⚠️ Overdue (${r.dueDate})</span>`;
+          } else if (r.dueDate === today) {
+            dueBadge = `<span style="font-size:0.75rem; font-weight:800; color:#f59e0b; background:rgba(245,158,11,0.15); padding:2px 6px; border-radius:4px; border:1px solid rgba(245,158,11,0.4);">⏰ Due Today (${r.dueDate})</span>`;
+          } else {
+            dueBadge = `<span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">📅 Due: ${r.dueDate}</span>`;
+          }
+        }
+
+        const netColor = r.network === 'Dialog' ? '#e11d48' : (r.network === 'Mobitel' ? '#059669' : (r.network === 'Airtel' ? '#dc2626' : (r.network === 'Hutch' ? '#ea580c' : 'var(--accent-blue)')));
+
+        html += `
+          <tr>
+            <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${r.takenDate || ''}</td>
+            <td><span class="network-badge" style="background:${netColor}20; color:${netColor}; border:1px solid ${netColor}50; font-weight:800;">${r.network}</span></td>
+            <td>
+              <div style="font-weight:700;">🤝 ${r.repName}</div>
+              ${r.repPhone ? `<div style="font-size:0.75rem; color:var(--text-muted);"><a href="tel:${r.repPhone}" style="color:var(--text-secondary); text-decoration:none;">📞 ${r.repPhone}</a></div>` : ''}
+              ${r.notes ? `<div style="font-size:0.75rem; color:var(--text-secondary); font-style:italic;">📝 ${r.notes}</div>` : ''}
+            </td>
+            <td style="text-align:right; font-weight:900; color:var(--accent-gold); font-size:1.05rem;">${DB.formatCurrency(r.amount)}</td>
+            <td style="text-align:center;">${dueBadge}</td>
+            <td style="text-align:center;">
+              ${isSettled ?
+                '<span class="status-badge paid">✅ Settled</span>' :
+                '<span class="status-badge pending" style="background:rgba(234,88,12,0.15); color:#ea580c; border:1px solid rgba(234,88,12,0.35);">⏳ Pending</span>'
+              }
+            </td>
+            <td style="text-align:center; white-space:nowrap;">
+              ${!isSettled ? `
+                <button class="btn btn-xs btn-success" onclick="App.showSettleRepCreditModal('${r.id}')" style="font-size:0.75rem; font-weight:700; padding:4px 8px; background:#16a34a; border:none; margin-right:4px;">
+                  💰 Settle
+                </button>
+              ` : ''}
+              <button class="btn btn-danger btn-sm" onclick="App.promptDeleteRepCredit('${r.id}')" style="padding:4px 8px; font-size:0.75rem;">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      container.innerHTML = html;
     }
+  },
+
+
+  switchLedgerTab(tab) {
+    this.currentLedgerTab = tab;
+    document.querySelectorAll('.ledger-tab-btn').forEach(btn => {
+      const bTab = btn.getAttribute('data-tab');
+      btn.classList.toggle('active', bTab === tab);
+      btn.classList.toggle('btn-primary', bTab === tab);
+      btn.classList.toggle('btn-ghost', bTab !== tab);
+    });
+    this.renderCreditsTable();
+  },
+
+  showAddRepCreditModal() {
+    const shops = DB.getShops();
+    const isSi = I18N.currentLang === 'si';
+    if (shops.length === 0) {
+      this.showToast('Please create a shop first', 'error');
+      return;
+    }
+    const activeShopId = DB.getActiveShopId() || shops[0].id;
+    const today = DB.getTodayDate();
+
+    // Default 3 days later
+    const d3 = new Date(today);
+    d3.setDate(d3.getDate() + 3);
+    const d3Str = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-${String(d3.getDate()).padStart(2, '0')}`;
+
+    const shopSelectHtml = shops.length > 1 ? `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">${isSi ? 'සාප්පුව (Shop / Branch) *' : 'Shop / Branch *'}</label>
+        <select id="repCreditShop" class="form-select">
+          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+        </select>
+      </div>
+    ` : `<input type="hidden" id="repCreditShop" value="${activeShopId}">`;
+
+    const bodyHtml = `
+      <form id="addRepCreditForm" style="display:flex; flex-direction:column; gap:12px;">
+        ${shopSelectHtml}
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-weight:700;">${isSi ? 'නෙට්වර්ක් එක (Network) *' : 'Network *'}</label>
+          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+            <label style="display:flex; align-items:center; justify-content:center; gap:4px; padding:8px 4px; border-radius:6px; border:1px solid #e11d48; cursor:pointer; background:rgba(225,29,72,0.1); font-weight:800; font-size:0.85rem; color:#e11d48;">
+              <input type="radio" name="repNetwork" value="Dialog" checked style="display:none;" onchange="this.parentElement.parentElement.querySelectorAll('label').forEach(l => l.style.opacity = '0.5'); this.parentElement.style.opacity = '1';">
+              Dialog
+            </label>
+            <label style="display:flex; align-items:center; justify-content:center; gap:4px; padding:8px 4px; border-radius:6px; border:1px solid #059669; cursor:pointer; background:rgba(5,150,105,0.1); font-weight:800; font-size:0.85rem; color:#059669; opacity:0.5;">
+              <input type="radio" name="repNetwork" value="Mobitel" style="display:none;" onchange="this.parentElement.parentElement.querySelectorAll('label').forEach(l => l.style.opacity = '0.5'); this.parentElement.style.opacity = '1';">
+              Mobitel
+            </label>
+            <label style="display:flex; align-items:center; justify-content:center; gap:4px; padding:8px 4px; border-radius:6px; border:1px solid #dc2626; cursor:pointer; background:rgba(220,38,38,0.1); font-weight:800; font-size:0.85rem; color:#dc2626; opacity:0.5;">
+              <input type="radio" name="repNetwork" value="Airtel" style="display:none;" onchange="this.parentElement.parentElement.querySelectorAll('label').forEach(l => l.style.opacity = '0.5'); this.parentElement.style.opacity = '1';">
+              Airtel
+            </label>
+            <label style="display:flex; align-items:center; justify-content:center; gap:4px; padding:8px 4px; border-radius:6px; border:1px solid #ea580c; cursor:pointer; background:rgba(234,88,12,0.1); font-weight:800; font-size:0.85rem; color:#ea580c; opacity:0.5;">
+              <input type="radio" name="repNetwork" value="Hutch" style="display:none;" onchange="this.parentElement.parentElement.querySelectorAll('label').forEach(l => l.style.opacity = '0.5'); this.parentElement.style.opacity = '1';">
+              Hutch
+            </label>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'රෙෆ්ගේ නම (Rep Name) *' : 'Rep Name *'}</label>
+            <input type="text" class="form-input" id="repCreditRepName" placeholder="e.g. Kamal (Dialog Rep)" required>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'දුරකථන අංකය (Phone)' : 'Rep Phone'}</label>
+            <input type="tel" class="form-input" id="repCreditRepPhone" placeholder="0771234567">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-weight:800; color:var(--accent-gold);">${isSi ? 'ණයට ගත් රීලෝඩ් මුදල (Amount Rs.) *' : 'Reload Amount (Rs.) *'}</label>
+          <input type="number" step="0.01" min="1" class="form-input" id="repCreditAmount" placeholder="25000.00" style="font-size:1.3rem; font-weight:900; color:var(--accent-gold);" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ගත්ත දිනය (Taken Date)' : 'Date Taken'}</label>
+            <input type="date" class="form-input" id="repCreditTakenDate" value="${today}">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-weight:700; color:#ea580c;">${isSi ? 'ගෙවිය යුතු දිනය (Due Date) *' : 'Payment Due Date *'}</label>
+            <input type="date" class="form-input" id="repCreditDueDate" value="${d3Str}">
+          </div>
+        </div>
+
+        <!-- Quick Due Date Presets -->
+        <div style="display:flex; gap:6px; align-items:center;">
+          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Quick Presets:</span>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.setRepDueDateDays(3)" style="border:1px solid var(--border-glass); padding:2px 8px; font-size:0.75rem;">+3 Days (දින 3)</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.setRepDueDateDays(7)" style="border:1px solid var(--border-glass); padding:2px 8px; font-size:0.75rem;">+1 Week (සතියක්)</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.setRepDueDateDays(14)" style="border:1px solid var(--border-glass); padding:2px 8px; font-size:0.75rem;">+2 Weeks (සති 2)</button>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'සටහන් / බිල් අංකය (Notes / Invoice)' : 'Notes / Invoice No'}</label>
+          <input type="text" class="form-input" id="repCreditNotes" placeholder="e.g. Invoice #9823 / Will collect cash next Tuesday">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      isSi ? '🤝 රෙෆ්ගෙන් ණයට රීලෝඩ් ගැනීම (Add Rep Reload Credit)' : '🤝 Add Rep Reload Credit',
+      bodyHtml,
+      [
+        { text: isSi ? 'අවලංගුයි' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? '💾 ණය සටහන් කරන්න (Save)' : '💾 Save Rep Credit', class: 'btn-primary', style: 'background:#ea580c; border-color:#ea580c; font-weight:800;', onClick: () => {
+          const shopId = document.getElementById('repCreditShop')?.value;
+          const network = document.querySelector('input[name="repNetwork"]:checked')?.value || 'Dialog';
+          const repName = document.getElementById('repCreditRepName')?.value?.trim();
+          const repPhone = document.getElementById('repCreditRepPhone')?.value?.trim();
+          const amount = parseFloat(document.getElementById('repCreditAmount')?.value) || 0;
+          const takenDate = document.getElementById('repCreditTakenDate')?.value || today;
+          const dueDate = document.getElementById('repCreditDueDate')?.value || d3Str;
+          const notes = document.getElementById('repCreditNotes')?.value?.trim() || '';
+
+          if (!shopId) { this.showToast('Please select a shop', 'error'); return; }
+          if (!repName) { this.showToast('Please enter Rep Name', 'error'); return; }
+          if (amount <= 0) { this.showToast('Please enter a valid amount', 'error'); return; }
+
+          DB.addRepCredit({
+            shopId,
+            network,
+            repName,
+            repPhone,
+            amount,
+            takenDate,
+            dueDate,
+            notes
+          });
+
+          this.closeModal();
+          this.showToast(isSi ? `✅ රෙෆ් ණය (${DB.formatCurrency(amount)}) සාර්ථකව සුරැකිණි!` : 'Rep credit saved successfully ✅', 'success');
+          this.updateTopBarBadges();
+          if (this.currentPage === 'credits') {
+            this.switchLedgerTab('rep_credits');
+          } else if (this.currentPage === 'update') {
+            this.renderUpdateForm();
+          } else {
+            this.renderDashboard();
+          }
+        }}
+      ]
+    );
+  },
+
+  setRepDueDateDays(days) {
+    const takenInp = document.getElementById('repCreditTakenDate');
+    const baseDate = (takenInp && takenInp.value) ? new Date(takenInp.value) : new Date();
+    baseDate.setDate(baseDate.getDate() + days);
+    const dueInp = document.getElementById('repCreditDueDate');
+    if (dueInp) {
+      dueInp.value = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, '0')}-${String(baseDate.getDate()).padStart(2, '0')}`;
+    }
+  },
+
+  showSettleRepCreditModal(creditId) {
+    const list = DB.getRepCredits(null, true);
+    const item = list.find(r => r.id === creditId);
+    if (!item) return;
+
+    const isSi = I18N.currentLang === 'si';
+    const today = DB.getTodayDate();
+
+    const bodyHtml = `
+      <div style="background:rgba(234,88,12,0.1); border:1px solid rgba(234,88,12,0.3); border-radius:var(--radius-sm); padding:12px; margin-bottom:14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-weight:800; font-size:1.1rem; color:#ea580c;">🤝 ${item.repName}</div>
+            <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;">Network: <strong>${item.network}</strong> | Taken: ${item.takenDate}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">TOTAL OWED</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-gold);">${DB.formatCurrency(item.amount)}</div>
+          </div>
+        </div>
+      </div>
+
+      <form id="settleRepForm" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="font-weight:700;">${isSi ? 'ගෙවූ මුදල (Paid Amount Rs.) *' : 'Paid Amount (Rs.) *'}</label>
+          <input type="number" step="0.01" min="1" class="form-input" id="settleRepPaidAmount" value="${item.amount}" style="font-size:1.25rem; font-weight:800; color:var(--accent-green);" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ගෙවූ ක්‍රමය (Paid From)' : 'Paid From'}</label>
+            <select class="form-select" id="settleRepPaidFrom">
+              <option value="cash" selected>💵 Cash Drawer (ලාච්චුවේ මුදලින්)</option>
+              <option value="bank">🏦 Bank Account (බැංකුවෙන් / Transfer)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ගෙවූ දිනය (Paid Date)' : 'Paid Date'}</label>
+            <input type="date" class="form-input" id="settleRepPaidDate" value="${today}">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'මුදල් ගෙවූ සේවකයා (Cashier Name)' : 'Cashier Name'}</label>
+          <input type="text" class="form-input" id="settleRepCashier" placeholder="Cashier Name">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'සටහන් (Settlement Notes)' : 'Notes'}</label>
+          <input type="text" class="form-input" id="settleRepNotes" placeholder="e.g. Paid in full to Rep Kamal">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      isSi ? '💰 රෙෆ්ට මුදල් ගෙවා අවසන් කිරීම (Settle Rep Credit)' : '💰 Settle Rep Credit Payment',
+      bodyHtml,
+      [
+        { text: isSi ? 'අවලංගුයි' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? '✅ ගෙවීම තහවුරු කරන්න (Confirm)' : '✅ Confirm Payment', class: 'btn-success', style: 'background:#16a34a; font-weight:800;', onClick: () => {
+          const paidAmount = parseFloat(document.getElementById('settleRepPaidAmount')?.value) || item.amount;
+          const paidFrom = document.getElementById('settleRepPaidFrom')?.value || 'cash';
+          const paidDate = document.getElementById('settleRepPaidDate')?.value || today;
+          const settledBy = document.getElementById('settleRepCashier')?.value?.trim() || '';
+          const notes = document.getElementById('settleRepNotes')?.value?.trim() || '';
+
+          DB.settleRepCredit(creditId, {
+            paidAmount,
+            paidFrom,
+            paidDate,
+            settledBy,
+            notes
+          });
+
+          this.closeModal();
+          this.showToast(isSi ? `✅ රෙෆ්ට ගෙවූ මුදල (${DB.formatCurrency(paidAmount)}) සටහන් විය!` : 'Rep credit settled successfully ✅', 'success');
+          this.updateTopBarBadges();
+          if (this.currentPage === 'credits') {
+            this.switchLedgerTab('rep_credits');
+          } else if (this.currentPage === 'update') {
+            this.renderUpdateForm();
+          } else {
+            this.renderDashboard();
+          }
+        }}
+      ]
+    );
+  },
+
+  promptDeleteRepCredit(id) {
+    this.showAdminPasswordModal(() => {
+      DB.deleteRepCredit(id);
+      this.showToast(I18N.currentLang === 'si' ? 'රෙෆ් ණය වාර්තාව මකා දමන ලදී' : 'Rep credit deleted', 'success');
+      this.updateTopBarBadges();
+      if (this.currentPage === 'credits') {
+        this.renderCreditsTable();
+      } else {
+        this.renderDashboard();
+      }
+    });
   },
 
   promptSettleCredit(creditId) {
@@ -3875,6 +4262,17 @@ Thank you! - ${shopName}`;
         badge.style.display = 'inline-flex';
       } else {
         badge.style.display = 'none';
+      }
+    }
+
+    const repBadge = document.getElementById('topBarRepCreditBadge');
+    if (repBadge && DB.getRepCreditsStats) {
+      const repStats = DB.getRepCreditsStats(shopId);
+      if (repStats.pendingCount > 0) {
+        repBadge.textContent = repStats.pendingCount;
+        repBadge.style.display = 'inline-flex';
+      } else {
+        repBadge.style.display = 'none';
       }
     }
 
@@ -4741,7 +5139,24 @@ Thank you! - ${shopName}`;
     const morningShift = todayShifts.find(s => s.shiftType === 'morning');
     const shopShifts = DB.getShiftsForShop(shopId);
     const lastShift = shopShifts.length > 0 ? shopShifts[0] : null;
-    const defaultFloat = morningShift ? (morningShift.openingFloat || morningShift.actualCountedCash || 0) : (lastShift ? (lastShift.countedCash || lastShift.actualCountedCash || 0) : 0);
+    const defaultFloat = morningShift ? (morningShift.actualCountedCash || morningShift.countedCash || morningShift.openingFloat || 0) : (lastShift ? (lastShift.countedCash || lastShift.actualCountedCash || 0) : 0);
+
+    // Format morning shift counted notes breakdown if available
+    let morningNotesSummary = '';
+    if (morningShift && morningShift.denominations) {
+      const md = morningShift.denominations;
+      const mParts = [];
+      if (md.n5000) mParts.push(`5,000×${md.n5000}`);
+      if (md.n2000) mParts.push(`2,000×${md.n2000}`);
+      if (md.n1000) mParts.push(`1,000×${md.n1000}`);
+      if (md.n500) mParts.push(`500×${md.n500}`);
+      if (md.n100) mParts.push(`100×${md.n100}`);
+      if (md.n50) mParts.push(`50×${md.n50}`);
+      if (md.n20) mParts.push(`20×${md.n20}`);
+      if (md.n10) mParts.push(`10×${md.n10}`);
+      if (md.coins) mParts.push(`Coins: ${md.coins}`);
+      morningNotesSummary = mParts.join(' | ');
+    }
 
     // Default drawer expenses today (Shop expenses only - NO reload)
     const todayExpenses = DB.getExpensesForShopByDate(shopId, today).filter(e => e.deductFromDrawer !== false && e.deductFromBalance !== false);
@@ -4751,8 +5166,28 @@ Thank you! - ${shopName}`;
       <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:10px;">
         <div style="font-size:0.82rem; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center; padding-bottom:6px; border-bottom:1px solid var(--border-glass);">
           <div>🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}</div>
-          <button type="button" class="btn btn-xs btn-ghost" onclick="App.showAddExpenseModal()" style="font-size:0.75rem; color:var(--accent-red); border:1px solid rgba(228,0,43,0.3); padding:2px 8px;">+ Add Expense</button>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.showAddExpenseModal(true)" style="font-size:0.75rem; color:var(--accent-red); border:1px solid rgba(228,0,43,0.3); padding:2px 8px;">+ Add Expense</button>
         </div>
+
+        ${morningShift ? `
+          <!-- Morning Shift Handover Banner -->
+          <div style="background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.35); border-radius:var(--radius-sm); padding:10px 14px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+              <div style="font-weight:800; color:var(--accent-gold); font-size:0.92rem;">
+                🌅 උදෑසන භාරදුන් මුදල (Morning Float): <strong>${DB.formatCurrency(defaultFloat)}</strong>
+              </div>
+              <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">👤 ${morningShift.cashierName || morningShift.cashier || 'Morning Staff'}</span>
+            </div>
+            ${morningNotesSummary ? `
+              <div style="font-size:0.8rem; font-weight:700; color:var(--accent-gold); margin-top:6px; background:rgba(0,0,0,0.25); padding:6px 10px; border-radius:4px; line-height:1.4;">
+                🧮 උදෑසන නෝට්ටු ගණන: ${morningNotesSummary}
+              </div>
+            ` : ''}
+            <div style="font-size:0.72rem; color:var(--text-secondary); margin-top:4px;">
+              ✅ සවස ශිෆ්ට් එක සඳහා Opening Float එක ලෙස ස්වයංක්‍රීයව සකසා ඇත.
+            </div>
+          </div>
+        ` : ''}
 
         <!-- Shift Type & Cashier Name -->
         <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px;">
@@ -4774,27 +5209,26 @@ Thank you! - ${shopName}`;
         <div style="background:var(--bg-card); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
           <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px;">
             <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--text-secondary);">1. Opening Cash Float</label>
+              <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--text-secondary);" id="shiftFloatLabel">1. Opening Cash Float</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalFloat" value="${defaultFloat}" style="padding:6px 8px; font-size:0.95rem; font-weight:700; height:34px;">
-              ${(morningShift && morningShift.denominations) ? `<div style="font-size:0.72rem; color:var(--accent-gold); font-weight:700; margin-top:2px;">🌅 Morning Notes: ${Object.entries(morningShift.denominations).filter(([k,v]) => v > 0).map(([k,v]) => `${k.replace('n','')}:${v}`).join(', ')}</div>` : ''}
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--accent-blue); font-weight:800;">2. 🛒 Total POS Machine Sales</label>
+            <div class="form-group" style="margin-bottom:0;" id="shiftPosCashGroup">
+              <label class="form-label" style="font-size:0.75rem; margin-bottom:2px; color:var(--accent-blue); font-weight:800;">2. 🛒 Total POS Sales</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCash" placeholder="0.00" value="0" style="padding:6px 8px; font-size:1.05rem; font-weight:800; color:var(--accent-blue); height:34px; border:1px solid rgba(59,130,246,0.4);">
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-purple);">3. Less: POS Card / Non-Cash</label>
+            <div class="form-group" style="margin-bottom:0;" id="shiftPosCardGroup">
+              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-purple);">3. Less: POS Card Sales</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCard" placeholder="0.00" value="0" style="padding:6px 8px; font-size:0.85rem; height:34px;">
             </div>
-            <div class="form-group" style="margin-bottom:0;">
-              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-red); font-weight:700;">4. Less: Daily Drawer Expenses</label>
+            <div class="form-group" style="margin-bottom:0;" id="shiftExpensesGroup">
+              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-red); font-weight:700;">4. Less: Drawer Expenses</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalExpenses" value="${defaultExpenses}" style="padding:6px 8px; font-size:0.85rem; color:var(--accent-red); font-weight:700; height:34px;">
             </div>
           </div>
         </div>
 
         <!-- Expected Cash Badge -->
-        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:8px 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:8px 12px;" id="shiftExpectedRow">
           <div>
             <div style="font-weight:700; font-size:0.82rem; color:var(--text-secondary);">Expected Cash in Drawer:</div>
             <div style="font-size:0.7rem; color:var(--text-muted);">(Float + POS Sales - Card - Expenses)</div>
@@ -4805,7 +5239,7 @@ Thank you! - ${shopName}`;
         <!-- Actual Counted Cash in Drawer -->
         <div class="form-group" style="margin-bottom:0; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius-sm); padding:8px 12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
-            <label class="form-label" style="font-weight:800; color:var(--accent-gold); font-size:0.82rem; margin-bottom:0;">💵 5. Actual Counted Cash in Drawer</label>
+            <label class="form-label" style="font-weight:800; color:var(--accent-gold); font-size:0.82rem; margin-bottom:0;" id="shiftCountedLabel">💵 5. Actual Counted Cash in Drawer</label>
             <button type="button" class="btn btn-xs btn-primary" onclick="App.openDenominationModalForShiftModal()" style="font-size:0.75rem; padding:3px 10px; font-weight:700; background:#f59e0b; border:none; color:#000;">🧮 Count Notes (5000, 2000...)</button>
           </div>
           <input type="number" step="0.01" min="0" class="form-input" id="shiftModalCounted" placeholder="0.00" value="0" style="font-size:1.25rem; font-weight:900; padding:6px 10px; text-align:right;">
@@ -4847,6 +5281,7 @@ Thank you! - ${shopName}`;
     const posCardInp = document.getElementById('shiftModalPosCard');
     const expInp = document.getElementById('shiftModalExpenses');
     const cntInp = document.getElementById('shiftModalCounted');
+    const typeSelect = document.getElementById('shiftModalType');
 
     const updateCalc = () => {
       const flt = parseFloat(fltInp.value) || 0;
@@ -4855,7 +5290,6 @@ Thank you! - ${shopName}`;
       const exp = parseFloat(expInp.value) || 0;
       const cnt = parseFloat(cntInp.value) || 0;
 
-      // Net expected cash in drawer = Opening Float + (POS Sales - Card Sales) - Expenses
       const posCash = Math.max(0, posTotal - posCard);
       const expected = flt + posCash - exp;
       const diff = cnt - expected;
@@ -4874,6 +5308,22 @@ Thank you! - ${shopName}`;
         }
       }
     };
+
+    if (typeSelect) {
+      typeSelect.addEventListener('change', () => {
+        const val = typeSelect.value;
+        const fltLabel = document.getElementById('shiftFloatLabel');
+        const cntLabel = document.getElementById('shiftCountedLabel');
+        if (val === 'morning') {
+          if (fltLabel) fltLabel.textContent = '1. Morning Opening Float (ආරම්භක මුදල)';
+          if (cntLabel) cntLabel.textContent = '💵 Counted Morning Drawer Cash';
+        } else {
+          if (fltLabel) fltLabel.textContent = '1. Opening Cash Float';
+          if (cntLabel) cntLabel.textContent = '💵 5. Actual Counted Cash in Drawer';
+        }
+        updateCalc();
+      });
+    }
 
     [fltInp, posCashInp, posCardInp, expInp, cntInp].forEach(inp => {
       if (inp) inp.addEventListener('input', updateCalc);
@@ -5637,30 +6087,49 @@ Thank you! - ${shopName}`;
     this.showToast(I18N.currentLang === 'si' ? 'වියදම මකා දමන ලදී' : 'Expense deleted', 'success');
   },
 
-  showAddExpenseModal() {
+  showAddExpenseModal(returnToShiftModal = false) {
     const shopId = DB.getActiveShopId();
     if (!shopId) { this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error'); return; }
-    const categories = ['Shop Wi-Fi / Router Reload', 'Staff / Shop Mobile Reload', 'Staff Salary', 'Electricity', 'Rent', 'Internet', 'Supplies', 'Owner Drawing', 'Maintenance', 'Other'];
+    const isSi = I18N.currentLang === 'si';
+    const categories = isSi ? 
+      ['කඩේ Wi-Fi / රවුටර් රීලෝඩ්', 'සේවක / සාප්පු සිම් රීලෝඩ්', 'සේවක වැටුප් (Staff Salary)', 'විදුලි බිල (Electricity)', 'කඩ කුලිය (Rent)', 'ඉන්ටර්නෙට් බිල්පත්', 'සාප්පු බඩු / Supplies', 'අයිතිකරු ලබාගත් මුදල් (Owner Drawing)', 'නඩත්තු වියදම් (Maintenance)', 'වෙනත් වියදම් (Other)'] :
+      ['Shop Wi-Fi / Router Reload', 'Staff / Shop Mobile Reload', 'Staff Salary', 'Electricity', 'Rent', 'Internet', 'Supplies', 'Owner Drawing', 'Maintenance', 'Other'];
     const catOptions = categories.map(c => `<option value="${c}">${c}</option>`).join('');
     this.showModal(
-      '💸 Add Expense / Drawing',
-      `<div class="form-group"><label class="form-label">Category</label>
+      isSi ? '💸 දෛනික වියදම් සටහන් කිරීම (Add Daily Expense)' : '💸 Add Expense / Drawing',
+      `<div class="form-group"><label class="form-label">${isSi ? 'වියදම් වර්ගය (Category)' : 'Category'}</label>
         <select class="form-select" id="expCatInput">${catOptions}</select></div>
-      <div class="form-group"><label class="form-label">Description</label>
-        <input type="text" class="form-input" id="expDescInput" placeholder="e.g. Electricity bill"></div>
-      <div class="form-group"><label class="form-label">Amount (Rs.)</label>
-        <input type="number" class="form-input" id="expAmtInput" placeholder="0.00" min="0" step="0.01"></div>`,
+      <div class="form-group"><label class="form-label">${isSi ? 'විස්තරය (Description)' : 'Description'}</label>
+        <input type="text" class="form-input" id="expDescInput" placeholder="${isSi ? 'උදා: විදුලි බිල / කෑම බීම / බඩු' : 'e.g. Electricity bill / Supplies'}"></div>
+      <div class="form-group"><label class="form-label">${isSi ? 'මුදල (Amount Rs.) *' : 'Amount (Rs.) *'}</label>
+        <input type="number" class="form-input" id="expAmtInput" placeholder="0.00" min="0" step="0.01" style="font-size:1.2rem; font-weight:700;"></div>`,
       [
-        { text: 'Cancel', class: 'btn-ghost', onclick: () => this.closeModal() },
-        { text: '💾 Save Expense', class: 'btn-primary', onclick: () => {
+        { text: isSi ? 'අවලංගුයි (Cancel)' : 'Cancel', class: 'btn-ghost', onClick: () => {
+          this.closeModal();
+          if (returnToShiftModal) this.showShiftSummaryModal();
+        }},
+        { text: isSi ? '💾 වියදම සුරකින්න (Save Expense)' : '💾 Save Expense', class: 'btn-primary', onClick: () => {
           const amount = parseFloat(document.getElementById('expAmtInput')?.value) || 0;
           const desc = document.getElementById('expDescInput')?.value?.trim() || '';
           const category = document.getElementById('expCatInput')?.value || 'Other';
-          if (amount <= 0) { this.showToast('Enter a valid amount', 'error'); return; }
-          DB.addExpense({ shopId, amount, description: desc || category, category, date: new Date().toISOString().split('T')[0], createdAt: new Date().toISOString() });
+          if (amount <= 0) { this.showToast(isSi ? 'කරුණාකර නිවැරදි මුදලක් ඇතුළත් කරන්න' : 'Enter a valid amount', 'error'); return; }
+          DB.addExpense({
+            shopId,
+            amount,
+            description: desc || category,
+            category,
+            date: DB.getTodayDate(),
+            createdAt: new Date().toISOString()
+          });
           this.closeModal();
-          this.renderDashboard(shopId);
-          this.showToast('Expense saved ✅', 'success');
+          if (returnToShiftModal) {
+            this.showShiftSummaryModal();
+          } else if (this.currentPage === 'shifts') {
+            this.renderShiftsPage();
+          } else {
+            this.renderDashboard(shopId);
+          }
+          this.showToast(isSi ? '✅ වියදම සාර්ථකව සුරැකිණි!' : 'Expense saved ✅', 'success');
         }}
       ]
     );

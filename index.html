@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=35.0">
+  <link rel="stylesheet" href="style.css?v=36.0">
 </head>
 <body>
 
@@ -158,6 +158,10 @@
           <button type="button" class="btn btn-sm" onclick="App.showQuickAddCreditModal()" style="font-weight:700; padding:8px 14px; background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.35); color:var(--accent-blue); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
             <span>👤</span> <span>+ Credit Reload</span>
             <span class="top-bar-badge" id="topBarCreditBadge" style="display:none; margin-left:4px;">0</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showAddRepCreditModal()" style="font-weight:700; padding:8px 14px; background:rgba(234,88,12,0.15); border:1px solid rgba(234,88,12,0.4); color:#ea580c; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>🤝</span> <span>+ Rep Reload Credit</span>
+            <span class="top-bar-badge" id="topBarRepCreditBadge" style="display:none; background:#ea580c; color:#fff; margin-left:4px;">0</span>
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showAddExpenseModal()" style="font-weight:700; padding:8px 14px; background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); color:#f43f5e; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
             <span>💸</span> <span>+ Daily Expense</span>
@@ -462,6 +466,9 @@
             <span class="total-value" id="liveReloadSimTotal" style="font-size:1.35rem; color:var(--accent-blue);">Rs.0.00</span>
           </div>
 
+          <!-- Rep Reload Credits Due Warning Banner (Explains why SIM balance is higher) -->
+          <div id="reloadRepCreditBanner" style="display:none; margin-bottom:20px;"></div>
+
           <!-- SECTION 2: RELOAD CASH DRAWER -->
           <div class="section-divider gold">
             <div class="divider-icon">💵</div>
@@ -655,6 +662,7 @@
           </div>
           <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-primary" id="pageQuickAddCreditBtn"><span data-i18n="cred_btn_add_credit">👤 + Customer Credit</span></button>
+            <button class="btn btn-warning" onclick="App.showAddRepCreditModal()" style="font-weight:700; background:#ea580c; border-color:#ea580c; color:#fff;"><span>🤝 + Rep Reload Credit</span></button>
             <button class="btn btn-ghost" id="pageQuickAddRouterBtn" style="border:1px solid rgba(255,255,255,0.15);"><span data-i18n="cred_btn_add_router">📶 + Router Reload</span></button>
             <button class="btn btn-ghost" id="pageQuickAddTopupBtn" style="border:1px solid rgba(255,255,255,0.15);"><span data-i18n="cred_btn_add_topup">📥 + Stock Top-up</span></button>
           </div>
@@ -688,6 +696,15 @@
             <div class="card-value" id="kpiSettledCredits">Rs.0.00</div>
             <div class="card-diff neutral" id="kpiSettledCreditsCount">0 Paid</div>
           </div>
+
+          <div class="card" style="border-left:4px solid #ea580c;">
+            <div class="card-header">
+              <span class="card-title" style="color:#ea580c;">🤝 Rep Credits Due (රෙෆ් ණය)</span>
+              <div class="card-icon">🤝</div>
+            </div>
+            <div class="card-value" id="kpiRepCredits" style="color:#ea580c;">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiRepCreditsCount">0 Pending</div>
+          </div>
         </div>
 
         <!-- Filter & Search Bar -->
@@ -695,6 +712,7 @@
           <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
             <div style="display:flex; gap:8px; flex-wrap:wrap;" id="ledgerTabButtons">
               <button class="btn btn-primary btn-sm ledger-tab-btn active" data-tab="credits" data-i18n="tab_credits">👤 Customer Credits</button>
+              <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="rep_credits" style="color:#ea580c; border:1px solid rgba(234,88,12,0.35);">🤝 Rep Reload Credits (රෙෆ් ණය)</button>
               <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="routers" data-i18n="tab_routers">📶 Router Expenses</button>
               <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="topups" data-i18n="tab_topups">📥 Distributor Top-ups</button>
             </div>
@@ -1012,10 +1030,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=35.0"></script>
-  <script src="firebase-init.js?v=35.0"></script>
-  <script src="data.js?v=35.0"></script>
-  <script src="app.js?v=35.0"></script>
+  <script src="i18n.js?v=36.0"></script>
+  <script src="firebase-init.js?v=36.0"></script>
+  <script src="data.js?v=36.0"></script>
+  <script src="app.js?v=36.0"></script>
   
   <!-- Register Service Worker -->
   <script>
