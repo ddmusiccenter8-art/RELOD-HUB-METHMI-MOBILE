@@ -5071,6 +5071,115 @@ Thank you! - ${shopName}`;
 
       html += `</tbody></table>`;
       tableContainer.innerHTML = html;
+    } else if (this.currentShiftTab === 'bank-handover') {
+      // Bank Deposits & Cash Handovers table
+      const allBtx = shopId ? DB.getBankTransactions(shopId) : DB.getBankTransactions(null);
+      const btxToShow = filterDate ? allBtx.filter(b => b.date === filterDate) : allBtx;
+
+      if (btxToShow.length === 0) {
+        tableContainer.innerHTML = `
+          <div class="empty-state" style="padding:32px;">
+            <div class="empty-icon">🏦</div>
+            <div class="empty-text">${I18N.currentLang === 'si' ? 'බැංකු තැන්පතු හෝ මුදල් භාරදීම් සටහන් කිසිවක් හමු නොවීය' : 'No bank deposit or cash handover records found'}</div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="App.showQuickAddBankDepositModal()" style="margin-top:12px; background:var(--accent-purple); border-color:var(--accent-purple); font-weight:700;">
+              + ${I18N.currentLang === 'si' ? 'බැංකු තැන්පතු / මුදල් භාරදීමක් සටහන් කරන්න' : 'Record Deposit / Cash Handover'}
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      const depTotal = btxToShow.filter(b => b.type === 'deposit').reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+      const handTotal = btxToShow.filter(b => b.type === 'handover').reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+      const outTotal = btxToShow.filter(b => b.type === 'cashout').reduce((s, b) => s + (parseFloat(b.amount) || 0), 0);
+
+      let html = `
+        <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center; background:rgba(139,92,246,0.06); border:1px solid rgba(139,92,246,0.2); padding:12px 16px; border-radius:var(--radius-md); margin-bottom:14px;">
+          <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
+            <div>
+              <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">🏦 ${I18N.currentLang === 'si' ? 'බැංකු තැන්පතු එකතුව' : 'Bank Deposits'}</span>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-purple);">Rs. ${DB.formatCurrency(depTotal)}</div>
+            </div>
+            <div style="border-left:1px solid rgba(255,255,255,0.15); height:28px;"></div>
+            <div>
+              <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">🤝 ${I18N.currentLang === 'si' ? 'අතට භාරදුන් මුදල්' : 'Cash Handovers'}</span>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-green);">Rs. ${DB.formatCurrency(handTotal)}</div>
+            </div>
+            ${outTotal > 0 ? `
+            <div style="border-left:1px solid rgba(255,255,255,0.15); height:28px;"></div>
+            <div>
+              <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">💵 ${I18N.currentLang === 'si' ? 'කැෂ් අවුට්' : 'Cash Outs'}</span>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-red);">Rs. ${DB.formatCurrency(outTotal)}</div>
+            </div>` : ''}
+          </div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="App.showQuickAddBankDepositModal()" style="background:var(--accent-purple); border-color:var(--accent-purple); font-weight:700;">
+            + ${I18N.currentLang === 'si' ? 'නව සටහනක්' : 'New Record'}
+          </button>
+        </div>
+
+        <table class="data-table" style="width:100%; min-width:850px;">
+          <thead>
+            <tr>
+              <th>${I18N.currentLang === 'si' ? 'දිනය සහ වේලාව' : 'Date & Time'}</th>
+              <th>${I18N.currentLang === 'si' ? 'ශාඛාව (Branch)' : 'Branch'}</th>
+              <th style="text-align:center;">${I18N.currentLang === 'si' ? 'වර්ගය' : 'Type'}</th>
+              <th>${I18N.currentLang === 'si' ? 'බැංකුව / භාරගත් කෙනා' : 'Bank / Handover To'}</th>
+              <th style="text-align:right;">${I18N.currentLang === 'si' ? 'මුදල (Rs.)' : 'Amount (Rs.)'}</th>
+              <th>${I18N.currentLang === 'si' ? 'භාරදුන් / යැවූ කෙනා' : 'Staff / Cashier'}</th>
+              <th style="text-align:center;">${I18N.currentLang === 'si' ? 'ස්ලිප් / රිසිට්පත' : 'Slip / Receipt'}</th>
+              <th>${I18N.currentLang === 'si' ? 'විස්තරය / සටහන්' : 'Remarks / Notes'}</th>
+              <th style="text-align:center;">${I18N.currentLang === 'si' ? 'ක්‍රියා' : 'Actions'}</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      btxToShow.forEach(b => {
+        const shop = DB.getShop(b.shopId);
+        const shopName = shop ? shop.name : (b.shopId || '--');
+        const typeBadge = b.type === 'handover'
+          ? `<span style="background:rgba(16,185,129,0.15); color:var(--accent-green); padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem; border:1px solid rgba(16,185,129,0.3);">🤝 Handover</span>`
+          : b.type === 'cashout'
+          ? `<span style="background:rgba(239,68,68,0.15); color:var(--accent-red); padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem; border:1px solid rgba(239,68,68,0.3);">💵 Cash Out</span>`
+          : `<span style="background:rgba(139,92,246,0.15); color:var(--accent-purple); padding:4px 8px; border-radius:6px; font-weight:700; font-size:0.75rem; border:1px solid rgba(139,92,246,0.3);">🏦 Bank Deposit</span>`;
+
+        const dest = b.type === 'handover' ? (b.handoverTo || 'Owner / Collector') : (b.bank || 'Bank');
+        const slipHtml = b.receiptPhoto
+          ? `<div style="display:inline-flex; align-items:center; gap:6px; cursor:pointer;" onclick="App.openImageZoomModal('${b.receiptPhoto}', 'Deposit Slip - ${dest.replace(/'/g, "\\'")}')">
+               <img src="${b.receiptPhoto}" style="width:36px; height:36px; object-fit:cover; border-radius:6px; border:1px solid var(--accent-purple); box-shadow:0 2px 5px rgba(0,0,0,0.2);">
+               <span style="font-size:0.72rem; color:var(--accent-purple); font-weight:700; text-decoration:underline;">🔍 View</span>
+             </div>`
+          : `<span style="color:var(--text-muted); font-size:0.75rem;">--</span>`;
+
+        const retNote = b.returnAmount > 0
+          ? `<div style="font-size:0.72rem; color:var(--text-muted);">(Sent: Rs. ${DB.formatCurrency(b.sentAmount)}, Ret: Rs. ${DB.formatCurrency(b.returnAmount)})</div>`
+          : '';
+
+        html += `
+          <tr style="border-bottom:1px solid var(--border-glass);">
+            <td>
+              <div style="font-weight:700;">${DB.formatDate(b.date)}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted);">${b.time || DB.formatTime(b.timestamp)}</div>
+            </td>
+            <td><span class="shop-badge" style="font-size:0.75rem;">🏪 ${shopName}</span></td>
+            <td style="text-align:center;">${typeBadge}</td>
+            <td style="font-weight:700; color:var(--text-primary);">${dest}</td>
+            <td style="text-align:right; font-weight:800; font-size:1.05rem; color:${b.type === 'cashout' ? 'var(--accent-red)' : 'var(--accent-green)'};">
+              Rs. ${DB.formatCurrency(b.amount)}
+              ${retNote}
+            </td>
+            <td style="font-weight:600;">${b.depositedBy || '--'}</td>
+            <td style="text-align:center;">${slipHtml}</td>
+            <td style="font-size:0.8rem; color:var(--text-secondary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${b.note || ''}">${b.note || '--'}</td>
+            <td style="text-align:center;">
+              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteBankTransaction('${b.id}')" title="Delete Record">🗑️</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      html += `</tbody></table>`;
+      tableContainer.innerHTML = html;
     } else {
       // Expenses table
       const expensesToShow = filterDate ? allExpenses.filter(e => e.date === filterDate) : allExpenses;
@@ -5786,68 +5895,271 @@ Thank you! - ${shopName}`;
   },
 
   // ================================================================
-  // QUICK ACTIONS: BANK DEPOSIT & CASH OUT
+  // QUICK ACTIONS: BANK DEPOSIT, CASH HANDOVER & CASH OUT
   // ================================================================
-  showQuickAddBankDepositModal() {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) {
-      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
-      return;
-    }
-    const shop = DB.getShop(shopId);
+  quickBtxMode: 'deposit',
+  tempBtxReceiptPhoto: '',
+  tempBtxReceiptSizeKB: 0,
+
+  showQuickAddBankDepositModal(initialMode = 'deposit') {
+    const defaultShopId = DB.getActiveShopId();
+    const shops = DB.getShops(true);
     const today = DB.getTodayDate();
+    const now = new Date();
+    const currentTime = now.toTimeString().substring(0, 5); // "HH:MM"
+
+    this.quickBtxMode = initialMode;
+    this.tempBtxReceiptPhoto = '';
+    this.tempBtxReceiptSizeKB = 0;
+
+    let shopOptions = '';
+    shops.forEach(s => {
+      shopOptions += `<option value="${s.id}" ${s.id === defaultShopId ? 'selected' : ''}>🏪 ${s.name}</option>`;
+    });
+
+    const isSi = I18N.currentLang === 'si';
 
     const bodyHtml = `
-      <form id="bankDepositForm" style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
-          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+      <form id="bankDepositForm" style="display:flex; flex-direction:column; gap:14px;" onsubmit="event.preventDefault(); App.saveQuickBankDeposit();">
+        <!-- 1. Mode Switcher Tabs -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; background:rgba(0,0,0,0.25); padding:4px; border-radius:10px; border:1px solid rgba(255,255,255,0.08);">
+          <button type="button" id="tabBtxDeposit" class="btn btn-sm" onclick="App.setQuickBtxMode('deposit')" style="font-weight:700; font-size:0.78rem; padding:8px 4px; border-radius:8px; border:none; ${initialMode === 'deposit' ? 'background:var(--accent-purple); color:#fff;' : 'background:transparent; color:var(--text-secondary);'}">
+            🏦 ${isSi ? 'බැංකු තැන්පතුව' : 'Bank Deposit'}
+          </button>
+          <button type="button" id="tabBtxHandover" class="btn btn-sm" onclick="App.setQuickBtxMode('handover')" style="font-weight:700; font-size:0.78rem; padding:8px 4px; border-radius:8px; border:none; ${initialMode === 'handover' ? 'background:var(--accent-green); color:#fff;' : 'background:transparent; color:var(--text-secondary);'}">
+            🤝 ${isSi ? 'අතට භාරදීම' : 'Cash Handover'}
+          </button>
+          <button type="button" id="tabBtxCashout" class="btn btn-sm" onclick="App.setQuickBtxMode('cashout')" style="font-weight:700; font-size:0.78rem; padding:8px 4px; border-radius:8px; border:none; ${initialMode === 'cashout' ? 'background:var(--accent-red); color:#fff;' : 'background:transparent; color:var(--text-secondary);'}">
+            💵 ${isSi ? 'කැෂ් අවුට්' : 'Cash Out'}
+          </button>
         </div>
-        <div style="background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-purple);">
-          💡 ලාච්චුවේ මුදල් බැංකුවට යවා තැන්පත් කිරීමේදී (Deposit) මුදල සහ CDM මැෂිමෙන්/බැංකුවෙන් ප්‍රතික්ෂේප වී ආපසු ගෙනා නෝට්ටු ඇත්නම් එය අඩු කර සත්‍ය තැන්පතු මුදල (Net Deposit) සටහන් වේ.
+
+        <!-- 2. Helper Hint -->
+        <div id="quickBtxHelperText" style="background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.83rem; color:var(--accent-purple);">
+          💡 ${isSi ? 'දුර බැංකුවලට හෝ CDM මැෂින් වලට මුදල් තැන්පත් කිරීමේදී සටහන් කර රිසිට්පත (Slip) අමුණන්න. ක්ෂණිකව සියලුම දුරකථන සහ පරිගණක වලට Live sync වේ.' : 'Record bank/CDM deposits or distant branch cash handovers with receipt slip photo upload. Syncs across all devices in real-time.'}
         </div>
-        <div class="form-group">
-          <label class="form-label">🏦 ${I18N.t('upd_bank_name_lbl') || 'Select Bank'}</label>
-          <select class="form-select" id="quickDepositBank">
-            <option value="HNB Bank" selected>HNB Bank</option>
-            <option value="Commercial Bank">Commercial Bank</option>
-            <option value="Sampath Bank">Sampath Bank</option>
-            <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
-            <option value="People's Bank">People's Bank</option>
-            <option value="Seylan Bank">Seylan Bank</option>
-            <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
-          </select>
-        </div>
+
+        <!-- 3. Branch & Staff Row -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <div class="form-group">
-            <label class="form-label" style="font-weight:700; color:var(--accent-purple);">📤 Sent Amount (Rs.)</label>
-            <input type="number" step="0.01" min="0" class="form-input" id="quickDepositSentAmount" placeholder="0.00" oninput="App.recalcBankDepositNet()" style="font-size:1.15rem; font-weight:700;" required>
-            <small style="font-size:0.75rem; color:var(--text-secondary);">කඩෙන් බැංකුවට යැවූ මුදල</small>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ශාඛාව (Branch / Shop)' : 'Branch / Shop'} *</label>
+            <select class="form-select" id="quickBtxShopId" required>
+              ${shopOptions}
+            </select>
           </div>
-          <div class="form-group">
-            <label class="form-label" style="font-weight:700; color:#ef4444;">↩️ Return / Reject Cash</label>
-            <input type="number" step="0.01" min="0" class="form-input" id="quickDepositReturnAmount" placeholder="0.00" oninput="App.recalcBankDepositNet()" style="font-size:1.15rem; font-weight:700;">
-            <small style="font-size:0.75rem; color:var(--text-secondary);">නැවත ගෙන ආ නෝට්ටු</small>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'භාරදුන් / යැවූ කෙනා (Staff)' : 'Handed / Deposited By'} *</label>
+            <input type="text" class="form-input" id="quickBtxStaffName" placeholder="e.g. Kasun / Dinuka / Cashier" required>
           </div>
         </div>
-        <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:var(--radius-sm); padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:0.9rem; font-weight:600; color:#059669;">💰 Actual Net Deposited:</span>
-          <span id="quickDepositNetDisplay" style="font-size:1.25rem; font-weight:800; color:#059669;">Rs. 0.00</span>
+
+        <!-- 4. Date & Time Row -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'දිනය (Date)' : 'Date'} *</label>
+            <input type="date" class="form-input" id="quickBtxDate" value="${today}" required>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'වේලාව (Time)' : 'Time'} *</label>
+            <input type="time" class="form-input" id="quickBtxTime" value="${currentTime}" required>
+          </div>
         </div>
-        <div class="form-group">
-          <label class="form-label">📝 Remarks / Reference</label>
-          <input type="text" class="form-input" id="quickDepositNote" placeholder="e.g. CDM Deposit ref, Cashier name">
+
+        <!-- 5A. MODE: Bank Deposit Fields -->
+        <div id="quickBtxDepositFields" style="display:${initialMode === 'deposit' ? 'flex' : 'none'}; flex-direction:column; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">🏦 ${isSi ? 'බැංකුව (Bank Name / CDM)' : 'Select Bank / CDM'} *</label>
+            <select class="form-select" id="quickDepositBank">
+              <option value="Commercial Bank" selected>Commercial Bank</option>
+              <option value="HNB Bank">HNB Bank</option>
+              <option value="Sampath Bank">Sampath Bank</option>
+              <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
+              <option value="People's Bank">People's Bank</option>
+              <option value="Seylan Bank">Seylan Bank</option>
+              <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
+              <option value="Other Bank">Other Bank / CDM</option>
+            </select>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-weight:700; color:var(--accent-purple);">📤 ${isSi ? 'යැවූ මුදල (Sent Rs.)' : 'Sent Amount (Rs.)'} *</label>
+              <input type="number" step="0.01" min="1" class="form-input" id="quickDepositSentAmount" placeholder="0.00" oninput="App.recalcBankDepositNet()" style="font-size:1.15rem; font-weight:700;">
+              <small style="font-size:0.73rem; color:var(--text-secondary);">${isSi ? 'කඩෙන් බැංකුවට යැවූ සම්පූර්ණ මුදල' : 'Total cash sent from drawer'}</small>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label" style="font-weight:700; color:#ef4444;">↩️ ${isSi ? 'ආපසු ලැබුණු නෝට්ටු (Rs.)' : 'Returned / Reject'}</label>
+              <input type="number" step="0.01" min="0" class="form-input" id="quickDepositReturnAmount" placeholder="0.00" oninput="App.recalcBankDepositNet()" style="font-size:1.15rem; font-weight:700;">
+              <small style="font-size:0.73rem; color:var(--text-secondary);">${isSi ? 'CDM නොගත් / නැවත ගෙන ආ මුදල්' : 'Rejected notes brought back'}</small>
+            </div>
+          </div>
+          <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:var(--radius-sm); padding:10px 14px; display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:0.85rem; font-weight:600; color:#059669;">💰 ${isSi ? 'සත්‍ය තැන්පතු මුදල (Net Deposit):' : 'Actual Net Deposited:'}</span>
+            <span id="quickDepositNetDisplay" style="font-size:1.25rem; font-weight:800; color:#059669;">Rs. 0.00</span>
+          </div>
+        </div>
+
+        <!-- 5B. MODE: Cash Handover Fields -->
+        <div id="quickBtxHandoverFields" style="display:${initialMode === 'handover' ? 'flex' : 'none'}; flex-direction:column; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-weight:700; color:var(--accent-green);">💵 ${isSi ? 'අතට භාරදුන් මුදල (Handover Rs.)' : 'Handover Amount (Rs.)'} *</label>
+            <input type="number" step="0.01" min="1" class="form-input" id="quickHandoverAmount" placeholder="0.00" style="font-size:1.25rem; font-weight:800; color:var(--accent-green);">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">👤 ${isSi ? 'මුදල් භාරගත් කෙනා (Handover To - Owner / Collector)' : 'Handed Over To (Recipient)'} *</label>
+            <input type="text" class="form-input" id="quickHandoverTo" placeholder="e.g. Kasun (Owner) / Supun (Collector)">
+            <small style="font-size:0.73rem; color:var(--text-secondary);">${isSi ? 'දුර ශාඛාවෙන් මුදල් එකතු කරගත් අයිතිකරු හෝ නියෝජිතයා' : 'Owner or agent collecting money from branch'}</small>
+          </div>
+        </div>
+
+        <!-- 5C. MODE: Cash Out Fields -->
+        <div id="quickBtxCashoutFields" style="display:${initialMode === 'cashout' ? 'flex' : 'none'}; flex-direction:column; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">🏦 ${isSi ? 'බැංකුව / ගිණුම' : 'Bank / Account'}</label>
+            <select class="form-select" id="quickCashoutBank">
+              <option value="Commercial Bank" selected>Commercial Bank</option>
+              <option value="HNB Bank">HNB Bank</option>
+              <option value="Sampath Bank">Sampath Bank</option>
+              <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
+              <option value="People's Bank">People's Bank</option>
+              <option value="Other">Other Counter Account</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label" style="font-weight:700; color:var(--accent-red);">💵 ${isSi ? 'කැෂ් අවුට් මුදල (Cash Out Rs.)' : 'Cash Out Amount (Rs.)'} *</label>
+            <input type="number" step="0.01" min="1" class="form-input" id="quickCashoutAmount" placeholder="0.00" style="font-size:1.25rem; font-weight:800; color:var(--accent-red);">
+          </div>
+        </div>
+
+        <!-- 6. Slip / Receipt Photo Upload (Strict Low-KB Compression) -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>📸 ${isSi ? 'බැංකු ස්ලිප් / රිසිට්පත් ඡායාරූපය (Slip / Receipt)' : 'Bank Slip / Receipt Photo'}</span>
+            <span style="font-size:0.72rem; color:var(--text-secondary); font-weight:normal;">Strict low-KB (<30KB)</span>
+          </label>
+          <input type="file" id="quickBtxReceiptInput" accept="image/*" capture="environment" style="display:none;" onchange="App.handleBtxReceiptUpload(this)">
+          
+          <div id="quickBtxReceiptContainer" style="border:2px dashed rgba(255,255,255,0.18); border-radius:10px; padding:12px; text-align:center; background:rgba(0,0,0,0.2); cursor:pointer;" onclick="document.getElementById('quickBtxReceiptInput').click()">
+            <div style="font-size:1.8rem; margin-bottom:4px;">📸</div>
+            <div style="font-size:0.83rem; font-weight:700; color:var(--text-primary);">${isSi ? 'ඡායාරූපය ගන්න හෝ ගැලරියෙන් තෝරන්න' : 'Snap photo or choose from gallery'}</div>
+            <div style="font-size:0.73rem; color:var(--text-muted); margin-top:2px;">${isSi ? 'ස්වයංක්‍රීයව KB ගණනකින් compress වී සුරැකේ (අංක පැහැදිලිව පෙනේ)' : 'Auto-compressed to ~20KB keeping all printed numbers crystal clear'}</div>
+          </div>
+        </div>
+
+        <!-- 7. Remarks / Reference Notes -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">📝 ${isSi ? 'විස්තරය / සටහන් (Remarks / Reference)' : 'Remarks / Reference'}</label>
+          <input type="text" class="form-input" id="quickBtxNote" placeholder="e.g. CDM slip #, transaction ref, Kasun handover">
         </div>
       </form>
     `;
 
     this.showModal(
-      `🏦 ${I18N.t('top_btn_bank_deposit') || '+ Bank Deposit'}`,
+      `🏦 ${isSi ? 'බැංකු තැන්පතු සහ මුදල් භාරදීම' : 'Bank Deposit & Cash Handover'}`,
       bodyHtml,
-      `
-        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
-        <button type="button" class="btn btn-primary" onclick="App.saveQuickBankDeposit()" style="background:var(--accent-purple); border-color:var(--accent-purple);">💾 Save Deposit</button>
-      `
+      [
+        { text: isSi ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? '💾 සටහන් කරන්න' : '💾 Save Record', class: 'btn-primary', onClick: () => this.saveQuickBankDeposit() }
+      ]
     );
+  },
+
+  setQuickBtxMode(mode) {
+    this.quickBtxMode = mode;
+    const isSi = I18N.currentLang === 'si';
+
+    const tabDep = document.getElementById('tabBtxDeposit');
+    const tabHand = document.getElementById('tabBtxHandover');
+    const tabOut = document.getElementById('tabBtxCashout');
+    const fDep = document.getElementById('quickBtxDepositFields');
+    const fHand = document.getElementById('quickBtxHandoverFields');
+    const fOut = document.getElementById('quickBtxCashoutFields');
+    const helper = document.getElementById('quickBtxHelperText');
+
+    if (tabDep) {
+      tabDep.style.background = mode === 'deposit' ? 'var(--accent-purple)' : 'transparent';
+      tabDep.style.color = mode === 'deposit' ? '#fff' : 'var(--text-secondary)';
+    }
+    if (tabHand) {
+      tabHand.style.background = mode === 'handover' ? 'var(--accent-green)' : 'transparent';
+      tabHand.style.color = mode === 'handover' ? '#fff' : 'var(--text-secondary)';
+    }
+    if (tabOut) {
+      tabOut.style.background = mode === 'cashout' ? 'var(--accent-red)' : 'transparent';
+      tabOut.style.color = mode === 'cashout' ? '#fff' : 'var(--text-secondary)';
+    }
+
+    if (fDep) fDep.style.display = mode === 'deposit' ? 'flex' : 'none';
+    if (fHand) fHand.style.display = mode === 'handover' ? 'flex' : 'none';
+    if (fOut) fOut.style.display = mode === 'cashout' ? 'flex' : 'none';
+
+    if (helper) {
+      if (mode === 'deposit') {
+        helper.style.background = 'rgba(139,92,246,0.08)';
+        helper.style.borderColor = 'rgba(139,92,246,0.25)';
+        helper.style.color = 'var(--accent-purple)';
+        helper.textContent = isSi ? '💡 දුර බැංකුවලට හෝ CDM මැෂින් වලට මුදල් තැන්පත් කිරීමේදී සටහන් කර රිසිට්පත (Slip) අමුණන්න. ක්ෂණිකව සියලුම දුරකථන සහ පරිගණක වලට Live sync වේ.' : '💡 Record bank/CDM deposits with receipt slip photo upload. Syncs across all devices in real-time.';
+      } else if (mode === 'handover') {
+        helper.style.background = 'rgba(16,185,129,0.08)';
+        helper.style.borderColor = 'rgba(16,185,129,0.25)';
+        helper.style.color = 'var(--accent-green)';
+        helper.textContent = isSi ? '💡 දුර ශාඛාවලින් අයිතිකරුට හෝ එකතු කරන්නාට මුදල් අතට භාරදීමේදී දිනය, වේලාව, භාරදුන් සහ භාරගත් නම් සටහන් කරන්න.' : '💡 Record physical cash handovers from distant branches to owner or collector with date, time, and signatures/receipts.';
+      } else {
+        helper.style.background = 'rgba(239,68,68,0.08)';
+        helper.style.borderColor = 'rgba(239,68,68,0.25)';
+        helper.style.color = 'var(--accent-red)';
+        helper.textContent = isSi ? '💡 පාරිභෝගිකයින්ට මුදල් ලබාදීම හෝ කවුන්ටරයෙන් කැෂ් අවුට් ලබාගත් විට මෙහි සටහන් කරන්න.' : '💡 Record counter withdrawals and customer cashouts.';
+      }
+    }
+  },
+
+  async handleBtxReceiptUpload(inputEl) {
+    const file = inputEl.files && inputEl.files[0];
+    if (!file) return;
+
+    const isSi = I18N.currentLang === 'si';
+    try {
+      this.showToast(isSi ? '📷 රිසිට්පත සකසමින් පවතී...' : 'Compressing receipt photo...', 'info');
+      const res = await this.compressImageFile(file, 600, 600, 0.55);
+      this.tempBtxReceiptPhoto = res.dataUrl;
+      this.tempBtxReceiptSizeKB = Math.round(res.compressedSize / 1024);
+
+      const container = document.getElementById('quickBtxReceiptContainer');
+      if (container) {
+        container.innerHTML = `
+          <div style="display:flex; align-items:center; gap:12px; text-align:left;">
+            <img src="${res.dataUrl}" style="width:58px; height:58px; object-fit:cover; border-radius:8px; border:2px solid var(--accent-purple); cursor:pointer;" onclick="event.stopPropagation(); App.openImageZoomModal('${res.dataUrl}', 'Deposit Slip Preview')">
+            <div style="flex:1;">
+              <div style="font-size:0.83rem; font-weight:700; color:var(--text-primary);">${isSi ? 'රිසිට්පත සාර්ථකව අමුණන ලදී' : 'Receipt Photo Attached'}</div>
+              <div style="font-size:0.75rem; color:#10b981; font-weight:700; margin-top:2px;">✅ ${this.tempBtxReceiptSizeKB} KB (${res.savedPercent}% compressed)</div>
+              <div style="display:flex; gap:8px; margin-top:4px;">
+                <button type="button" class="btn btn-xs btn-ghost" onclick="event.stopPropagation(); App.openImageZoomModal('${res.dataUrl}', 'Deposit Slip Preview')" style="padding:2px 8px; font-size:0.72rem; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">🔍 View / Zoom</button>
+                <button type="button" class="btn btn-xs btn-danger" onclick="event.stopPropagation(); App.removeBtxReceiptPhoto()" style="padding:2px 8px; font-size:0.72rem;">✕ Remove</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      this.showToast(`✅ ${isSi ? 'රිසිට්පත අමුණන ලදී' : 'Receipt attached'} (${this.tempBtxReceiptSizeKB} KB)`, 'success');
+    } catch (err) {
+      console.error('Receipt upload error:', err);
+      this.showToast(isSi ? 'රිසිට්පත් ඡායාරූපය කියවීමට නොහැකි විය' : 'Failed to process receipt photo', 'error');
+    }
+  },
+
+  removeBtxReceiptPhoto() {
+    this.tempBtxReceiptPhoto = '';
+    this.tempBtxReceiptSizeKB = 0;
+    const isSi = I18N.currentLang === 'si';
+    const container = document.getElementById('quickBtxReceiptContainer');
+    if (container) {
+      container.innerHTML = `
+        <div style="font-size:1.8rem; margin-bottom:4px;">📸</div>
+        <div style="font-size:0.83rem; font-weight:700; color:var(--text-primary);">${isSi ? 'ඡායාරූපය ගන්න හෝ ගැලරියෙන් තෝරන්න' : 'Snap photo or choose from gallery'}</div>
+        <div style="font-size:0.73rem; color:var(--text-muted); margin-top:2px;">${isSi ? 'ස්වයංක්‍රීයව KB ගණනකින් compress වී සුරැකේ (අංක පැහැදිලිව පෙනේ)' : 'Auto-compressed to ~20KB keeping all printed numbers crystal clear'}</div>
+      `;
+    }
+    const inp = document.getElementById('quickBtxReceiptInput');
+    if (inp) inp.value = '';
   },
 
   recalcBankDepositNet() {
@@ -5861,113 +6173,110 @@ Thank you! - ${shopName}`;
   },
 
   saveQuickBankDeposit() {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) return;
-    const bank = document.getElementById('quickDepositBank')?.value || 'HNB Bank';
-    const sent = parseFloat(document.getElementById('quickDepositSentAmount')?.value) || 0;
-    const returned = parseFloat(document.getElementById('quickDepositReturnAmount')?.value) || 0;
-    const net = Math.max(0, sent - returned);
-    const userNote = document.getElementById('quickDepositNote')?.value?.trim() || '';
-
-    if (sent <= 0) {
-      this.showToast('කරුණාකර යැවූ මුදල (Sent Amount) ඇතුළත් කරන්න', 'error');
+    const isSi = I18N.currentLang === 'si';
+    const shopId = document.getElementById('quickBtxShopId')?.value || DB.getActiveShopId();
+    if (!shopId) {
+      this.showToast(isSi ? 'කරුණාකර ශාඛාවක් තෝරන්න' : 'Please select a shop/branch', 'error');
       return;
     }
 
-    let noteText = userNote;
-    if (returned > 0) {
-      const returnTag = `(Sent: Rs. ${DB.formatCurrency(sent)}, Returned: Rs. ${DB.formatCurrency(returned)})`;
-      noteText = noteText ? `${noteText} ${returnTag}` : returnTag;
+    const staffName = (document.getElementById('quickBtxStaffName')?.value || '').trim();
+    const date = document.getElementById('quickBtxDate')?.value || DB.getTodayDate();
+    const time = document.getElementById('quickBtxTime')?.value || '';
+    const userNote = (document.getElementById('quickBtxNote')?.value || '').trim();
+    const mode = this.quickBtxMode || 'deposit';
+
+    let amount = 0;
+    let sentAmount = 0;
+    let returnAmount = 0;
+    let bank = '';
+    let handoverTo = '';
+    let finalNote = userNote;
+
+    if (mode === 'deposit') {
+      bank = document.getElementById('quickDepositBank')?.value || 'Commercial Bank';
+      sentAmount = parseFloat(document.getElementById('quickDepositSentAmount')?.value) || 0;
+      returnAmount = parseFloat(document.getElementById('quickDepositReturnAmount')?.value) || 0;
+      amount = Math.max(0, sentAmount - returnAmount);
+
+      if (sentAmount <= 0) {
+        this.showToast(isSi ? 'කරුණාකර යැවූ මුදල (Sent Amount) ඇතුළත් කරන්න' : 'Please enter sent amount', 'error');
+        return;
+      }
+      if (amount <= 0) amount = sentAmount;
+
+      if (returnAmount > 0) {
+        const retTag = `(Sent: Rs. ${DB.formatCurrency(sentAmount)}, Returned: Rs. ${DB.formatCurrency(returnAmount)})`;
+        finalNote = finalNote ? `${finalNote} ${retTag}` : retTag;
+      }
+    } else if (mode === 'handover') {
+      amount = parseFloat(document.getElementById('quickHandoverAmount')?.value) || 0;
+      handoverTo = (document.getElementById('quickHandoverTo')?.value || '').trim();
+
+      if (amount <= 0) {
+        this.showToast(isSi ? 'කරුණාකර අතට භාරදුන් මුදල ඇතුළත් කරන්න' : 'Please enter handover amount', 'error');
+        return;
+      }
+      if (!handoverTo) {
+        this.showToast(isSi ? 'කරුණාකර මුදල් භාරගත් කෙනාගේ නම ඇතුළත් කරන්න' : 'Please enter recipient name', 'error');
+        return;
+      }
+    } else {
+      // Cashout
+      amount = parseFloat(document.getElementById('quickCashoutAmount')?.value) || 0;
+      bank = document.getElementById('quickCashoutBank')?.value || 'Commercial Bank';
+
+      if (amount <= 0) {
+        this.showToast(isSi ? 'කරුණාකර කැෂ් අවුට් මුදල ඇතුළත් කරන්න' : 'Please enter cashout amount', 'error');
+        return;
+      }
     }
 
-    DB.addBankTransaction({
+    const item = DB.addBankTransaction({
       shopId,
-      type: 'deposit',
+      type: mode,
       bank,
-      amount: net > 0 ? net : sent,
-      note: noteText,
-      sentAmount: sent,
-      returnAmount: returned
+      amount,
+      sentAmount,
+      returnAmount,
+      handoverTo,
+      depositedBy: staffName,
+      receiptPhoto: this.tempBtxReceiptPhoto,
+      receiptPhotoSize: this.tempBtxReceiptSizeKB ? (this.tempBtxReceiptSizeKB + ' KB') : '',
+      date,
+      time,
+      note: finalNote
     });
 
     this.closeModal();
-    this.showToast(`✅ Rs. ${DB.formatCurrency(net > 0 ? net : sent)} බැංකුවට තැන්පත් කිරීම සාර්ථකයි!`, 'success');
-    this.refreshPage(this.currentPage);
+    const typeLabel = mode === 'deposit' ? 'බැංකු තැන්පතුව' : mode === 'handover' ? 'මුදල් භාරදීම' : 'කැෂ් අවුට්';
+    this.showToast(`✅ Rs. ${DB.formatCurrency(amount)} ${typeLabel} සාර්ථකව සටහන් විය!`, 'success');
+
+    if (this.currentPage === 'shifts') {
+      this.renderShiftsPage();
+    } else {
+      this.refreshPage(this.currentPage);
+    }
   },
 
   showQuickAddCashOutModal() {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) {
-      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
-      return;
-    }
-    const shop = DB.getShop(shopId);
-    const today = DB.getTodayDate();
-
-    const bodyHtml = `
-      <form id="cashOutForm" style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
-          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
-        </div>
-        <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-green);">
-          💡 පාරිභෝගිකයින්ට මුදල් ලබාදීම හෝ බැංකුවෙන් කැෂ් අවුට් ලබාගත් විට මෙහි සටහන් කරන්න.
-        </div>
-        <div class="form-group">
-          <label class="form-label">🏦 ${I18N.t('upd_bank_name_lbl') || 'Select Bank / Account'}</label>
-          <select class="form-select" id="quickCashOutBank">
-            <option value="HNB Bank" selected>HNB Bank</option>
-            <option value="Commercial Bank">Commercial Bank</option>
-            <option value="Sampath Bank">Sampath Bank</option>
-            <option value="Bank of Ceylon (BOC)">Bank of Ceylon (BOC)</option>
-            <option value="People's Bank">People's Bank</option>
-            <option value="Seylan Bank">Seylan Bank</option>
-            <option value="Nations Trust Bank (NTB)">Nations Trust Bank (NTB)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label" style="font-weight:700; color:var(--accent-green);">💵 Cash Out Amount (Rs.)</label>
-          <input type="number" step="0.01" min="1" class="form-input" id="quickCashOutAmount" placeholder="0.00" style="font-size:1.3rem; font-weight:800; color:var(--accent-green);" required>
-        </div>
-        <div class="form-group">
-          <label class="form-label">📝 Remarks / Customer Ref</label>
-          <input type="text" class="form-input" id="quickCashOutNote" placeholder="e.g. Customer withdrawal, Counter cashout">
-        </div>
-      </form>
-    `;
-
-    this.showModal(
-      `💵 ${I18N.t('top_btn_cash_out') || '+ Cash Out'}`,
-      bodyHtml,
-      `
-        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
-        <button type="button" class="btn btn-success" onclick="App.saveQuickCashOut()">💾 Save Cash Out</button>
-      `
-    );
+    this.showQuickAddBankDepositModal('cashout');
   },
 
   saveQuickCashOut() {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) return;
-    const bank = document.getElementById('quickCashOutBank')?.value || 'HNB Bank';
-    const amount = parseFloat(document.getElementById('quickCashOutAmount')?.value) || 0;
-    const note = document.getElementById('quickCashOutNote')?.value || '';
+    this.saveQuickBankDeposit();
+  },
 
-    if (amount <= 0) {
-      this.showToast('කරුණාකර නිවැරදි මුදලක් ඇතුළත් කරන්න (Please enter a valid amount)', 'error');
-      return;
+  promptDeleteBankTransaction(id) {
+    const isSi = I18N.currentLang === 'si';
+    if (!confirm(isSi ? 'මෙම බැංකු තැන්පතු හෝ මුදල් භාරදීම් සටහන ඉවත් කිරීමට ඔබට විශ්වාසද?' : 'Are you sure you want to delete this bank/handover transaction?')) return;
+    DB.deleteBankTransaction(id);
+    this.showToast(isSi ? 'සටහන ඉවත් කරන ලදී' : 'Record deleted', 'info');
+    if (this.currentPage === 'shifts') {
+      this.renderShiftsPage();
+    } else {
+      this.refreshPage(this.currentPage);
     }
-
-    DB.addBankTransaction({
-      shopId,
-      type: 'cashout',
-      bank,
-      amount,
-      note
-    });
-
-    this.closeModal();
-    this.showToast(`✅ ${DB.formatCurrency(amount)} කැෂ් අවුට් සටහන් කිරීම සාර්ථකයි!`, 'success');
-    this.refreshPage(this.currentPage);
   },
 
   // ================================================================
@@ -6448,7 +6757,7 @@ Thank you! - ${shopName}`;
   devCreditActiveFilter: 'all',
   tempDevCreditPhotos: {},
 
-  compressImageFile(file, maxWidth = 640, maxHeight = 640, initialQuality = 0.6) {
+  compressImageFile(file, maxWidth = 600, maxHeight = 600, initialQuality = 0.55) {
     return new Promise((resolve, reject) => {
       if (!file) return reject(new Error('No file provided'));
 
@@ -6477,7 +6786,7 @@ Thank you! - ${shopName}`;
           let width = img.width;
           let height = img.height;
 
-          // Proportional scale down to max 640x640 (crystal clear text/faces, lightweight <35KB)
+          // Proportional scale down to max 600x600 (sharp digits & text, ultralight)
           if (width > height) {
             if (width > maxWidth) {
               height = Math.round((height * maxWidth) / width);
@@ -6490,10 +6799,10 @@ Thank you! - ${shopName}`;
             }
           }
 
-          const canvas = document.createElement('canvas');
+          let canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
-          const ctx = canvas.getContext('2d');
+          let ctx = canvas.getContext('2d');
           
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, width, height);
@@ -6502,11 +6811,32 @@ Thank you! - ${shopName}`;
           let quality = initialQuality;
           let dataUrl = canvas.toDataURL('image/jpeg', quality);
 
-          // Progressive reduction so base64 string stays under 45,000 characters (~33KB)
-          // Guarantees entire agreement document never approaches Firestore 1MB limit!
-          while (dataUrl.length > 45000 && quality > 0.25) {
-            quality -= 0.08;
+          // Phase 1: Progressive quality reduction down to 0.20
+          // 36,000 chars base64 = ~27KB compressed binary
+          while (dataUrl.length > 36000 && quality > 0.20) {
+            quality -= 0.05;
             dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+
+          // Phase 2: If photo is still > 36,000 characters (ultra-high-frequency camera shot),
+          // downscale canvas dimensions to 80% (e.g. 480x480) and re-encode
+          if (dataUrl.length > 36000) {
+            const scaledWidth = Math.round(width * 0.8);
+            const scaledHeight = Math.round(height * 0.8);
+            const smallCanvas = document.createElement('canvas');
+            smallCanvas.width = scaledWidth;
+            smallCanvas.height = scaledHeight;
+            const smallCtx = smallCanvas.getContext('2d');
+            smallCtx.fillStyle = '#ffffff';
+            smallCtx.fillRect(0, 0, scaledWidth, scaledHeight);
+            smallCtx.drawImage(canvas, 0, 0, scaledWidth, scaledHeight);
+            
+            quality = 0.38;
+            dataUrl = smallCanvas.toDataURL('image/jpeg', quality);
+            while (dataUrl.length > 36000 && quality > 0.18) {
+              quality -= 0.05;
+              dataUrl = smallCanvas.toDataURL('image/jpeg', quality);
+            }
           }
 
           const head = 'data:image/jpeg;base64,';
@@ -8433,18 +8763,29 @@ Thank you! - ${shopName}`;
     window.open(url, '_blank');
   },
 
+  isTorchOn: false,
+
   openImeiScannerModal(targetInputId = null) {
+    const isSi = I18N.currentLang === 'si';
     const bodyHtml = `
-      <div style="display:flex; flex-direction:column; gap:14px; text-align:center;">
-        <div style="font-size:0.85rem; color:var(--text-secondary);">
-          ${I18N.currentLang === 'si' ? 'දුරකථන පෙට්ටියේ හෝ ස්ටිකරයේ ඇති IMEI බාර්කෝඩ් එක කැමරාව ඉදිරියට පෙන්වන්න, නැතහොත් අතින් ඇතුළත් කරන්න:' : 'Point your camera at the phone box barcode / IMEI, or enter manually below:'}
+      <div style="display:flex; flex-direction:column; gap:12px; text-align:center;">
+        <div style="font-size:0.83rem; color:var(--text-secondary); line-height:1.4;">
+          ${isSi ? 'දුරකථන පෙට්ටියේ හෝ ස්ටිකරයේ ඇති IMEI 1 බාර්කෝඩ් එක කැමරා තිරයේ ඕනෑම තැනකට පෙන්වන්න (ස්වයංක්‍රීයව ෆෝකස් වී IMEI 1 තෝරාගනී):' : 'Point camera anywhere at the phone box label. Continuous auto-focus is active and IMEI 1 will be selected automatically:'}
         </div>
 
-        <div class="scanner-container" id="scannerVideoContainer">
-          <video id="imeiScannerVideo" class="scanner-video" playsinline></video>
+        <div class="scanner-container" id="scannerVideoContainer" onclick="App.refocusScanner()" title="Tap anywhere to refocus camera">
+          <video id="imeiScannerVideo" class="scanner-video" playsinline muted autoplay></video>
           <div class="scanner-overlay">
+            <div class="scanner-corner tl"></div>
+            <div class="scanner-corner tr"></div>
+            <div class="scanner-corner bl"></div>
+            <div class="scanner-corner br"></div>
             <div class="scanner-laser"></div>
+            <div class="scanner-status-pill">🎯 Auto-Focus Active • IMEI 1 Priority</div>
           </div>
+          <button type="button" id="scannerTorchBtn" class="scanner-torch-btn" onclick="event.stopPropagation(); App.toggleScannerTorch()" style="display:none;">
+            💡 Torch
+          </button>
         </div>
 
         <div style="display:flex; gap:8px;">
@@ -8455,10 +8796,10 @@ Thank you! - ${shopName}`;
     `;
 
     this.showModal(
-      '📷 IMEI Barcode Scanner',
+      '📷 ' + (isSi ? 'IMEI 1 බාර්කෝඩ් ස්කෑනරය' : 'IMEI 1 Barcode Scanner'),
       bodyHtml,
       [
-        { text: 'Cancel', class: 'btn-ghost', onClick: () => { this.stopImeiCamera(); this.closeModal(); } }
+        { text: isSi ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => { this.stopImeiCamera(); this.closeModal(); } }
       ]
     );
 
@@ -8486,32 +8827,133 @@ Thank you! - ${shopName}`;
     const video = document.getElementById('imeiScannerVideo');
     if (!video || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
 
-    try {
-      this.scannerStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      video.srcObject = this.scannerStream;
-      video.play();
+    this.isTorchOn = false;
 
-      // Check BarcodeDetector API support
+    try {
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          advanced: [
+            { focusMode: 'continuous' },
+            { exposureMode: 'continuous' }
+          ]
+        }
+      };
+
+      this.scannerStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = this.scannerStream;
+      await video.play();
+
+      // Apply continuous auto-focus & detect torch capability
+      const track = this.scannerStream.getVideoTracks()[0];
+      if (track) {
+        const caps = track.getCapabilities ? track.getCapabilities() : {};
+        const adv = {};
+        if (caps.focusMode && caps.focusMode.includes('continuous')) {
+          adv.focusMode = 'continuous';
+        }
+        if (caps.exposureMode && caps.exposureMode.includes('continuous')) {
+          adv.exposureMode = 'continuous';
+        }
+        if (Object.keys(adv).length > 0 && track.applyConstraints) {
+          try { await track.applyConstraints({ advanced: [adv] }); } catch (e) {}
+        }
+        if (caps.torch) {
+          const torchBtn = document.getElementById('scannerTorchBtn');
+          if (torchBtn) torchBtn.style.display = 'inline-flex';
+        }
+      }
+
+      // Barcode detection with strict IMEI 1 priority
       if ('BarcodeDetector' in window) {
-        const detector = new window.BarcodeDetector({ formats: ['code_128', 'code_39', 'ean_13', 'qr_code', 'itf'] });
+        const detector = new window.BarcodeDetector({
+          formats: ['code_128', 'code_39', 'ean_13', 'itf', 'qr_code', 'upc_a', 'upc_e']
+        });
+
         this.scannerInterval = setInterval(async () => {
           try {
             const barcodes = await detector.detect(video);
             if (barcodes && barcodes.length > 0) {
-              const code = barcodes[0].rawValue;
-              if (code && code.length >= 8) {
+              const candidates = [];
+
+              for (const b of barcodes) {
+                const raw = (b.rawValue || '').trim();
+                if (!raw) continue;
+
+                // Extract all sequences of 15 digits
+                const match15 = raw.match(/\b\d{15}\b/);
+                const digits = raw.replace(/\D/g, '');
+
+                // Calculate vertical position (y coordinate)
+                let yPos = 99999;
+                if (b.boundingBox && typeof b.boundingBox.top === 'number') {
+                  yPos = b.boundingBox.top;
+                } else if (b.cornerPoints && b.cornerPoints.length > 0 && typeof b.cornerPoints[0].y === 'number') {
+                  yPos = b.cornerPoints[0].y;
+                }
+
+                const isExplicitImei1 = /imei\s*1\b|imei1\b|meid1\b/i.test(raw);
+                const isExplicitImei2 = /imei\s*2\b|imei2\b|meid2\b/i.test(raw);
+
+                candidates.push({
+                  raw,
+                  digits,
+                  imei15: digits.length === 15 ? digits : (match15 ? match15[0] : null),
+                  yPos,
+                  isExplicitImei1,
+                  isExplicitImei2
+                });
+              }
+
+              let bestImei = null;
+
+              // Priority 1: Barcode explicitly labeled IMEI 1
+              const explicit1 = candidates.find(c => c.isExplicitImei1 && c.imei15);
+              if (explicit1) {
+                bestImei = explicit1.imei15;
+              }
+
+              // Priority 2: 15-digit barcodes that are NOT labeled IMEI 2
+              // On phone box labels, IMEI 1 is ALWAYS printed above IMEI 2 (lowest yPos)
+              if (!bestImei) {
+                const valid15 = candidates.filter(c => c.imei15 && !c.isExplicitImei2);
+                if (valid15.length > 0) {
+                  valid15.sort((a, b) => a.yPos - b.yPos);
+                  bestImei = valid15[0].imei15;
+                }
+              }
+
+              // Priority 3: Any barcode with 15 digits
+              if (!bestImei) {
+                const any15 = candidates.filter(c => c.imei15);
+                if (any15.length > 0) {
+                  any15.sort((a, b) => a.yPos - b.yPos);
+                  bestImei = any15[0].imei15;
+                }
+              }
+
+              // Priority 4: If no 15-digit barcode, check for standard barcodes >= 10 digits
+              if (!bestImei) {
+                const digitsOnly = candidates.filter(c => c.digits && c.digits.length >= 10 && !c.isExplicitImei2);
+                if (digitsOnly.length > 0) {
+                  digitsOnly.sort((a, b) => a.yPos - b.yPos);
+                  bestImei = digitsOnly[0].digits;
+                }
+              }
+
+              if (bestImei) {
                 this.playBeepSound();
                 this.stopImeiCamera();
                 this.closeModal();
-                this.handleScannedImei(code, targetInputId);
+                this.handleScannedImei(bestImei, targetInputId);
               }
             }
           } catch (e) {
             // Frame detection error, continue loop
           }
-        }, 200);
+        }, 180);
       }
     } catch (err) {
       console.warn('Camera access denied or unavailable', err);
@@ -8522,15 +8964,55 @@ Thank you! - ${shopName}`;
     }
   },
 
+  async toggleScannerTorch() {
+    if (!this.scannerStream) return;
+    const track = this.scannerStream.getVideoTracks()[0];
+    if (!track || !track.applyConstraints) return;
+    try {
+      this.isTorchOn = !this.isTorchOn;
+      await track.applyConstraints({
+        advanced: [{ torch: this.isTorchOn }]
+      });
+      const btn = document.getElementById('scannerTorchBtn');
+      if (btn) {
+        btn.textContent = this.isTorchOn ? '🔦 Torch ON' : '💡 Torch';
+        btn.style.background = this.isTorchOn ? 'var(--accent-gold)' : 'rgba(0,0,0,0.75)';
+        btn.style.color = this.isTorchOn ? '#000' : '#fff';
+      }
+    } catch (e) {
+      console.warn('Torch toggle failed', e);
+    }
+  },
+
+  async refocusScanner() {
+    if (!this.scannerStream) return;
+    const track = this.scannerStream.getVideoTracks()[0];
+    if (!track || !track.applyConstraints) return;
+    try {
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.focusMode && caps.focusMode.includes('continuous')) {
+        await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+      }
+    } catch (e) {}
+  },
+
   stopImeiCamera() {
     if (this.scannerInterval) {
       clearInterval(this.scannerInterval);
       this.scannerInterval = null;
     }
     if (this.scannerStream) {
-      this.scannerStream.getTracks().forEach(t => t.stop());
+      this.scannerStream.getTracks().forEach(t => {
+        try {
+          if (this.isTorchOn && t.applyConstraints) {
+            t.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {});
+          }
+          t.stop();
+        } catch (e) {}
+      });
       this.scannerStream = null;
     }
+    this.isTorchOn = false;
   },
 
   playBeepSound() {

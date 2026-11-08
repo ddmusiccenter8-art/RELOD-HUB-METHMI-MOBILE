@@ -268,6 +268,14 @@ const DB = {
         });
       }
 
+      const localBtx = this.getBankTransactions(null);
+      if (localBtx.length > 0) {
+        localBtx.forEach(btx => {
+          const docId = btx.id.startsWith('btx_') ? btx.id : ('btx_' + btx.id);
+          window.FS.collection('payment_tracker_updates').doc(docId).set({ ...btx, docType: 'bank_transaction' }, { merge: true }).catch(() => {});
+        });
+      }
+
       // One-time check for shops
       const shopsSnapshot = await window.FS.collection('payment_tracker_shops').limit(1).get().catch(() => null);
       if (shopsSnapshot && shopsSnapshot.empty) {
@@ -325,11 +333,14 @@ const DB = {
       const repCredits = [];
       const routerExpenses = [];
       const distributorTopups = [];
+      const bankTransactions = [];
 
       snapshot.forEach(doc => {
         const d = doc.data();
         if (d.docType === 'device_credit' || doc.id.startsWith('devcred_') || doc.id.startsWith('dc_')) {
           devCredits.push(d);
+        } else if (d.docType === 'bank_transaction' || doc.id.startsWith('btx_')) {
+          bankTransactions.push(d);
         } else if (d.docType === 'shift' || doc.id.startsWith('shift_')) {
           shifts.push(d);
         } else if (d.docType === 'expense' || doc.id.startsWith('exp_')) {
@@ -429,6 +440,17 @@ const DB = {
         curTopups.forEach(t => map.set(t.id, t));
         distributorTopups.forEach(t => map.set(t.id, { ...(map.get(t.id) || {}), ...t }));
         this._dualSave(this.DISTRIBUTOR_TOPUPS_KEY, Array.from(map.values()));
+      }
+
+      // Merge and save bank transactions & cash handovers
+      if (bankTransactions.length > 0) {
+        const curBtx = this.getBankTransactions(null);
+        const map = new Map();
+        curBtx.forEach(b => map.set(b.id, b));
+        bankTransactions.forEach(b => map.set(b.id, { ...(map.get(b.id) || {}), ...b }));
+        const merged = Array.from(map.values());
+        merged.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
+        this._dualSave(this.BANK_TRANSACTIONS_KEY, merged);
       }
 
       if (window.App) {
@@ -2480,19 +2502,28 @@ const DB = {
   addBankTransaction(data) {
     const list = this.getBankTransactions(null);
     const now = new Date();
+    const id = data.id || ('btx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
     const item = {
-      id: 'btx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      id: id,
       shopId: data.shopId,
-      type: data.type || 'deposit', // 'deposit' or 'cashout'
-      bank: data.bank || 'Commercial Bank',
+      type: data.type || 'deposit', // 'deposit', 'handover', or 'cashout'
+      bank: (data.bank || '').trim(),
       amount: parseFloat(data.amount) || 0,
+      sentAmount: parseFloat(data.sentAmount) || (parseFloat(data.amount) || 0),
+      returnAmount: parseFloat(data.returnAmount) || 0,
+      handoverTo: (data.handoverTo || '').trim(), // e.g. Owner name, Collector name
+      depositedBy: (data.depositedBy || '').trim(), // e.g. Cashier / Staff name
+      receiptPhoto: data.receiptPhoto || '', // compressed slip/receipt base64 (<35KB)
+      receiptPhotoSize: data.receiptPhotoSize || '',
+      date: data.date || this.getTodayDate(),
+      time: data.time || now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       note: (data.note || '').trim(),
-      date: data.date || now.toISOString().split('T')[0],
-      timestamp: now.toISOString()
+      timestamp: data.timestamp || now.toISOString(),
+      docType: 'bank_transaction'
     };
     list.unshift(item);
     this.saveBankTransactions(list);
-    this._syncToFirebase('payment_tracker_bank_transactions', item.id, item);
+    this._syncToFirebase('payment_tracker_updates', item.id, item);
     return item;
   },
 
@@ -2500,7 +2531,7 @@ const DB = {
     let list = this.getBankTransactions(null);
     list = list.filter(t => t.id !== id);
     this.saveBankTransactions(list);
-    this._deleteFromFirebase('payment_tracker_bank_transactions', id);
+    this._deleteFromFirebase('payment_tracker_updates', id);
     return true;
   },
 

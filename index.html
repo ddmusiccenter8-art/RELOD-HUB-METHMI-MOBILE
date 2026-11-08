@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=36.0">
+  <link rel="stylesheet" href="style.css?v=37.0">
 </head>
 <body>
 
@@ -147,7 +147,7 @@
             <span>✍️</span> <span>+ Phone Agreement</span>
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showQuickAddBankDepositModal()" style="font-weight:700; padding:8px 14px; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.4); color:var(--accent-purple); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
-            <span>🏦</span> <span>+ Bank Deposit</span>
+            <span>🏦</span> <span>+ Bank Deposit / Handover</span>
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal()" style="font-weight:700; padding:8px 14px; background:rgba(245,158,11,0.12); border:1px solid rgba(245,158,11,0.4); color:var(--accent-gold); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
             <span>🌅</span> <span>Morning Shift</span>
@@ -804,13 +804,15 @@
         <!-- Shift Subtabs & Filter Bar -->
         <div class="card" style="margin-bottom:20px; padding:16px;">
           <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
-            <div style="display:flex; gap:8px;" id="shiftTabButtons">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;" id="shiftTabButtons">
               <button type="button" class="btn btn-primary btn-sm shift-tab-btn active" data-tab="closings" onclick="App.setShiftTab('closings')" data-i18n="tab_shift_closings">🌙 Shift Closings</button>
               <button type="button" class="btn btn-ghost btn-sm shift-tab-btn" data-tab="expenses" onclick="App.setShiftTab('expenses')" data-i18n="tab_expenses">💸 Expenses & Drawings</button>
+              <button type="button" class="btn btn-ghost btn-sm shift-tab-btn" data-tab="bank-handover" onclick="App.setShiftTab('bank-handover')" data-i18n="tab_bank_handover">🏦 Bank Deposits & Cash Handovers</button>
             </div>
-            <div style="display:flex; gap:8px; align-items:center;">
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
               <input type="date" class="form-input" id="shiftDateFilter" style="width:auto; padding:6px 10px;">
               <button type="button" class="btn btn-ghost btn-sm" onclick="App.resetShiftDateFilter()" data-i18n="hist_btn_all">View All</button>
+              <button type="button" class="btn btn-primary btn-sm" onclick="App.showQuickAddBankDepositModal()" style="background:var(--accent-purple); border-color:var(--accent-purple); font-weight:700;">+ Record Bank / Cash Handover</button>
             </div>
           </div>
         </div>
@@ -1030,10 +1032,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=36.0"></script>
-  <script src="firebase-init.js?v=36.0"></script>
-  <script src="data.js?v=36.0"></script>
-  <script src="app.js?v=36.0"></script>
+  <script src="i18n.js?v=37.0"></script>
+  <script src="firebase-init.js?v=37.0"></script>
+  <script src="data.js?v=37.0"></script>
+  <script src="app.js?v=37.0"></script>
   
   <!-- Register Service Worker -->
   <script>
