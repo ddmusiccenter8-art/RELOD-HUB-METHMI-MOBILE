@@ -2766,3 +2766,14 @@ select option {
   border-color: rgba(56, 189, 248, 0.6) !important;
   background: rgba(56, 189, 248, 0.15) !important;
 }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+

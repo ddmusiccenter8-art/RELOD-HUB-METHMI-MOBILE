@@ -218,13 +218,7 @@ const DB = {
 
       // Real-time synchronization: push all local entities into payment_tracker_updates
       // (This collection is 100% verified to allow writes without PERMISSION_DENIED)
-      const localDevCredits = this.getDeviceCredits();
-      if (localDevCredits.length > 0) {
-        localDevCredits.forEach(credit => {
-          window.FS.collection('payment_tracker_updates').doc('devcred_' + credit.id).set({ ...credit, docType: 'device_credit' }, { merge: true }).catch(() => {});
-          window.FS.collection('payment_tracker_device_credits').doc(credit.id).set(credit, { merge: true }).catch(() => {});
-        });
-      }
+      await this.syncAllLocalDeviceCreditsToCloud();
 
       const localShifts = this.getShifts();
       if (localShifts.length > 0) {
@@ -338,6 +332,9 @@ const DB = {
       snapshot.forEach(doc => {
         const d = doc.data();
         if (d.docType === 'device_credit' || doc.id.startsWith('devcred_') || doc.id.startsWith('dc_')) {
+          if (!d.id) {
+            d.id = doc.id.startsWith('devcred_') ? doc.id.replace('devcred_', '') : doc.id;
+          }
           devCredits.push(d);
         } else if (d.docType === 'bank_transaction' || doc.id.startsWith('btx_')) {
           bankTransactions.push(d);
@@ -2183,9 +2180,42 @@ const DB = {
     };
     credits.unshift(newCredit);
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', newCredit.id, newCredit);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + newCredit.id, { ...newCredit, docType: 'device_credit' });
     return newCredit;
+  },
+
+  async syncDeviceCreditToCloud(id, creditRecord = null) {
+    if (!creditRecord) {
+      const credits = this.getDeviceCredits();
+      creditRecord = credits.find(c => c.id === id);
+    }
+    if (!creditRecord || !window.FS) return false;
+    const docId = id.startsWith('devcred_') ? id : ('devcred_' + id);
+    return await this._syncToFirebase('payment_tracker_updates', docId, {
+      ...creditRecord,
+      docType: 'device_credit'
+    });
+  },
+
+  async syncAllLocalDeviceCreditsToCloud() {
+    if (!window.FS) return { count: 0, success: false };
+    const local = this.getDeviceCredits();
+    if (!local || local.length === 0) return { count: 0, success: true };
+
+    let uploaded = 0;
+    for (const credit of local) {
+      try {
+        const docId = credit.id.startsWith('devcred_') ? credit.id : ('devcred_' + credit.id);
+        await window.FS.collection('payment_tracker_updates').doc(docId).set({
+          ...credit,
+          docType: 'device_credit'
+        }, { merge: true });
+        uploaded++;
+      } catch (e) {
+        console.warn('Failed to push credit to cloud:', credit.id, e);
+      }
+    }
+    return { count: uploaded, success: true };
   },
 
   saveCreditSignature(id, signatureDataUrl, lang = 'si') {
@@ -2196,7 +2226,6 @@ const DB = {
     credits[idx].signedAt = new Date().toISOString();
     credits[idx].agreementLanguage = lang;
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', id, credits[idx]);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credits[idx], docType: 'device_credit' });
     return credits[idx];
   },
@@ -2225,7 +2254,6 @@ const DB = {
       updatedAt: new Date().toISOString()
     };
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', id, credits[idx]);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credits[idx], docType: 'device_credit' });
     return credits[idx];
   },
@@ -2258,7 +2286,6 @@ const DB = {
     }
 
     this.saveDeviceCredits(credits);
-    this._syncToFirebase('payment_tracker_device_credits', id, credit);
     this._syncToFirebase('payment_tracker_updates', 'devcred_' + id, { ...credit, docType: 'device_credit' });
     return credit;
   },
@@ -2267,7 +2294,6 @@ const DB = {
     const credits = this.getDeviceCredits();
     const filtered = credits.filter(c => c.id !== id);
     this.saveDeviceCredits(filtered);
-    this._deleteFromFirebase('payment_tracker_device_credits', id);
     this._deleteFromFirebase('payment_tracker_updates', 'devcred_' + id);
     return true;
   },

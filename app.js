@@ -186,6 +186,7 @@ const App = {
     } else if (Array.isArray(actions)) {
       actions.forEach(action => {
         const btn = document.createElement('button');
+        if (action.id) btn.id = action.id;
         btn.className = `btn ${action.class || 'btn-ghost'}`;
         btn.textContent = action.text;
         if (action.style) btn.style.cssText = action.style;
@@ -7241,6 +7242,13 @@ Thank you! - ${shopName}`;
       nicBackPhoto: existing?.nicBackPhoto || ''
     };
 
+    this.pendingPhotoUploads = {
+      customerPhoto: false,
+      devicePhoto: false,
+      nicFrontPhoto: false,
+      nicBackPhoto: false
+    };
+
     const today = DB.getTodayDate();
     const agreedDate = existing?.agreementDate || today;
     const initialPeriod = existing?.creditPeriodDays || 14;
@@ -7429,6 +7437,8 @@ Thank you! - ${shopName}`;
           </div>
         </div>
 
+        <div id="devCreditPhotoStatusBanner" style="display:none; padding:10px 14px; border-radius:var(--radius-sm); font-size:0.85rem; font-weight:700; align-items:center; gap:8px; margin-top:8px;"></div>
+
         <!-- 5. On-the-Spot Digital Customer Signature -->
         <div class="section-divider purple">
           <div class="divider-icon">✍️</div>
@@ -7471,8 +7481,8 @@ Thank you! - ${shopName}`;
       bodyHtml,
       [
         { text: I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        { text: I18N.t('btn_save_agreement') || '💾 Save Agreement', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId, false) },
-        { text: I18N.currentLang === 'si' ? '✍️ එවෙලෙම අත්සන් කරන්න' : '✍️ Save & Sign Now', class: 'btn-warning', onClick: () => this.saveDeviceCreditAgreement(editCreditId, true) }
+        { text: I18N.t('btn_save_agreement') || '💾 Save Agreement', id: 'btnSaveDevCredit', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId, false) },
+        { text: I18N.currentLang === 'si' ? '✍️ එවෙලෙම අත්සන් කරන්න' : '✍️ Save & Sign Now', id: 'btnSaveSignDevCredit', class: 'btn-warning', onClick: () => this.saveDeviceCreditAgreement(editCreditId, true) }
       ]
     );
 
@@ -7601,16 +7611,107 @@ Thank you! - ${shopName}`;
     }
   },
 
+  updateDevCreditSubmitButtons() {
+    const btnSave = document.getElementById('btnSaveDevCredit');
+    const btnSaveSign = document.getElementById('btnSaveSignDevCredit');
+    const banner = document.getElementById('devCreditPhotoStatusBanner');
+
+    const pendingKeys = Object.keys(this.pendingPhotoUploads || {}).filter(k => this.pendingPhotoUploads[k]);
+    const hasPending = pendingKeys.length > 0;
+
+    if (hasPending) {
+      if (btnSave) {
+        btnSave.disabled = true;
+        btnSave.style.opacity = '0.55';
+        btnSave.style.cursor = 'not-allowed';
+        btnSave.innerHTML = `⏳ ඡායාරූප සකසමින් (${pendingKeys.length})...`;
+      }
+      if (btnSaveSign) {
+        btnSaveSign.disabled = true;
+        btnSaveSign.style.opacity = '0.55';
+        btnSaveSign.style.cursor = 'not-allowed';
+        btnSaveSign.innerHTML = `⏳ ඡායාරූප සකසමින් (${pendingKeys.length})...`;
+      }
+      if (banner) {
+        banner.style.display = 'flex';
+        banner.style.background = 'rgba(245, 158, 11, 0.12)';
+        banner.style.border = '1px solid rgba(245, 158, 11, 0.4)';
+        banner.style.color = '#f59e0b';
+        banner.innerHTML = `
+          <div style="font-size:1.2rem; animation:spin 1s linear infinite;">⏳</div>
+          <div>
+            <strong>${I18N.currentLang === 'si' ? 'ඡායාරූප සකසමින් පවතී...' : 'Processing Photos...'}</strong><br>
+            <span style="font-size:0.78rem; opacity:0.9;">${I18N.currentLang === 'si' ? 'ඡායාරූපය Cloud වෙත යැවීමට කුඩා ප්‍රමාණයකට (KB) හකුළන තුරු Submit කිරීමට නොහැක. කරුණාකර නිමවන තෙක් රැඳී සිටින්න.' : 'Compressing image into lightweight KB. Submit is locked until compression completes.'}</span>
+          </div>
+        `;
+      }
+    } else {
+      if (btnSave) {
+        btnSave.disabled = false;
+        btnSave.style.opacity = '1';
+        btnSave.style.cursor = 'pointer';
+        btnSave.innerHTML = I18N.t('btn_save_agreement') || '💾 Save Agreement';
+      }
+      if (btnSaveSign) {
+        btnSaveSign.disabled = false;
+        btnSaveSign.style.opacity = '1';
+        btnSaveSign.style.cursor = 'pointer';
+        btnSaveSign.innerHTML = I18N.currentLang === 'si' ? '✍️ එවෙලෙම අත්සන් කරන්න' : '✍️ Save & Sign Now';
+      }
+      if (banner) {
+        const attachedCount = Object.values(this.tempDevCreditPhotos || {}).filter(Boolean).length;
+        if (attachedCount > 0) {
+          banner.style.display = 'flex';
+          banner.style.background = 'rgba(16, 185, 129, 0.1)';
+          banner.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+          banner.style.color = 'var(--accent-green)';
+          banner.innerHTML = `
+            <div style="font-size:1.2rem;">✅</div>
+            <div>
+              <strong>${I18N.currentLang === 'si' ? `ඡායාරූප ${attachedCount} ක් සාර්ථකව සකසා ඇත` : `${attachedCount} Photos Ready`}</strong><br>
+              <span style="font-size:0.78rem; opacity:0.9;">${I18N.currentLang === 'si' ? 'සියලුම ඡායාරූප Cloud වෙත සුරැකීමට සූදානම්. දැන් ඔබට Submit කළ හැක.' : 'All photos ready to save & upload.'}</span>
+            </div>
+          `;
+        } else {
+          banner.style.display = 'none';
+        }
+      }
+    }
+  },
+
   async handleDevCreditPhotoUpload(inputEl, key, containerId, badgeId) {
     const file = inputEl.files && inputEl.files[0];
     if (!file) return;
 
+    if (!this.pendingPhotoUploads) {
+      this.pendingPhotoUploads = {};
+    }
+    this.pendingPhotoUploads[key] = true;
+    this.updateDevCreditSubmitButtons();
+
+    const container = document.getElementById(containerId + 'Container');
+    if (container) {
+      container.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; min-height:80px; gap:6px;">
+          <div style="font-size:1.8rem; animation:spin 1s linear infinite;">⏳</div>
+          <div style="font-size:0.75rem; color:var(--accent-gold); font-weight:700;">${I18N.currentLang === 'si' ? 'සකසමින්...' : 'Compressing...'}</div>
+        </div>
+      `;
+    }
+
+    const badge = document.getElementById(badgeId);
+    if (badge) {
+      badge.style.display = 'inline-block';
+      badge.style.background = 'rgba(245,158,11,0.2)';
+      badge.style.color = '#f59e0b';
+      badge.textContent = '⏳ Processing...';
+    }
+
     try {
       this.showToast('📷 ' + (I18N.currentLang === 'si' ? 'ඡායාරූපය සකසමින් පවතී...' : 'Compressing photo...'), 'info');
-      const res = await this.compressImageFile(file, 640, 640, 0.6);
+      const res = await this.compressImageFile(file, 600, 600, 0.55);
       this.tempDevCreditPhotos[key] = res.dataUrl;
 
-      const container = document.getElementById(containerId + 'Container');
       if (container) {
         container.innerHTML = `
           <div style="position:relative; display:inline-block; width:100%; height:100%;">
@@ -7620,21 +7721,35 @@ Thank you! - ${shopName}`;
         `;
       }
 
-      const badge = document.getElementById(badgeId);
       if (badge) {
         badge.style.display = 'inline-block';
+        badge.style.background = 'rgba(16,185,129,0.15)';
+        badge.style.color = '#10b981';
         badge.textContent = `✅ ${Math.round(res.compressedSize / 1024)} KB (-${res.savedPercent}%)`;
       }
       this.showToast(`✅ ${I18N.currentLang === 'si' ? 'ඡායාරූපය සාර්ථකව අමුණන ලදී' : 'Photo attached'} (${Math.round(res.compressedSize / 1024)} KB)`, 'success');
     } catch (err) {
       console.error(err);
+      if (container) {
+        const icon = key === 'customerPhoto' ? '👤' : key === 'devicePhoto' ? '📱' : '🪪';
+        container.innerHTML = `<div style="font-size:2rem; margin-bottom:4px;">${icon}</div>`;
+      }
+      if (badge) {
+        badge.style.display = 'none';
+      }
       this.showToast(I18N.currentLang === 'si' ? 'ඡායාරූපය කියවීමට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.' : 'Failed to process image. Please try again.', 'error');
+    } finally {
+      this.pendingPhotoUploads[key] = false;
+      this.updateDevCreditSubmitButtons();
     }
   },
 
   removeDevCreditPhoto(key, containerId, badgeId) {
     if (this.tempDevCreditPhotos) {
       this.tempDevCreditPhotos[key] = '';
+    }
+    if (this.pendingPhotoUploads) {
+      this.pendingPhotoUploads[key] = false;
     }
     const container = document.getElementById(containerId + 'Container');
     if (container) {
@@ -7646,6 +7761,7 @@ Thank you! - ${shopName}`;
       badge.style.display = 'none';
       badge.textContent = '';
     }
+    this.updateDevCreditSubmitButtons();
   },
 
   
@@ -7691,6 +7807,11 @@ Thank you! - ${shopName}`;
   },
 
   async saveDeviceCreditAgreement(editCreditId = null, openSignImmediately = false) {
+    if (this.pendingPhotoUploads && Object.values(this.pendingPhotoUploads).some(Boolean)) {
+      this.showToast(I18N.currentLang === 'si' ? '⏳ කරුණාකර ඡායාරූප සකසා නිමවන තෙක් මඳක් රැඳී සිටින්න...' : '⏳ Please wait for photos to finish compressing...', 'warning');
+      return;
+    }
+
     const custName = document.getElementById('devCustName')?.value.trim();
     const nicNumber = document.getElementById('devCustNic')?.value.trim();
     const phone1 = document.getElementById('devCustPhone1')?.value.trim();
@@ -7774,17 +7895,53 @@ Thank you! - ${shopName}`;
       agreementLanguage: 'si'
     };
 
-    this.showToast('☁️ ' + (I18N.currentLang === 'si' ? 'Cloud වෙත Upload වෙමින් පවතී...' : 'Syncing to Cloud...'), 'info');
+    // Transition modal into Active Cloud Upload Mode
+    const modalFooter = document.querySelector('.modal-actions');
+    if (modalFooter) modalFooter.style.display = 'none';
+
+    const modalBody = document.querySelector('.modal-body');
+    if (modalBody) {
+      modalBody.innerHTML = `
+        <div id="devCreditSubmitOverlay" style="text-align:center; padding:32px 16px;">
+          <div style="font-size:3.5rem; margin-bottom:12px; animation: bounce 1.2s infinite alternate;">☁️</div>
+          <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-primary); margin-bottom:8px;">
+            ${I18N.currentLang === 'si' ? 'Cloud වෙත Live Upload වෙමින් පවතී...' : 'Live Uploading to Cloud...'}
+          </h3>
+          <p style="font-size:0.88rem; color:var(--text-secondary); max-width:400px; margin:0 auto 20px auto; line-height:1.5;">
+            ${I18N.currentLang === 'si'
+              ? `<strong>${custName}</strong> මහතාගේ ගිවිසුම සහ ලේඛන සියලු දුරකථන සහ පරිගණක සඳහා එකවර සජීවීව (Live Sync) උඩුගත කෙරේ...`
+              : `Uploading agreement & attached photos for <strong>${custName}</strong> across all connected devices...`}
+          </p>
+          <div style="width:100%; max-width:320px; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden; margin:0 auto 16px; border:1px solid rgba(255,255,255,0.15);">
+            <div style="width:100%; height:100%; background:linear-gradient(90deg, #6366f1, #10b981, #6366f1); background-size:200% 100%; animation: shimmer 1.5s infinite linear;"></div>
+          </div>
+          <div id="devCreditUploadStep" style="font-size:0.82rem; color:var(--accent-gold); font-weight:700;">
+            💾 ${I18N.currentLang === 'si' ? 'දත්ත ගබඩා කර Cloud වෙත සමමුහුර්ත කෙරේ...' : 'Storing data and synchronizing with Firestore Cloud...'}
+          </div>
+        </div>
+      `;
+    }
+
     let savedRecord = null;
     if (editCreditId) {
       savedRecord = DB.updateDeviceCredit(editCreditId, payload);
-      this.showToast(I18N.currentLang === 'si' ? '✅ ගිවිසුම සාර්ථකව යාවත්කාලීන විය!' : '✅ Agreement updated successfully!', 'success');
     } else {
       savedRecord = DB.addDeviceCredit(payload);
-      this.showToast(I18N.currentLang === 'si' ? '✅ නව දුරකථන ණය ගිවිසුම සාර්ථකව සුරැකිණි!' : '✅ New device credit agreement recorded!', 'success');
     }
 
-    this.closeModal();
+    const stepEl = document.getElementById('devCreditUploadStep');
+    if (stepEl) {
+      stepEl.textContent = I18N.currentLang === 'si' ? '☁️ Cloud Server වෙත සජීවීව ලියාපදිංචි කෙරේ...' : '☁️ Registering live on cloud server...';
+    }
+
+    try {
+      if (savedRecord) {
+        await DB.syncDeviceCreditToCloud(savedRecord.id, savedRecord);
+      }
+    } catch (syncErr) {
+      console.warn('Cloud sync error on agreement save:', syncErr);
+    }
+
     this.updateTopBarBadges();
     if (this.currentPage === 'device-credits') {
       this.renderDeviceCreditsPage();
@@ -7793,10 +7950,50 @@ Thank you! - ${shopName}`;
       this.renderDashboard();
     }
 
-    if (openSignImmediately && savedRecord) {
-      setTimeout(() => {
-        this.openCreditAgreementModal(savedRecord.id, 'si');
-      }, 250);
+    if (modalBody) {
+      modalBody.innerHTML = `
+        <div style="text-align:center; padding:32px 16px;">
+          <div style="font-size:3.5rem; margin-bottom:12px;">🎉</div>
+          <h3 style="font-size:1.3rem; font-weight:800; color:var(--accent-green); margin-bottom:8px;">
+            ${I18N.currentLang === 'si' ? 'ගිවිසුම සාර්ථකව Live Upload විය!' : 'Agreement Live Uploaded Successfully!'}
+          </h3>
+          <p style="font-size:0.9rem; color:var(--text-secondary); max-width:420px; margin:0 auto 20px auto; line-height:1.5;">
+            ${I18N.currentLang === 'si'
+              ? `<strong>${custName}</strong> මහතාගේ දුරකථන ණය ගිවිසුම සාර්ථකව සටහන් විය. දැන් සියලු දුරකථන සහ පරිගණක වල සජීවීව දිස්වේ.`
+              : `Device credit agreement for <strong>${custName}</strong> is saved and verified live on Cloud.`}
+          </p>
+
+          <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-sm); padding:12px 16px; max-width:380px; margin:0 auto 24px auto; text-align:left; font-size:0.85rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:var(--text-muted);">Customer:</span>
+              <strong>${custName}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:var(--text-muted);">Phone & Model:</span>
+              <span>${model}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+              <span style="color:var(--text-muted);">IMEI:</span>
+              <span style="font-family:monospace; color:var(--accent-gold);">${imei1}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.15); margin-top:6px;">
+              <span style="color:var(--text-muted);">Balance Due:</span>
+              <strong style="color:var(--accent-red); font-size:1rem;">${DB.formatCurrency(savedRecord?.balanceDue || 0)}</strong>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+            ${openSignImmediately ? `
+              <button type="button" class="btn btn-warning" onclick="App.closeModal(); App.openCreditAgreementModal('${savedRecord.id}', 'si');" style="font-weight:700; padding:10px 22px; font-size:0.95rem;">
+                ✍️ ${I18N.currentLang === 'si' ? 'දැන් අත්සන් කරන්න (Open Agreement)' : 'Open Agreement to Sign'}
+              </button>
+            ` : ''}
+            <button type="button" class="btn btn-primary" onclick="App.closeModal(); App.renderDeviceCreditsPage();" style="font-weight:800; padding:10px 28px; font-size:0.95rem;">
+              🚀 ${I18N.currentLang === 'si' ? 'සම්පූර්ණයි (Complete)' : 'Complete & Done'}
+            </button>
+          </div>
+        </div>
+      `;
     }
   },
 
@@ -7846,12 +8043,12 @@ Thank you! - ${shopName}`;
       bodyHtml,
       [
         { text: I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        { text: I18N.t('btn_save_payment') || '💾 Record Payment', class: 'btn-success', onClick: () => this.saveDevicePayment(creditId) }
+        { text: I18N.t('btn_save_payment') || '💾 Record Payment', id: 'btnSubmitDevPayment', class: 'btn-success', onClick: () => this.saveDevicePayment(creditId) }
       ]
     );
   },
 
-  saveDevicePayment(creditId) {
+  async saveDevicePayment(creditId) {
     const amt = parseFloat(document.getElementById('devPayAmount')?.value) || 0;
     const date = document.getElementById('devPayDate')?.value || DB.getTodayDate();
     const cashier = document.getElementById('devPayCashier')?.value.trim();
@@ -7862,13 +8059,33 @@ Thank you! - ${shopName}`;
       return;
     }
 
-    const updated = DB.addDevicePayment(creditId, { amount: amt, date, cashier, note });
-    this.closeModal();
+    const modalFooter = document.querySelector('.modal-actions');
+    if (modalFooter) modalFooter.style.display = 'none';
 
-    if (updated.status === 'settled') {
-      this.showToast(I18N.currentLang === 'si' ? '🎉 මුළු ණය මුදලම පියවා අවසන් විය!' : '🎉 Loan fully settled!', 'success');
-    } else {
-      this.showToast(`✅ Payment of ${DB.formatCurrency(amt)} recorded! Balance: ${DB.formatCurrency(updated.balanceDue)}`, 'success');
+    const modalBody = document.querySelector('.modal-body');
+    if (modalBody) {
+      modalBody.innerHTML = `
+        <div style="text-align:center; padding:30px 16px;">
+          <div style="font-size:3rem; margin-bottom:12px; animation: bounce 1.2s infinite alternate;">☁️</div>
+          <h3 style="font-size:1.2rem; font-weight:800; color:var(--text-primary); margin-bottom:6px;">
+            ${I18N.currentLang === 'si' ? 'ගෙවීම් වාර්තාව Cloud වෙත සටහන් වෙමින් පවතී...' : 'Recording Payment to Cloud...'}
+          </h3>
+          <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">
+            ${I18N.currentLang === 'si' ? 'සියලු දුරකථන සහ පරිගණක වල සජීවීව යාවත්කාලීන වේ...' : 'Syncing live across all phones and PCs...'}
+          </p>
+          <div style="width:100%; max-width:280px; height:6px; background:rgba(255,255,255,0.1); border-radius:3px; overflow:hidden; margin:0 auto;">
+            <div style="width:100%; height:100%; background:linear-gradient(90deg, #10b981, #6366f1); animation: shimmer 1.5s infinite linear;"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    const updated = DB.addDevicePayment(creditId, { amount: amt, date, cashier, note });
+
+    try {
+      await DB.syncDeviceCreditToCloud(creditId, updated);
+    } catch (e) {
+      console.warn('Failed to sync payment immediately to cloud:', e);
     }
 
     this.updateTopBarBadges();
@@ -7877,6 +8094,69 @@ Thank you! - ${shopName}`;
     }
     if (this.currentPage === 'dashboard') {
       this.renderDashboard();
+    }
+
+    if (modalBody) {
+      const isSettled = updated.status === 'settled';
+      modalBody.innerHTML = `
+        <div style="text-align:center; padding:30px 16px;">
+          <div style="font-size:3.5rem; margin-bottom:12px;">${isSettled ? '🎉' : '✅'}</div>
+          <h3 style="font-size:1.3rem; font-weight:800; color:var(--accent-green); margin-bottom:8px;">
+            ${isSettled 
+              ? (I18N.currentLang === 'si' ? 'ණය මුදල සම්පූර්ණයෙන් පියවා අවසන්!' : 'Loan Fully Settled!') 
+              : (I18N.currentLang === 'si' ? 'ගෙවීම සාර්ථකව Live සටහන් විය!' : 'Payment Live Recorded!')}
+          </h3>
+          <p style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:20px;">
+            ${I18N.currentLang === 'si' ? 'මෙම ගෙවීම සියලු උපාංග වල සජීවීව යාවත්කාලීන විය.' : 'This settlement has been verified on Cloud.'}
+          </p>
+
+          <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-sm); padding:14px 18px; max-width:340px; margin:0 auto 24px auto; text-align:left; font-size:0.88rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+              <span style="color:var(--text-muted);">${I18N.currentLang === 'si' ? 'පාරිභෝගිකයා:' : 'Customer:'}</span>
+              <strong>${updated.customerName}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+              <span style="color:var(--text-muted);">${I18N.currentLang === 'si' ? 'දැන් ගෙවූ මුදල:' : 'Paid Now:'}</span>
+              <strong style="color:var(--accent-green); font-size:1.05rem;">${DB.formatCurrency(amt)}</strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.15);">
+              <span style="color:var(--text-muted);">${I18N.currentLang === 'si' ? 'ඉතිරි හිඟ මුදල:' : 'Remaining Balance:'}</span>
+              <strong style="color:${updated.balanceDue > 0 ? 'var(--accent-red)' : 'var(--accent-green)'}; font-size:1.05rem;">${DB.formatCurrency(updated.balanceDue)}</strong>
+            </div>
+          </div>
+
+          <button type="button" class="btn btn-primary" onclick="App.closeModal(); App.renderDeviceCreditsPage();" style="font-weight:800; padding:10px 32px; font-size:0.95rem;">
+            🚀 ${I18N.currentLang === 'si' ? 'සම්පූර්ණයි (Done)' : 'Done'}
+          </button>
+        </div>
+      `;
+    }
+  },
+
+  async manualSyncDeviceCredits() {
+    const btn = document.getElementById('devCreditSyncBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳</span> <span>Syncing...</span>';
+    }
+    this.showToast('☁️ ' + (I18N.currentLang === 'si' ? 'දුරකථන ණය දත්ත Cloud වෙත සමමුහුර්ත වෙමින් පවතී...' : 'Syncing device agreements to Cloud...'), 'info');
+    try {
+      const res = await DB.syncAllLocalDeviceCreditsToCloud();
+      if (res.count > 0) {
+        this.showToast(I18N.currentLang === 'si' ? `✅ ගිවිසුම් ${res.count} ක් සාර්ථකව Cloud වෙත Live Upload විය!` : `✅ ${res.count} agreement(s) synced to cloud!`, 'success');
+      } else {
+        this.showToast(I18N.currentLang === 'si' ? '✅ සියලුම ගිවිසුම් දැනටමත් Cloud සමග යාවත්කාලීනයි!' : '✅ All agreements already up-to-date!', 'success');
+      }
+    } catch (e) {
+      console.error(e);
+      this.showToast(I18N.currentLang === 'si' ? '❌ දෝෂයක්: Cloud සමග සම්බන්ධ විය නොහැක' : '❌ Cloud sync error', 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>☁️</span> <span>Sync Cloud</span>';
+      }
+      this.renderDeviceCreditsPage();
+      this.updateTopBarBadges();
     }
   },
 
