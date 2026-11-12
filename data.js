@@ -189,6 +189,7 @@ const DB = {
 
     // Migrate any legacy updates to 3-pillar system
     this._migrateLegacyUpdates();
+    this._deduplicateLegacyShifts();
 
     // Setup page close warning
     this._setupBeforeUnload();
@@ -1509,51 +1510,201 @@ const DB = {
     this._dualSave(this.SHIFTS_KEY, list);
   },
 
+  _deduplicateLegacyShifts() {
+    try {
+      const list = this.getShifts(null);
+      if (!Array.isArray(list) || list.length === 0) return;
+
+      const groups = new Map();
+      list.forEach(s => {
+        const key = (s.shopId || '') + '_' + (s.date || '');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(s);
+      });
+
+      let hasDuplicates = false;
+      const deduplicated = [];
+      const idsToDeleteFromCloud = [];
+
+      groups.forEach((group, key) => {
+        if (group.length === 1) {
+          deduplicated.push(group[0]);
+        } else {
+          hasDuplicates = true;
+          // Sort so closing/evening shifts with sales come first
+          group.sort((a, b) => {
+            const aSales = parseFloat(a.posGrossSales || a.posSales || 0);
+            const bSales = parseFloat(b.posGrossSales || b.posSales || 0);
+            if (bSales !== aSales) return bSales - aSales;
+            return new Date(b.timestamp) - new Date(a.timestamp);
+          });
+
+          const primary = { ...group[0] };
+          // Find if any entry had a non-zero opening float from morning
+          const morning = group.find(s => s.shiftType === 'morning' || (parseFloat(s.openingFloat) || 0) > 0);
+          if (morning && (!primary.openingFloat || primary.openingFloat === 0)) {
+            primary.openingFloat = morning.openingFloat;
+          }
+
+          // Combine any special notes
+          const allNotes = group.map(s => s.specialNotes || s.cashNote).filter(Boolean);
+          if (allNotes.length > 0) {
+            primary.specialNotes = [...new Set(allNotes)].join(' | ');
+            primary.cashNote = primary.specialNotes;
+          }
+
+          // Recalculate tally
+          const posCash = primary.posCashSales || 0;
+          const posGross = primary.posGrossSales || primary.posSales || posCash;
+          const expenses = primary.drawerExpenses || primary.totalExpenses || 0;
+          primary.expectedCash = (primary.openingFloat || 0) + posCash - expenses;
+          primary.difference = (primary.countedCash || primary.actualCountedCash || 0) - primary.expectedCash;
+          if (primary.difference > 0.01) primary.status = 'excess';
+          else if (primary.difference < -0.01) primary.status = 'shortage';
+          else primary.status = 'balanced';
+
+          deduplicated.push(primary);
+
+          // Collect redundant IDs to purge
+          for (let i = 1; i < group.length; i++) {
+            idsToDeleteFromCloud.push(group[i].id);
+          }
+        }
+      });
+
+      if (hasDuplicates) {
+        deduplicated.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
+        this.saveShifts(deduplicated);
+        console.log(`✅ Cleaned up ${idsToDeleteFromCloud.length} duplicate shift rows into unified daily records`);
+        idsToDeleteFromCloud.forEach(dupId => {
+          this._deleteFromFirebase('payment_tracker_updates', 'shift_' + dupId);
+          this._deleteFromFirebase('payment_tracker_shifts', dupId);
+        });
+      }
+    } catch (e) {
+      console.warn('Shift deduplication error:', e);
+    }
+  },
+
+  updateShift(id, shiftData) {
+    const list = this.getShifts(null);
+    const idx = list.findIndex(s => s.id === id);
+    if (idx === -1) return null;
+
+    const existing = list[idx];
+    const posCash = (shiftData.posCashSales !== undefined) ? (parseFloat(shiftData.posCashSales) || 0) : (existing.posCashSales || 0);
+    const posCard = (shiftData.posCardSales !== undefined) ? (parseFloat(shiftData.posCardSales) || 0) : (existing.posCardSales || 0);
+    const posCheque = (shiftData.posChequeSales !== undefined) ? (parseFloat(shiftData.posChequeSales) || 0) : (existing.posChequeSales || 0);
+    const posGross = (shiftData.posGrossSales !== undefined) ? (parseFloat(shiftData.posGrossSales) || 0) : (existing.posGrossSales || (posCash + posCard + posCheque));
+    const openingFloat = (shiftData.openingFloat !== undefined) ? (parseFloat(shiftData.openingFloat) || 0) : (existing.openingFloat || 0);
+    const drawerExpenses = (shiftData.drawerExpenses !== undefined) ? (parseFloat(shiftData.drawerExpenses) || 0) : (existing.drawerExpenses || 0);
+    const countedCash = (shiftData.countedCash !== undefined) ? (parseFloat(shiftData.countedCash) || 0) : (existing.countedCash || 0);
+
+    const expectedCash = openingFloat + posCash - drawerExpenses;
+    const difference = countedCash - expectedCash;
+    let status = 'balanced';
+    if (difference > 0.01) status = 'excess';
+    else if (difference < -0.01) status = 'shortage';
+
+    const updated = {
+      ...existing,
+      ...shiftData,
+      id,
+      shopId: shiftData.shopId || existing.shopId,
+      shiftName: shiftData.shiftName || existing.shiftName || 'Daily Evening Closing',
+      shiftType: shiftData.shiftType || existing.shiftType || 'evening',
+      date: existing.date, // Preserve date
+      timestamp: shiftData.timestamp || existing.timestamp,
+      updatedAt: new Date().toISOString(),
+      cashierName: (shiftData.cashierName || shiftData.cashier || existing.cashierName || existing.cashier || '').trim(),
+      cashier: (shiftData.cashierName || shiftData.cashier || existing.cashierName || existing.cashier || '').trim(),
+      openingFloat,
+      posSales: posGross,
+      posGrossSales: posGross,
+      posCashSales: posCash,
+      posCardSales: posCard,
+      posChequeSales: posCheque,
+      drawerExpenses,
+      totalExpenses: drawerExpenses,
+      expectedCash,
+      countedCash,
+      actualCountedCash: countedCash,
+      difference,
+      status,
+      denominations: (shiftData.denominations !== undefined) ? shiftData.denominations : existing.denominations,
+      specialNotes: (shiftData.specialNotes !== undefined) ? shiftData.specialNotes : (existing.specialNotes || existing.cashNote || ''),
+      cashNote: (shiftData.specialNotes !== undefined) ? shiftData.specialNotes : (existing.specialNotes || existing.cashNote || ''),
+      notes: (shiftData.notes !== undefined) ? shiftData.notes : (existing.notes || existing.note || ''),
+      note: (shiftData.notes !== undefined) ? shiftData.notes : (existing.notes || existing.note || ''),
+      docType: 'shift'
+    };
+
+    list[idx] = updated;
+    this.saveShifts(list);
+    this._syncToFirebase('payment_tracker_updates', 'shift_' + id, updated);
+    this._syncToFirebase('payment_tracker_shifts', id, updated).catch(() => {});
+    return updated;
+  },
+
   addShift(data) {
     const list = this.getShifts(null);
     const now = new Date();
+    const targetDate = data.date || now.toISOString().split('T')[0];
+    const targetShopId = data.shopId || this.getActiveShopId();
+
+    // Check if a shift already exists for this shop on this date!
+    const existing = list.find(s => s.shopId === targetShopId && s.date === targetDate);
+    if (existing) {
+      console.log('Shift already exists for shop and date. Merging into existing shift record:', existing.id);
+      return this.updateShift(existing.id, data);
+    }
+
     const posCash = parseFloat(data.posCash || data.posCashSales) || 0;
     const posCard = parseFloat(data.posCard || data.posCardSales) || 0;
     const posCheque = parseFloat(data.posCheque || data.posChequeSales) || 0;
     const posTotal = (parseFloat(data.posSales || data.posGrossSales) || 0) || (posCash + posCard + posCheque);
+    const openingFloat = parseFloat(data.openingFloat) || 0;
+    const drawerExpenses = parseFloat(data.drawerExpenses || data.totalExpenses) || 0;
+    const countedCash = parseFloat(data.actualCountedCash || data.countedCash) || 0;
+    const expectedCash = openingFloat + posCash - drawerExpenses;
+    const difference = countedCash - expectedCash;
+    let status = 'balanced';
+    if (difference > 0.01) status = 'excess';
+    else if (difference < -0.01) status = 'shortage';
 
     const item = {
       id: 'shift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-      shopId: data.shopId,
-      shiftName: data.shiftName || 'Evening Closing',
+      shopId: targetShopId,
+      shiftName: data.shiftName || 'Daily Closing',
       shiftType: data.shiftType || 'evening',
-      date: data.date || now.toISOString().split('T')[0],
+      date: targetDate,
       timestamp: data.timestamp || now.toISOString(),
       cashierName: (data.cashierName || data.cashier || '').trim(),
       cashier: (data.cashierName || data.cashier || '').trim(),
-      openingFloat: parseFloat(data.openingFloat) || 0,
-      
-      // Detailed POS breakdown
+      openingFloat,
       posSales: posTotal,
       posGrossSales: posTotal,
       posCashSales: posCash,
       posCardSales: posCard,
       posChequeSales: posCheque,
-      
-      reloadCashCollected: parseFloat(data.reloadCashCollected || data.reloadCashInDrawer) || 0,
-      reloadCashInDrawer: parseFloat(data.reloadCashCollected || data.reloadCashInDrawer) || 0,
-      drawerExpenses: parseFloat(data.drawerExpenses || data.totalExpenses) || 0,
-      totalExpenses: parseFloat(data.drawerExpenses || data.totalExpenses) || 0,
+      reloadCashCollected: 0,
+      reloadCashInDrawer: 0,
+      drawerExpenses,
+      totalExpenses: drawerExpenses,
       ownerDrawings: parseFloat(data.ownerDrawings) || 0,
-      
-      expectedCash: parseFloat(data.expectedCash) || 0,
-      actualCountedCash: parseFloat(data.actualCountedCash || data.countedCash) || 0,
-      countedCash: parseFloat(data.actualCountedCash || data.countedCash) || 0,
-      difference: parseFloat(data.difference) || 0,
-      status: data.status || 'balanced', // 'balanced', 'excess', 'shortage'
+      expectedCash,
+      actualCountedCash: countedCash,
+      countedCash: countedCash,
+      difference,
+      status,
       denominations: data.denominations || null,
       note: (data.note || data.notes || '').trim(),
       notes: (data.note || data.notes || '').trim(),
       specialNotes: (data.specialNotes || data.cashNote || '').trim(),
-      cashNote: (data.specialNotes || data.cashNote || '').trim()
+      cashNote: (data.specialNotes || data.cashNote || '').trim(),
+      docType: 'shift'
     };
     list.unshift(item);
-    item.docType = 'shift';
     this.saveShifts(list);
     this._syncToFirebase('payment_tracker_updates', 'shift_' + item.id, item);
     this._syncToFirebase('payment_tracker_shifts', item.id, item).catch(() => {});
