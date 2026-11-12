@@ -106,94 +106,84 @@ const DB = {
   },
 
   _initialized: false,
+  _cache: {},
 
-  // ---- Initialize: load from IDB if localStorage empty ----
+  // Fast in-memory cache lookup with localStorage fallback
+  _getStorage(key, defaultVal = []) {
+    if (!this._cache) this._cache = {};
+    if (this._cache[key] !== undefined && this._cache[key] !== null) {
+      return this._cache[key];
+    }
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        this._cache[key] = parsed;
+        return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to parse localStorage for ' + key, e);
+    }
+    this._cache[key] = defaultVal;
+    return defaultVal;
+  },
+
+  // ---- Initialize: load from IDB and seed memory cache ----
   async initialize() {
     if (this._initialized) return;
     await IDB.open();
+    if (!this._cache) this._cache = {};
 
-    // If localStorage is empty but IDB has data, restore from IDB
-    const lsShops = localStorage.getItem(this.SHOPS_KEY);
-    if (!lsShops || lsShops === '[]') {
-      const idbShops = await IDB.load(this.SHOPS_KEY);
-      if (idbShops && idbShops.length > 0) {
-        localStorage.setItem(this.SHOPS_KEY, JSON.stringify(idbShops));
-        console.log('✅ Data restored from IndexedDB backup!');
-      }
-    }
+    const restoreKey = async (key) => {
+      let lsData = null;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw && raw !== '[]' && raw !== '{}') {
+          lsData = JSON.parse(raw);
+        }
+      } catch (e) {}
 
-    const lsUpdates = localStorage.getItem(this.UPDATES_KEY);
-    if (!lsUpdates || lsUpdates === '[]') {
-      const idbUpdates = await IDB.load(this.UPDATES_KEY);
-      if (idbUpdates && idbUpdates.length > 0) {
-        localStorage.setItem(this.UPDATES_KEY, JSON.stringify(idbUpdates));
-        console.log('✅ Updates restored from IndexedDB backup!');
+      // Load full data from IDB (has gigabytes of quota for photos/documents)
+      try {
+        const idbData = await IDB.load(key);
+        if (idbData && ((Array.isArray(idbData) && idbData.length > 0) || (typeof idbData === 'object' && Object.keys(idbData).length > 0))) {
+          this._cache[key] = idbData;
+          if (!lsData || (Array.isArray(lsData) && lsData.length === 0)) {
+            // Safely write to localStorage with quota protection
+            this._safeLocalStorageSet(key, idbData);
+          }
+          return;
+        }
+      } catch (e) {
+        console.warn('IDB load failed for ' + key, e);
       }
-    }
 
-    const lsCredits = localStorage.getItem(this.CREDITS_KEY);
-    if (!lsCredits || lsCredits === '[]') {
-      const idbCredits = await IDB.load(this.CREDITS_KEY);
-      if (idbCredits && idbCredits.length > 0) {
-        localStorage.setItem(this.CREDITS_KEY, JSON.stringify(idbCredits));
+      if (lsData) {
+        this._cache[key] = lsData;
+        IDB.save(key, lsData).catch(() => {});
       }
-    }
+    };
 
-    const lsRouters = localStorage.getItem(this.ROUTER_EXPENSES_KEY);
-    if (!lsRouters || lsRouters === '[]') {
-      const idbRouters = await IDB.load(this.ROUTER_EXPENSES_KEY);
-      if (idbRouters && idbRouters.length > 0) {
-        localStorage.setItem(this.ROUTER_EXPENSES_KEY, JSON.stringify(idbRouters));
-      }
-    }
+    await restoreKey(this.SHOPS_KEY);
+    await restoreKey(this.UPDATES_KEY);
+    await restoreKey(this.CREDITS_KEY);
+    await restoreKey(this.ROUTER_EXPENSES_KEY);
+    await restoreKey(this.DISTRIBUTOR_TOPUPS_KEY);
+    await restoreKey(this.SHIFTS_KEY);
+    await restoreKey(this.EXPENSES_KEY);
+    await restoreKey(this.REP_CREDITS_KEY);
+    await restoreKey(this.BANK_TRANSACTIONS_KEY);
+    await restoreKey(this.DEVICE_CREDITS_KEY);
 
-    const lsTopups = localStorage.getItem(this.DISTRIBUTOR_TOPUPS_KEY);
-    if (!lsTopups || lsTopups === '[]') {
-      const idbTopups = await IDB.load(this.DISTRIBUTOR_TOPUPS_KEY);
-      if (idbTopups && idbTopups.length > 0) {
-        localStorage.setItem(this.DISTRIBUTOR_TOPUPS_KEY, JSON.stringify(idbTopups));
+    try {
+      let lsActive = localStorage.getItem(this.ACTIVE_SHOP_KEY);
+      if (!lsActive) {
+        const idbActive = await IDB.load(this.ACTIVE_SHOP_KEY);
+        if (idbActive) {
+          localStorage.setItem(this.ACTIVE_SHOP_KEY, idbActive);
+        }
       }
-    }
-
-    const lsShifts = localStorage.getItem(this.SHIFTS_KEY);
-    if (!lsShifts || lsShifts === '[]') {
-      const idbShifts = await IDB.load(this.SHIFTS_KEY);
-      if (idbShifts && idbShifts.length > 0) {
-        localStorage.setItem(this.SHIFTS_KEY, JSON.stringify(idbShifts));
-      }
-    }
-
-    const lsExpenses = localStorage.getItem(this.EXPENSES_KEY);
-    if (!lsExpenses || lsExpenses === '[]') {
-      const idbExpenses = await IDB.load(this.EXPENSES_KEY);
-      if (idbExpenses && idbExpenses.length > 0) {
-        localStorage.setItem(this.EXPENSES_KEY, JSON.stringify(idbExpenses));
-      }
-    }
-
-    const lsBank = localStorage.getItem(this.BANK_TRANSACTIONS_KEY);
-    if (!lsBank || lsBank === '[]') {
-      const idbBank = await IDB.load(this.BANK_TRANSACTIONS_KEY);
-      if (idbBank && idbBank.length > 0) {
-        localStorage.setItem(this.BANK_TRANSACTIONS_KEY, JSON.stringify(idbBank));
-      }
-    }
-
-    const lsDevCredits = localStorage.getItem(this.DEVICE_CREDITS_KEY);
-    if (!lsDevCredits || lsDevCredits === '[]') {
-      const idbDevCredits = await IDB.load(this.DEVICE_CREDITS_KEY);
-      if (idbDevCredits && idbDevCredits.length > 0) {
-        localStorage.setItem(this.DEVICE_CREDITS_KEY, JSON.stringify(idbDevCredits));
-      }
-    }
-
-    const lsActive = localStorage.getItem(this.ACTIVE_SHOP_KEY);
-    if (!lsActive) {
-      const idbActive = await IDB.load(this.ACTIVE_SHOP_KEY);
-      if (idbActive) {
-        localStorage.setItem(this.ACTIVE_SHOP_KEY, idbActive);
-      }
-    }
+    } catch (e) {}
 
     this._initialized = true;
 
@@ -216,61 +206,7 @@ const DB = {
       // 1. Immediately setup real-time cloud listeners
       this._setupFirebaseListeners();
 
-      // Real-time synchronization: push all local entities into payment_tracker_updates
-      // (This collection is 100% verified to allow writes without PERMISSION_DENIED)
-      await this.syncAllLocalDeviceCreditsToCloud();
-
-      const localShifts = this.getShifts();
-      if (localShifts.length > 0) {
-        localShifts.forEach(shift => {
-          window.FS.collection('payment_tracker_updates').doc('shift_' + shift.id).set({ ...shift, docType: 'shift' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      const localExpenses = this.getExpenses();
-      if (localExpenses.length > 0) {
-        localExpenses.forEach(exp => {
-          window.FS.collection('payment_tracker_updates').doc('exp_' + exp.id).set({ ...exp, docType: 'expense' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      const localCredits = this.getCredits(null, true);
-      if (localCredits.length > 0) {
-        localCredits.forEach(cred => {
-          window.FS.collection('payment_tracker_updates').doc('cred_' + cred.id).set({ ...cred, docType: 'credit' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      const localRepCredits = this.getRepCredits();
-      if (localRepCredits.length > 0) {
-        localRepCredits.forEach(rep => {
-          window.FS.collection('payment_tracker_updates').doc(rep.id).set({ ...rep, docType: 'rep_credit' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      const localRouters = this.getRouterExpenses(null);
-      if (localRouters.length > 0) {
-        localRouters.forEach(r => {
-          window.FS.collection('payment_tracker_updates').doc('routerexp_' + r.id).set({ ...r, docType: 'router_expense' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      const localTopups = this.getDistributorTopups(null);
-      if (localTopups.length > 0) {
-        localTopups.forEach(t => {
-          window.FS.collection('payment_tracker_updates').doc('topup_' + t.id).set({ ...t, docType: 'distributor_topup' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      const localBtx = this.getBankTransactions(null);
-      if (localBtx.length > 0) {
-        localBtx.forEach(btx => {
-          const docId = btx.id.startsWith('btx_') ? btx.id : ('btx_' + btx.id);
-          window.FS.collection('payment_tracker_updates').doc(docId).set({ ...btx, docType: 'bank_transaction' }, { merge: true }).catch(() => {});
-        });
-      }
-
-      // One-time check for shops
+      // 2. One-time check for shops: if Firestore has no shops, seed from local
       const shopsSnapshot = await window.FS.collection('payment_tracker_shops').limit(1).get().catch(() => null);
       if (shopsSnapshot && shopsSnapshot.empty) {
         const localShops = this.getShops();
@@ -296,18 +232,27 @@ const DB = {
       this.setCloudStatus(true);
       if (snapshot.metadata.hasPendingWrites) return;
       
-      const shops = [];
-      snapshot.forEach(doc => shops.push(doc.data()));
-      shops.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-      
-      if (shops.length > 0) {
-        this._dualSave(this.SHOPS_KEY, shops);
-        let activeId = this.getActiveShopId();
-        if (!activeId || !shops.some(s => s.id === activeId)) {
-          this.setActiveShop(shops[0].id);
+      try {
+        const shops = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          if (d) shops.push(d);
+        });
+        shops.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        
+        if (shops.length > 0) {
+          this._dualSave(this.SHOPS_KEY, shops);
+          let activeId = this.getActiveShopId();
+          if (!activeId || !shops.some(s => s.id === activeId)) {
+            // On a new PC, intelligently prefer 'MAIN SHOP' or the first active shop
+            const mainShop = shops.find(s => s.name && s.name.toUpperCase().includes('MAIN') && s.active !== false);
+            this.setActiveShop(mainShop ? mainShop.id : shops[0].id);
+          }
+          if (window.App && window.App.refreshShopSelector) window.App.refreshShopSelector();
+          if (window.App && window.App.refreshPage) window.App.refreshPage(window.App.currentPage);
         }
-        if (window.App && window.App.refreshShopSelector) window.App.refreshShopSelector();
-        if (window.App && window.App.refreshPage) window.App.refreshPage(window.App.currentPage);
+      } catch (err) {
+        console.error('Error handling shops snapshot:', err);
       }
     }, err => {
       console.warn('Firebase shops error:', err);
@@ -318,7 +263,17 @@ const DB = {
     window.FS.collection('payment_tracker_updates').onSnapshot(snapshot => {
       this.setCloudStatus(true);
       if (snapshot.metadata.hasPendingWrites) return;
+      this.processUpdatesSnapshot(snapshot);
+    }, err => {
+      console.warn('Firebase updates error:', err);
+      this.setCloudStatus(false);
+    });
+  },
 
+  // Centralized processor for updates collection snapshot (used by real-time listener & manual sync)
+  processUpdatesSnapshot(snapshot) {
+    if (!snapshot) return;
+    try {
       const updates = [];
       const devCredits = [];
       const credits = [];
@@ -331,24 +286,29 @@ const DB = {
 
       snapshot.forEach(doc => {
         const d = doc.data();
-        if (d.docType === 'device_credit' || doc.id.startsWith('devcred_') || doc.id.startsWith('dc_')) {
-          if (!d.id) {
-            d.id = doc.id.startsWith('devcred_') ? doc.id.replace('devcred_', '') : doc.id;
-          }
+        if (!d) return;
+
+        const docId = doc.id;
+        // Normalize ID if missing
+        if (!d.id) {
+          d.id = docId.replace(/^(devcred_|shift_|exp_|cred_|repcred_|routerexp_|topup_|btx_)/, '');
+        }
+
+        if (d.docType === 'device_credit' || docId.startsWith('devcred_') || docId.startsWith('dc_')) {
           devCredits.push(d);
-        } else if (d.docType === 'bank_transaction' || doc.id.startsWith('btx_')) {
+        } else if (d.docType === 'bank_transaction' || docId.startsWith('btx_')) {
           bankTransactions.push(d);
-        } else if (d.docType === 'shift' || doc.id.startsWith('shift_')) {
+        } else if (d.docType === 'shift' || docId.startsWith('shift_')) {
           shifts.push(d);
-        } else if (d.docType === 'expense' || doc.id.startsWith('exp_')) {
+        } else if (d.docType === 'expense' || docId.startsWith('exp_')) {
           expenses.push(d);
-        } else if (d.docType === 'rep_credit' || doc.id.startsWith('repcred_')) {
+        } else if (d.docType === 'rep_credit' || docId.startsWith('repcred_')) {
           repCredits.push(d);
-        } else if (d.docType === 'router_expense' || doc.id.startsWith('routerexp_')) {
+        } else if (d.docType === 'router_expense' || docId.startsWith('routerexp_')) {
           routerExpenses.push(d);
-        } else if (d.docType === 'distributor_topup' || doc.id.startsWith('topup_')) {
+        } else if (d.docType === 'distributor_topup' || docId.startsWith('topup_')) {
           distributorTopups.push(d);
-        } else if (d.docType === 'credit' || doc.id.startsWith('cred_') || doc.id.startsWith('cr_')) {
+        } else if (d.docType === 'credit' || docId.startsWith('cred_') || docId.startsWith('cr_')) {
           credits.push(d);
         } else {
           updates.push(d);
@@ -399,7 +359,7 @@ const DB = {
         this._dualSave(this.REP_CREDITS_KEY, merged);
       }
 
-      // Merge and save device credits
+      // Merge and save device credits (100% quota safe)
       if (devCredits.length > 0) {
         const currentDev = this.getDeviceCredits();
         const devMap = new Map();
@@ -454,10 +414,9 @@ const DB = {
         window.App.updateTopBarBadges();
         window.App.refreshPage(window.App.currentPage);
       }
-    }, err => {
-      console.warn('Firebase updates error:', err);
-      this.setCloudStatus(false);
-    });
+    } catch (err) {
+      console.error('Error processing Firestore updates snapshot:', err);
+    }
   },
 
   async _syncToFirebase(collection, docId, data) {
@@ -494,12 +453,48 @@ const DB = {
     }
   },
 
-  // ---- Dual Save: localStorage + IndexedDB ----
+  // ---- Quota-Safe Dual Save: Memory Cache + IndexedDB (Full) + localStorage (Safe) ----
   _dualSave(key, data) {
-    const json = JSON.stringify(data);
-    localStorage.setItem(key, json);
-    // Async save to IDB (fire and forget)
-    IDB.save(key, data).catch(() => {});
+    // 1. Immediately update fast in-memory cache
+    if (!this._cache) this._cache = {};
+    this._cache[key] = data;
+
+    // 2. Save full data (including photos) to IndexedDB (virtually unlimited quota)
+    try {
+      IDB.save(key, data).catch(err => console.warn('IDB save error for ' + key, err));
+    } catch (e) {
+      console.warn('IDB save exception for ' + key, e);
+    }
+
+    // 3. Save to localStorage safely with quota protection
+    this._safeLocalStorageSet(key, data);
+  },
+
+  _safeLocalStorageSet(key, data) {
+    try {
+      const json = JSON.stringify(data);
+      localStorage.setItem(key, json);
+    } catch (e) {
+      // Quota exceeded: strip large base64 strings so metadata always fits in 5MB
+      console.warn('localStorage quota exceeded for ' + key + '. Storing lightweight version...');
+      try {
+        if (Array.isArray(data)) {
+          const lightweight = data.map(item => {
+            if (!item || typeof item !== 'object') return item;
+            const copy = { ...item };
+            if (copy.customerPhoto && copy.customerPhoto.length > 500) copy.customerPhoto = '[stored_in_idb]';
+            if (copy.phoneBoxPhoto && copy.phoneBoxPhoto.length > 500) copy.phoneBoxPhoto = '[stored_in_idb]';
+            if (copy.nicFrontPhoto && copy.nicFrontPhoto.length > 500) copy.nicFrontPhoto = '[stored_in_idb]';
+            if (copy.nicBackPhoto && copy.nicBackPhoto.length > 500) copy.nicBackPhoto = '[stored_in_idb]';
+            if (copy.receiptPhoto && copy.receiptPhoto.length > 500) copy.receiptPhoto = '[stored_in_idb]';
+            return copy;
+          });
+          localStorage.setItem(key, JSON.stringify(lightweight));
+        }
+      } catch (fallbackErr) {
+        console.warn('Could not save even lightweight ' + key + ' to localStorage:', fallbackErr);
+      }
+    }
   },
 
   // ---- Page close warning ----
@@ -1317,7 +1312,7 @@ const DB = {
 
   // ---- Router Reload Expenses ----
   getRouterExpenses(shopId = null) {
-    let list = JSON.parse(localStorage.getItem(this.ROUTER_EXPENSES_KEY) || '[]');
+    let list = this._getStorage(this.ROUTER_EXPENSES_KEY, []);
     if (shopId) list = list.filter(r => r.shopId === shopId);
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
@@ -1396,7 +1391,7 @@ const DB = {
 
   // ---- Distributor Top-ups Received ----
   getDistributorTopups(shopId = null) {
-    let list = JSON.parse(localStorage.getItem(this.DISTRIBUTOR_TOPUPS_KEY) || '[]');
+    let list = this._getStorage(this.DISTRIBUTOR_TOPUPS_KEY, []);
     if (shopId) list = list.filter(t => t.shopId === shopId);
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
@@ -2093,7 +2088,7 @@ const DB = {
   // ================================================================
   getDeviceCredits(shopId = null) {
     try {
-      const all = JSON.parse(localStorage.getItem(this.DEVICE_CREDITS_KEY) || '[]');
+      const all = this._getStorage(this.DEVICE_CREDITS_KEY, []);
       if (shopId && shopId !== 'all') {
         return all.filter(c => !c.shopId || c.shopId === shopId);
       }
@@ -2104,12 +2099,25 @@ const DB = {
   },
 
   saveDeviceCredits(credits) {
-    try {
-      localStorage.setItem(this.DEVICE_CREDITS_KEY, JSON.stringify(credits));
-      IDB.save(this.DEVICE_CREDITS_KEY, credits);
-    } catch (e) {
-      console.error('Failed to save device credits', e);
+    this._dualSave(this.DEVICE_CREDITS_KEY, credits);
+  },
+
+  async getFullDeviceCredit(id) {
+    const list = this.getDeviceCredits();
+    let record = list.find(c => c.id === id);
+    if (record && record.customerPhoto && record.customerPhoto !== '[stored_in_idb]') {
+      return record;
     }
+    const idbCredits = await IDB.load(this.DEVICE_CREDITS_KEY);
+    if (Array.isArray(idbCredits)) {
+      const full = idbCredits.find(c => c.id === id);
+      if (full) {
+        if (!this._cache) this._cache = {};
+        this._cache[this.DEVICE_CREDITS_KEY] = idbCredits;
+        return full;
+      }
+    }
+    return record;
   },
 
   addDeviceCredit(creditData) {
@@ -2334,7 +2342,7 @@ const DB = {
   // ================================================================
   getRepCredits(shopId = null, includeSettled = true) {
     try {
-      let list = JSON.parse(localStorage.getItem(this.REP_CREDITS_KEY) || '[]');
+      let list = this._getStorage(this.REP_CREDITS_KEY, []);
       if (shopId && shopId !== 'all') list = list.filter(r => r.shopId === shopId);
       if (!includeSettled) list = list.filter(r => r.status === 'pending');
       return list.sort((a, b) => new Date(b.timestamp || b.takenDate) - new Date(a.timestamp || a.takenDate));
@@ -2492,7 +2500,7 @@ const DB = {
 
   // ---- Bank Deposits & Cash Outs ----
   getBankTransactions(shopId = null, date = null) {
-    let list = JSON.parse(localStorage.getItem(this.BANK_TRANSACTIONS_KEY) || '[]');
+    let list = this._getStorage(this.BANK_TRANSACTIONS_KEY, []);
     if (shopId) list = list.filter(t => t.shopId === shopId);
     if (date) list = list.filter(t => t.date === date);
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));

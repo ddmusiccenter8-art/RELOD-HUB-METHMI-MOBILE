@@ -8138,7 +8138,45 @@ Thank you! - ${shopName}`;
     }
   },
 
+  async manualSyncFromCloud() {
+    if (!window.FS) {
+      this.showToast('⚠️ Firebase Cloud is not connected', 'error');
+      return;
+    }
+    this.showToast(I18N.currentLang === 'si' ? '☁️ Cloud වෙතින් සජීවී දත්ත ලබා ගනිමින්...' : '☁️ Syncing live data with Cloud...', 'info');
+    this.updateCloudSyncingUI(true);
+    try {
+      // 1. Fetch shops
+      const shopsSnap = await window.FS.collection('payment_tracker_shops').get();
+      const shops = [];
+      shopsSnap.forEach(d => {
+        const val = d.data();
+        if (val) shops.push(val);
+      });
+      if (shops.length > 0) {
+        shops.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        DB.saveShops(shops);
+        this.refreshShopSelector();
+      }
+
+      // 2. Fetch updates collection (includes shifts, device credits, etc.)
+      const updatesSnap = await window.FS.collection('payment_tracker_updates').get();
+      DB.processUpdatesSnapshot(updatesSnap);
+
+      this.updateCloudSyncingUI(false, true);
+      this.showToast('✅ ' + (I18N.currentLang === 'si' ? 'සියලු දත්ත Cloud සමඟ සමමුහුර්ත විය!' : 'All data live-synced with Cloud!'), 'success');
+      this.refreshPage(this.currentPage);
+      this.updateTopBarBadges();
+    } catch (e) {
+      console.error('Manual sync from cloud error:', e);
+      this.updateCloudSyncingUI(false, false, e.message);
+      this.showToast('❌ Cloud Sync Error: ' + (e.message || 'Network error'), 'error');
+    }
+  },
+
   async manualSyncDeviceCredits() {
+    return await this.manualSyncFromCloud();
+    // Legacy:
     const btn = document.getElementById('devCreditSyncBtn');
     if (btn) {
       btn.disabled = true;

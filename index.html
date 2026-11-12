@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=39.0">
+  <link rel="stylesheet" href="style.css?v=40.0">
 </head>
 <body>
 
@@ -44,7 +44,7 @@
       <div class="mobile-page-name" id="mobileCurrentPageTitle">Dashboard</div>
     </div>
     <div class="mobile-header-actions">
-      <span class="mobile-cloud-pill" id="mobileCloudStatusPill" title="Cloud Connection: Live">
+      <span class="mobile-cloud-pill" id="mobileCloudStatusPill" title="Click to Live Sync with Cloud" onclick="App.manualSyncFromCloud()" style="cursor:pointer;">
         <span class="cloud-dot online"></span>
       </span>
       <button type="button" class="mobile-header-action-btn" onclick="App.showShiftSummaryModal()" title="Shift Closing">
@@ -105,7 +105,7 @@
       </ul>
 
       <!-- Cloud Connection Status -->
-      <div class="cloud-status-badge" id="sidebarCloudStatus">
+      <div class="cloud-status-badge" id="sidebarCloudStatus" title="Click to Live Sync with Cloud" onclick="App.manualSyncFromCloud()" style="cursor:pointer;">
         <span class="cloud-dot online"></span>
         <span id="cloudStatusText" style="color:var(--accent-green); font-size:0.82rem;">☁️ Cloud: Online</span>
       </div>
@@ -1035,10 +1035,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=39.0"></script>
-  <script src="firebase-init.js?v=39.0"></script>
-  <script src="data.js?v=39.0"></script>
-  <script src="app.js?v=39.0"></script>
+  <script src="i18n.js?v=40.0"></script>
+  <script src="firebase-init.js?v=40.0"></script>
+  <script src="data.js?v=40.0"></script>
+  <script src="app.js?v=40.0"></script>
   
   <!-- Register Service Worker -->
   <script>
