@@ -1078,18 +1078,18 @@ const App = {
 
       let diffBadges = '';
       if (comp && !comp.isFirst) {
-        const rDiff = comp.reload?.diff ?? comp.sim?.diff ?? 0;
+        const sDiff = comp.sim?.diff ?? 0;
         const bDiff = comp.bank?.diff ?? comp.mobileRental?.diff ?? 0;
         const cDiff = comp.cash?.diff ?? 0;
         const oDiff = comp.overall?.diff ?? 0;
         const oType = comp.overall?.type ?? 'neutral';
 
         diffBadges = `
-          <div class="update-diff" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
-            <span class="update-diff-badge ${rDiff >= 0 ? 'profit' : 'loss'}">🔄 Reload: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}</span>
-            <span class="update-diff-badge ${bDiff >= 0 ? 'profit' : 'loss'}">🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}</span>
-            <span class="update-diff-badge ${cDiff >= 0 ? 'profit' : 'loss'}">💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}</span>
-            <span class="update-diff-badge ${oType}" style="font-weight:800;">💰 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
+          <div class="update-diff" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <span class="update-diff-badge neutral" style="background:rgba(59,130,246,0.1); color:var(--accent-blue); font-weight:700;">📱 SIMs: ${sDiff >= 0 ? '+' : ''}${DB.formatCurrency(sDiff)}</span>
+            <span class="update-diff-badge neutral" style="background:rgba(139,92,246,0.1); color:var(--accent-purple); font-weight:700;">🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}</span>
+            <span class="update-diff-badge neutral" style="background:rgba(245,158,11,0.1); color:var(--accent-gold); font-weight:700;">💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}</span>
+            <span class="update-diff-badge ${oType}" style="font-weight:900;">💰 ${oType === 'profit' ? 'NET PROFIT: +' : oType === 'loss' ? 'NET LOSS: -' : 'BALANCED: '}${DB.formatCurrency(Math.abs(oDiff))}</span>
           </div>`;
       } else {
         diffBadges = `<div class="update-diff" style="margin-top:6px;"><span class="update-diff-badge neutral">📌 ${I18N.currentLang === 'si' ? 'First Update (පළමු Update)' : 'First Update'}</span></div>`;
@@ -1101,27 +1101,31 @@ const App = {
             <div>
               <span class="update-time">📅 ${DB.formatDateTime(u.timestamp)}</span>
               ${!shopId && shop ? `<span class="badge" style="margin-left:8px; background:rgba(59,130,246,0.15); color:var(--accent-blue); padding:2px 8px; border-radius:10px; font-size:0.75rem; font-weight:700;">🏪 ${shop.name}</span>` : ''}
-              ${u.empName ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? `(${u.jobRole})` : ''}</div>` : ''}
+              ${u.empName ? `<div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? '(' + u.jobRole + ')' : ''}</div>` : ''}
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
               <button type="button" class="btn btn-xs" onclick="event.stopPropagation(); App.shareUpdateViaWhatsApp('${u.id}');" style="background:#16a34a; color:#fff; font-weight:700; padding:3px 7px; font-size:0.75rem; border:none; border-radius:6px; cursor:pointer;" title="Share this update to WhatsApp">📲</button>
-              <div style="font-size:1.1rem; font-weight:900; color:var(--accent-blue); text-align:right;">
+              <div style="font-size:1.1rem; font-weight:900; color:var(--accent-green); text-align:right;">
                 ${DB.formatCurrency(vals.totalCapital)}
               </div>
             </div>
           </div>
           <div class="update-totals">
             <div class="update-total-item">
-              <span class="update-total-label">🔄 Reload Total</span>
-              <span class="update-total-value">${DB.formatCurrency(vals.reloadTotal)}</span>
+              <span class="update-total-label">📱 SIMs Float</span>
+              <span class="update-total-value">${DB.formatCurrency(vals.simTotal)}</span>
             </div>
             <div class="update-total-item">
               <span class="update-total-label">🏦 Bank Total</span>
               <span class="update-total-value">${DB.formatCurrency(vals.bankTotal)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">💵 Cash Drawer</span>
+              <span class="update-total-label">💵 Cash in Drawer</span>
               <span class="update-total-value">${DB.formatCurrency(vals.totalCash)}</span>
+            </div>
+            <div class="update-total-item">
+              <span class="update-total-label">💰 Total Capital</span>
+              <span class="update-total-value" style="color:var(--accent-green); font-weight:900;">${DB.formatCurrency(vals.totalCapital)}</span>
             </div>
           </div>
           ${diffBadges}
@@ -2313,18 +2317,18 @@ const App = {
 
       let diffBadges = '';
       if (comp && !comp.isFirst) {
-        const rDiff = comp.reload?.diff ?? comp.sim?.diff ?? 0;
+        const sDiff = comp.sim?.diff ?? 0;
         const bDiff = comp.bank?.diff ?? comp.mobileRental?.diff ?? 0;
         const cDiff = comp.cash?.diff ?? 0;
         const oDiff = comp.overall?.diff ?? 0;
         const oType = comp.overall?.type ?? 'neutral';
 
         diffBadges = `
-          <div class="update-diff" style="margin-top:6px; display:flex; gap:8px; flex-wrap:wrap;">
-            <span class="update-diff-badge ${rDiff >= 0 ? 'profit' : 'loss'}">🔄 Reload: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}</span>
-            <span class="update-diff-badge ${bDiff >= 0 ? 'profit' : 'loss'}">🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}</span>
-            <span class="update-diff-badge ${cDiff >= 0 ? 'profit' : 'loss'}">💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}</span>
-            <span class="update-diff-badge ${oType}" style="font-weight:800;">💰 ${oType === 'profit' ? 'PROFIT' : oType === 'loss' ? 'LOSS' : '='}: ${oDiff >= 0 ? '+' : ''}${DB.formatCurrency(oDiff)}</span>
+          <div class="update-diff" style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+            <span class="update-diff-badge neutral" style="background:rgba(59,130,246,0.1); color:var(--accent-blue); font-weight:700;">📱 SIMs: ${sDiff >= 0 ? '+' : ''}${DB.formatCurrency(sDiff)}</span>
+            <span class="update-diff-badge neutral" style="background:rgba(139,92,246,0.1); color:var(--accent-purple); font-weight:700;">🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}</span>
+            <span class="update-diff-badge neutral" style="background:rgba(245,158,11,0.1); color:var(--accent-gold); font-weight:700;">💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}</span>
+            <span class="update-diff-badge ${oType}" style="font-weight:900;">💰 ${oType === 'profit' ? 'NET PROFIT: +' : oType === 'loss' ? 'NET LOSS: -' : 'BALANCED: '}${DB.formatCurrency(Math.abs(oDiff))}</span>
           </div>`;
       } else {
         diffBadges = `<div class="update-diff"><span class="update-diff-badge neutral">📌 ${I18N.currentLang === 'si' ? 'පළමු Update' : 'First Update'}</span></div>`;
@@ -2335,7 +2339,7 @@ const App = {
           <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
               <div class="update-time">🕐 ${DB.formatTime(u.timestamp)}</div>
-              ${u.empName ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? `(${u.jobRole})` : ''}</div>` : ''}
+              ${u.empName ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? '(' + u.jobRole + ')' : ''}</div>` : ''}
             </div>
             <div style="display:flex; gap:6px; align-items:center;">
               <button type="button" class="btn btn-xs" onclick="event.stopPropagation(); App.shareUpdateViaWhatsApp('${u.id}');" style="background:#16a34a; color:#fff; font-weight:700; padding:4px 9px; font-size:0.75rem; border:none; border-radius:6px; cursor:pointer;" title="Share this update to WhatsApp">📲 WhatsApp</button>
@@ -2344,20 +2348,20 @@ const App = {
           </div>
           <div class="update-totals">
             <div class="update-total-item">
-              <span class="update-total-label">🔄 Reload</span>
-              <span class="update-total-value">${DB.formatCurrency(vals.reloadTotal)}</span>
+              <span class="update-total-label">📱 SIMs Float</span>
+              <span class="update-total-value">${DB.formatCurrency(vals.simTotal)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">🏦 Bank</span>
+              <span class="update-total-label">🏦 Bank Total</span>
               <span class="update-total-value">${DB.formatCurrency(vals.bankTotal)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">💵 Cash</span>
+              <span class="update-total-label">💵 Cash in Drawer</span>
               <span class="update-total-value">${DB.formatCurrency(vals.totalCash)}</span>
             </div>
             <div class="update-total-item">
-              <span class="update-total-label">💰 Total</span>
-              <span class="update-total-value" style="color:var(--accent-green); font-weight:800;">${DB.formatCurrency(vals.totalCapital)}</span>
+              <span class="update-total-label">💰 Total Capital</span>
+              <span class="update-total-value" style="color:var(--accent-green); font-weight:900;">${DB.formatCurrency(vals.totalCapital)}</span>
             </div>
           </div>
           ${diffBadges}
@@ -2476,21 +2480,27 @@ const App = {
     if (comp && !comp.isFirst) {
       const type = comp.overall.type;
       const color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
+      const sDiff = comp.sim?.diff ?? 0;
+      const bDiff = comp.bank?.diff ?? comp.mobileRental?.diff ?? 0;
+      const cDiff = comp.cash?.diff ?? 0;
       compSummary = `
         <div style="text-align:center;padding:16px;background:${type === 'profit' ? 'rgba(16,185,129,0.08)' : type === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)'};border-radius:var(--radius-md);margin-top:16px;">
-          <div style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;">Vs Previous Update</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);text-transform:uppercase;">Vs Previous Update (දින දෙක අතර ශුද්ධ වෙනස)</div>
           <div style="font-size:1.8rem;font-weight:900;color:${color};">
             ${comp.overall.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.overall.diff)}
           </div>
           <div style="font-weight:700;color:${color};">
-            ${type === 'profit' ? (I18N.currentLang === 'si' ? '✅ PROFIT (ලාභ)' : '✅ PROFIT') : type === 'loss' ? (I18N.currentLang === 'si' ? '❌ LOSS (අලාභ)' : '❌ LOSS') : '➖ NO CHANGE'}
+            ${type === 'profit' ? (I18N.currentLang === 'si' ? '✅ NET PROFIT (ශුද්ධ ලාභ)' : '✅ NET PROFIT') : type === 'loss' ? (I18N.currentLang === 'si' ? '❌ NET LOSS (ශුද්ධ අලාභ)' : '❌ NET LOSS') : '⚖️ BALANCED'}
           </div>
-          <div style="margin-top:10px; display:flex; justify-content:center; gap:16px; font-size:0.85rem; font-weight:700;">
-            <span style="color:var(--accent-${comp.reload.diff >= 0 ? 'green' : 'red'});">
-              🔄 Reload: ${comp.reload.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.reload.diff)}
+          <div style="margin-top:10px; display:flex; justify-content:center; gap:12px; font-size:0.82rem; font-weight:700; flex-wrap:wrap;">
+            <span style="color:var(--accent-blue); background:rgba(59,130,246,0.1); padding:2px 8px; border-radius:6px;">
+              📱 SIMs: ${sDiff >= 0 ? '+' : ''}${DB.formatCurrency(sDiff)}
             </span>
-            <span style="color:var(--accent-${comp.bank.diff >= 0 ? 'green' : 'red'});">
-              🏦 Bank: ${comp.bank.diff >= 0 ? '+' : ''}${DB.formatCurrency(comp.bank.diff)}
+            <span style="color:var(--accent-purple); background:rgba(139,92,246,0.1); padding:2px 8px; border-radius:6px;">
+              🏦 Bank: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}
+            </span>
+            <span style="color:var(--accent-gold); background:rgba(245,158,11,0.1); padding:2px 8px; border-radius:6px;">
+              💵 Cash: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}
             </span>
           </div>
         </div>`;
@@ -4408,7 +4418,7 @@ Thank you! - ${shopName}`;
     const container = document.getElementById('reportResults');
 
     if (!shopId) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න' : 'Please select a shop'}</div></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📈</div><div class="empty-text">${I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න' : 'Please select a shop'}</div></div>`;
       return;
     }
 
@@ -4423,45 +4433,40 @@ Thank you! - ${shopName}`;
     const updates = DB.getDateRange(shopId, startDate, endDate);
 
     if (updates.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'මෙම කාලය තුළ Updates නැහැ' : 'No updates found for this period'}</div></div>`;
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">📊</div>
+          <div class="empty-text">${I18N.currentLang === 'si' ? 'තෝරාගත් කාල සීමාවට දත්ත නැත' : 'No data in selected date range'}</div>
+        </div>
+      `;
       return;
     }
 
-    // Calculate totals across 2-track system + cash and overall
-    let totalProfit = 0;
-    let totalLoss = 0;
-    let reloadProfit = 0;
-    let reloadLoss = 0;
-    let bankProfit = 0;
-    let bankLoss = 0;
-    let cashProfit = 0;
-    let cashLoss = 0;
+    // Sort chronologically (oldest to newest)
+    const sorted = [...updates].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const firstUpdate = sorted[0];
+    const lastUpdate = sorted[sorted.length - 1];
 
-    updates.forEach(u => {
-      if (u.comparison && !u.comparison.isFirst) {
-        const c = u.comparison;
-        if (c.overall.diff > 0) totalProfit += c.overall.diff;
-        else totalLoss += Math.abs(c.overall.diff);
+    const baseline = DB.getLastUpdateBefore(shopId, firstUpdate.timestamp);
+    const openingVals = baseline ? DB.extractValues(baseline) : DB.extractValues(firstUpdate);
+    const closingVals = DB.extractValues(lastUpdate);
 
-        const rDiff = c.reload ? c.reload.diff : (c.sim ? c.sim.diff : 0);
-        if (rDiff > 0) reloadProfit += rDiff;
-        else reloadLoss += Math.abs(rDiff);
-
-        const bDiff = c.bank ? c.bank.diff : (c.mobileRental ? c.mobileRental.diff : 0);
-        if (bDiff > 0) bankProfit += bDiff;
-        else bankLoss += Math.abs(bDiff);
-
-        const cDiff = c.cash ? c.cash.diff : 0;
-        if (cDiff > 0) cashProfit += cDiff;
-        else cashLoss += Math.abs(cDiff);
-      }
+    let creditsTotal = 0;
+    let routersTotal = 0;
+    let topupsTotal = 0;
+    sorted.forEach(u => {
+      creditsTotal += u.adjustments?.creditsTotal || 0;
+      routersTotal += u.adjustments?.routersTotal || 0;
+      topupsTotal += u.adjustments?.topupsTotal || 0;
     });
 
-    const netProfitLoss = totalProfit - totalLoss;
-    const netType = netProfitLoss > 0 ? 'profit' : netProfitLoss < 0 ? 'loss' : 'neutral';
-    const reloadNet = reloadProfit - reloadLoss;
-    const bankNet = bankProfit - bankLoss;
-    const cashNet = cashProfit - cashLoss;
+    const simNet = closingVals.simTotal - openingVals.simTotal;
+    const bankNet = closingVals.bankTotal - openingVals.bankTotal;
+    const cashNet = closingVals.totalCash - openingVals.totalCash;
+
+    // True Net Operating Profit / Loss over the date range
+    const netProfitLoss = (closingVals.totalCapital + creditsTotal + routersTotal) - (openingVals.totalCapital + topupsTotal);
+    const netType = Math.abs(netProfitLoss) < 1 ? 'neutral' : (netProfitLoss > 0 ? 'profit' : 'loss');
 
     // Get unique dates
     const uniqueDates = [...new Set(updates.map(u => u.date))].sort();
@@ -4472,114 +4477,114 @@ Thank you! - ${shopName}`;
         <div class="overall-label">📊 ${DB.formatDate(startDate)} - ${DB.formatDate(endDate)}</div>
         <div class="overall-value ${netType}">${netProfitLoss >= 0 ? '+' : ''}${DB.formatCurrency(netProfitLoss)}</div>
         <div class="overall-type" style="color:var(--accent-${netType === 'profit' ? 'green' : netType === 'loss' ? 'red' : 'text-muted'});">
-          ${netType === 'profit' ? '✅ ' + (I18N.t('profit') || 'PROFIT') : netType === 'loss' ? '❌ ' + (I18N.t('loss') || 'LOSS') : '➖ ' + (I18N.t('neutral') || 'BREAK EVEN')}
+          ${netType === 'profit' ? '✅ ' + (I18N.t('profit') || 'PROFIT (ලාභ)') : netType === 'loss' ? '❌ ' + (I18N.t('loss') || 'LOSS (අලාභ)') : '➖ ' + (I18N.t('neutral') || 'BREAK EVEN')}
         </div>
       </div>
 
-      <!-- 2-Track + Cash Category Breakdown -->
+      <!-- 3 Asset Pillars + Activity Breakdown -->
       <div class="summary-grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
-        <!-- Reload Total Card -->
+        <!-- SIMs Float Card -->
         <div class="card accent-blue" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
           <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
-              <span>🔄</span> <span>${I18N.t('dash_reload_total') || 'Reload Total'}</span>
+              <span>📱</span> <span>SIMs Balance Shift</span>
             </span>
-            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(59,130,246,0.12); color:var(--accent-blue);">Reload</span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(59,130,246,0.12); color:var(--accent-blue);">SIMs Float</span>
           </div>
           <div style="margin-bottom:10px;">
-            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Balance</div>
-            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${reloadNet >= 0 ? 'green' : 'red'}); line-height:1.2; word-break:break-all;">
-              ${reloadNet >= 0 ? '+' : ''}${DB.formatCurrency(reloadNet)}
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Float Movement</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-blue); line-height:1.2; word-break:break-all;">
+              ${simNet >= 0 ? '+' : ''}${DB.formatCurrency(simNet)}
             </div>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
             <div style="min-width:0; overflow:hidden;">
-              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('profit') || 'Profit'} (+)</div>
-              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="+${DB.formatCurrency(reloadProfit)}">
-                +${DB.formatCurrency(reloadProfit)}
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Opening SIMs</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${DB.formatCurrency(openingVals.simTotal)}
               </div>
             </div>
             <div style="min-width:0; overflow:hidden;">
-              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('loss') || 'Loss'} (-)</div>
-              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="-${DB.formatCurrency(reloadLoss)}">
-                -${DB.formatCurrency(reloadLoss)}
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Closing SIMs</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-blue); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${DB.formatCurrency(closingVals.simTotal)}
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Bank Total Card -->
+        <!-- Bank Balance Card -->
         <div class="card accent-purple" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
           <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
-              <span>🏦</span> <span>${I18N.t('dash_bank_total') || 'Bank Total'}</span>
+              <span>🏦</span> <span>Bank Accounts Shift</span>
             </span>
             <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(139,92,246,0.12); color:var(--accent-purple);">Bank</span>
           </div>
           <div style="margin-bottom:10px;">
-            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Balance</div>
-            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${bankNet >= 0 ? 'green' : 'red'}); line-height:1.2; word-break:break-all;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Bank Movement</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-purple); line-height:1.2; word-break:break-all;">
               ${bankNet >= 0 ? '+' : ''}${DB.formatCurrency(bankNet)}
             </div>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
             <div style="min-width:0; overflow:hidden;">
-              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('profit') || 'Profit'} (+)</div>
-              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="+${DB.formatCurrency(bankProfit)}">
-                +${DB.formatCurrency(bankProfit)}
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Opening Bank</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${DB.formatCurrency(openingVals.bankTotal)}
               </div>
             </div>
             <div style="min-width:0; overflow:hidden;">
-              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('loss') || 'Loss'} (-)</div>
-              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="-${DB.formatCurrency(bankLoss)}">
-                -${DB.formatCurrency(bankLoss)}
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Closing Bank</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-purple); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${DB.formatCurrency(closingVals.bankTotal)}
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Cash Drawer Card -->
+        <!-- Cash in Drawer Card -->
         <div class="card accent-yellow" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
           <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
-              <span>💵</span> <span>${I18N.t('dash_cash_total') || 'Cash Drawer'}</span>
+              <span>💵</span> <span>Cash Drawer Shift</span>
             </span>
-            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(245,158,11,0.12); color:var(--accent-gold);">Cash Drawer</span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(245,158,11,0.12); color:var(--accent-gold);">Drawer Cash</span>
           </div>
           <div style="margin-bottom:10px;">
-            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Balance</div>
-            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${cashNet >= 0 ? 'green' : 'red'}); line-height:1.2; word-break:break-all;">
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Net Cash Movement</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-gold); line-height:1.2; word-break:break-all;">
               ${cashNet >= 0 ? '+' : ''}${DB.formatCurrency(cashNet)}
             </div>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
             <div style="min-width:0; overflow:hidden;">
-              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('profit') || 'Profit'} (+)</div>
-              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-green); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="+${DB.formatCurrency(cashProfit)}">
-                +${DB.formatCurrency(cashProfit)}
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Opening Cash</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${DB.formatCurrency(openingVals.totalCash)}
               </div>
             </div>
             <div style="min-width:0; overflow:hidden;">
-              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">${I18N.t('loss') || 'Loss'} (-)</div>
-              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="-${DB.formatCurrency(cashLoss)}">
-                -${DB.formatCurrency(cashLoss)}
+              <div style="font-size:0.68rem; color:var(--text-muted); font-weight:700;">Closing Cash</div>
+              <div style="font-size:0.85rem; font-weight:800; color:var(--accent-gold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${DB.formatCurrency(closingVals.totalCash)}
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Total Updates / Summary Card -->
+        <!-- Total Activity Card -->
         <div class="card accent-green" style="box-sizing:border-box; overflow:hidden; display:flex; flex-direction:column; justify-content:space-between; padding:14px 16px;">
           <div class="card-header" style="margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
             <span class="card-title" style="font-weight:800; font-size:0.92rem; display:flex; align-items:center; gap:6px;">
-              <span>📌</span> <span>${I18N.t('stat_total_updates') || 'Summary'}</span>
+              <span>📌</span> <span>${I18N.t('stat_total_updates') || 'Activity'}</span>
             </span>
-            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:var(--accent-green);">Activity</span>
+            <span style="font-size:0.7rem; font-weight:800; padding:2px 8px; border-radius:12px; background:rgba(16,185,129,0.12); color:var(--accent-green);">Summary</span>
           </div>
           <div style="margin-bottom:10px;">
-            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Total Activity</div>
-            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-green); line-height:1.2;">
-              ${updates.length} Records
+            <div style="font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:2px;">Total Capital Shift</div>
+            <div style="font-size:1.35rem; font-weight:900; color:var(--accent-${netType === 'profit' ? 'green' : netType === 'loss' ? 'red' : 'text-muted'}); line-height:1.2;">
+              ${(closingVals.totalCapital - openingVals.totalCapital) >= 0 ? '+' : ''}${DB.formatCurrency(closingVals.totalCapital - openingVals.totalCapital)}
             </div>
           </div>
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 10px; background:rgba(0,0,0,0.03); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
