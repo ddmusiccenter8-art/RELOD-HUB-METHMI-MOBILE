@@ -16,6 +16,7 @@ const App = {
 
   // V14 Shift, Expense & Denomination State
   currentShiftTab: 'closings',
+  shiftViewMode: 'table',
   shiftDateFilter: '',
   dashChartTimeframe: 'week',
   dashChartInstance: null,
@@ -331,6 +332,7 @@ const App = {
     if (pageEl) pageEl.classList.add('active');
 
     window.scrollTo({ top: 0, behavior: 'instant' });
+    this.updateActiveShopHeaderBadges();
     // Refresh page data
     this.refreshPage(page);
   },
@@ -451,12 +453,61 @@ const App = {
     this.updateCloudStatusUI(DB.cloudStatus);
   },
 
+  setActiveShopAndRefresh(shopId, showToast = true) {
+    if (!shopId) return;
+    DB.setActiveShop(shopId);
+    const shop = DB.getShop(shopId);
+    const shopName = shop ? shop.name : (DB.getShops(false)[0]?.name || 'Shop');
+
+    // 1. Sync all shop selector dropdowns and mobile chips
+    this.refreshShopSelector();
+
+    // 2. Sync branch filter on Device Credits
+    this.devCreditShopFilter = shopId;
+    const devFilterEl = document.getElementById('devCreditShopFilter');
+    if (devFilterEl) devFilterEl.value = shopId;
+
+    // 3. Reset shift date filter so all shifts for the newly selected shop are immediately visible
+    this.shiftDateFilter = '';
+    const shiftDateInp = document.getElementById('shiftDateFilter');
+    if (shiftDateInp) shiftDateInp.value = '';
+
+    // 4. Update top bar badges
+    this.updateTopBarBadges();
+
+    // 5. Update active shop indicator badges across all page headers
+    this.updateActiveShopHeaderBadges();
+
+    // 6. Instantly re-render the current page
+    this.refreshPage(this.currentPage);
+
+    // 7. Instant Toast Feedback
+    if (showToast) {
+      this.showToast(I18N.currentLang === 'si' ? `🏪 ${shopName} ශාඛාවට සාර්ථකව මාරු විය!` : `🏪 Switched to ${shopName}!`, 'success');
+    }
+  },
+
+  updateActiveShopHeaderBadges() {
+    const shopId = DB.getActiveShopId();
+    const shop = DB.getShop(shopId);
+    const shopName = shop ? shop.name : (DB.getShops(false)[0]?.name || 'Main Shop');
+
+    const elements = document.querySelectorAll('.active-shop-display-name, .shifts-active-shop-name, #quickActionsActiveShopName, #mobileActiveShopName');
+    elements.forEach(el => {
+      el.textContent = shopName;
+    });
+
+    const sel = document.getElementById('shopSelector');
+    if (sel && sel.value !== shopId) {
+      sel.value = shopId;
+    }
+  },
+
   setupShopSelector() {
     const sel = document.getElementById('shopSelector');
     if (sel) {
       sel.addEventListener('change', () => {
-        DB.setActiveShop(sel.value);
-        this.refreshPage(this.currentPage);
+        this.setActiveShopAndRefresh(sel.value, true);
         const sb = document.getElementById('sidebar');
         const so = document.getElementById('sidebarOverlay');
         if (sb) sb.classList.remove('open');
@@ -492,6 +543,7 @@ const App = {
     if (mShopEl) {
       mShopEl.textContent = activeShop ? activeShop.name : (shops[0] ? shops[0].name : 'Main Shop');
     }
+    this.updateActiveShopHeaderBadges();
     this.updateTopBarBadges();
   },
 
@@ -2921,12 +2973,8 @@ const App = {
   },
 
   switchShopFromModal(shopId) {
-    DB.setActiveShop(shopId);
-    this.refreshShopSelector();
-    this.refreshPage(this.currentPage);
     this.closeSubModal();
-    const shop = DB.getShop(shopId);
-    this.showToast(`🏪 Switched to ${shop ? shop.name : 'Shop'}!`, 'success');
+    this.setActiveShopAndRefresh(shopId, true);
   },
 
   showMainDashboard() {
@@ -2935,10 +2983,8 @@ const App = {
   },
 
   switchShop(shopId) {
-    DB.setActiveShop(shopId);
-    this.refreshShopSelector();
+    this.setActiveShopAndRefresh(shopId, true);
     this.navigateTo('dashboard');
-    this.showToast(I18N.currentLang === 'si' ? '🏪 Shop switch කරා!' : '🏪 Shop switched!', 'success');
   },
 
   editShop(shopId) {
@@ -4962,9 +5008,38 @@ Thank you! - ${shopName}`;
     this.showShiftSummaryModal(s);
   },
 
+  setShiftViewMode(mode) {
+    this.shiftViewMode = mode;
+    const btnTable = document.getElementById('shiftViewModeTableBtn');
+    const btnCards = document.getElementById('shiftViewModeCardsBtn');
+    if (btnTable && btnCards) {
+      if (mode === 'cards') {
+        btnCards.className = 'btn btn-xs btn-primary';
+        btnTable.className = 'btn btn-xs btn-ghost';
+      } else {
+        btnTable.className = 'btn btn-xs btn-primary';
+        btnCards.className = 'btn btn-xs btn-ghost';
+      }
+    }
+    this.renderShiftsPage();
+  },
+
   renderShiftsPage() {
     const today = DB.getTodayDate();
     const filterDate = this.shiftDateFilter;
+
+    // Sync View Mode Toggle Button Styles
+    const btnTable = document.getElementById('shiftViewModeTableBtn');
+    const btnCards = document.getElementById('shiftViewModeCardsBtn');
+    if (btnTable && btnCards) {
+      if (this.shiftViewMode === 'cards') {
+        btnCards.className = 'btn btn-xs btn-primary';
+        btnTable.className = 'btn btn-xs btn-ghost';
+      } else {
+        btnTable.className = 'btn btn-xs btn-primary';
+        btnCards.className = 'btn btn-xs btn-ghost';
+      }
+    }
 
     // Populate shiftShopFilter dropdown
     const shopSelect = document.getElementById('shiftShopFilter');
@@ -5060,22 +5135,112 @@ Thank you! - ${shopName}`;
         return;
       }
 
+      if (this.shiftViewMode === 'cards') {
+        // Render Responsive Cards View (Auto-adjusts with zero horizontal scroll)
+        let cardsHtml = `<div class="shift-card-grid">`;
+        shiftsToShow.forEach(s => {
+          const diff = s.difference || 0;
+          let badgeHtml = '';
+          if (s.status === 'balanced') {
+            badgeHtml = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'}</span>`;
+          } else if (s.status === 'excess') {
+            badgeHtml = `<span class="tally-badge excess">🟢 +${DB.formatCurrency(diff)}</span>`;
+          } else {
+            badgeHtml = `<span class="tally-badge shortage">🔴 -${DB.formatCurrency(Math.abs(diff))}</span>`;
+          }
+
+          const posCash = s.posCashSales || 0;
+          const posCard = s.posCardSales || 0;
+          const posCheque = s.posChequeSales || 0;
+          const posTotal = s.posGrossSales || s.posSales || (posCash + posCard + posCheque);
+
+          const isToday = s.date === today;
+          const editBtnHtml = isToday ? `
+            <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:5px 12px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:6px; cursor:pointer;">
+              ✏️ Edit
+            </button>
+          ` : '';
+
+          const sShop = DB.getShop(s.shopId);
+          const shopName = sShop ? sShop.name : (s.shopId || 'Shop');
+
+          cardsHtml += `
+            <div class="shift-closing-card">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
+                <div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-weight:800; font-size:1.05rem; color:var(--text-primary);">${DB.formatDate(s.date)}</span>
+                    <span class="badge" style="background:rgba(59,130,246,0.12); color:var(--accent-blue); padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:700;">🏪 ${shopName}</span>
+                  </div>
+                  <div style="font-size:0.78rem; color:var(--text-muted); margin-top:2px;">
+                    🕒 ${DB.formatTime(s.timestamp)} &bull; 👤 <strong>${s.cashier || s.cashierName || 'Staff'}</strong>
+                  </div>
+                </div>
+                <div>${badgeHtml}</div>
+              </div>
+
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:12px; font-size:0.85rem;">
+                <div style="background:rgba(255,255,255,0.03); padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.05);">
+                  <div style="color:var(--text-muted); font-size:0.75rem;">Opening Float</div>
+                  <div style="font-weight:700;">${DB.formatCurrency(s.openingFloat || 0)}</div>
+                </div>
+                <div style="background:rgba(59,130,246,0.06); padding:8px 10px; border-radius:6px; border:1px solid rgba(59,130,246,0.15);">
+                  <div style="color:var(--accent-blue); font-size:0.75rem; font-weight:700;">POS Gross Sales</div>
+                  <div style="font-weight:800; color:var(--text-primary);">${DB.formatCurrency(posTotal)}</div>
+                </div>
+                <div style="background:rgba(239,68,68,0.06); padding:8px 10px; border-radius:6px; border:1px solid rgba(239,68,68,0.15);">
+                  <div style="color:var(--accent-red); font-size:0.75rem; font-weight:700;">Expenses Deducted</div>
+                  <div style="font-weight:800; color:var(--accent-red);">${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</div>
+                </div>
+                <div style="background:rgba(16,185,129,0.06); padding:8px 10px; border-radius:6px; border:1px solid rgba(16,185,129,0.15);">
+                  <div style="color:var(--accent-green); font-size:0.75rem; font-weight:700;">Counted Cash</div>
+                  <div style="font-weight:800; color:var(--accent-green); font-size:0.95rem;">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</div>
+                </div>
+              </div>
+
+              ${(s.specialNotes || s.cashNote) ? `
+                <div style="font-size:0.8rem; background:rgba(139,92,246,0.08); color:var(--accent-purple); padding:8px 10px; border-radius:6px; margin-bottom:12px; border:1px solid rgba(139,92,246,0.2);">
+                  📝 <strong>Notes:</strong> ${s.specialNotes || s.cashNote}
+                </div>
+              ` : ''}
+
+              <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; border-top:1px solid var(--border-glass); padding-top:10px;">
+                ${editBtnHtml}
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:5px 10px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                  📄 PDF
+                </button>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:5px 10px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                  💬 WhatsApp
+                </button>
+                <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:5px 8px; border-radius:6px;">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          `;
+        });
+        cardsHtml += `</div>`;
+        tableContainer.innerHTML = cardsHtml;
+        return;
+      }
+
       let html = `
+        <div class="data-table-container">
         <table class="data-table" style="width:100%; min-width:920px;">
           <thead>
             <tr>
-              <th>${I18N.t('hist_col_date') || 'Date / Branch'}</th>
+              <th>${I18N.t('hist_col_date') || 'Date / Time'}</th>
               <th>${I18N.t('upd_emp_name') || 'Cashier'}</th>
               <th style="text-align:right;">${I18N.t('shift_opening_float') || 'Opening Float'}</th>
               <th style="text-align:right;">${I18N.t('shift_pos_cash') || 'POS Cash'}</th>
-              <th style="text-align:right;">${I18N.t('shift_pos_card') || 'POS Cards'}</th>
+              <th style="text-align:right;">${I18N.t('shift_pos_card') || 'POS Card'}</th>
               <th style="text-align:right; font-weight:800;">${I18N.t('shift_pos_sales') || 'POS Gross Total'}</th>
               <th style="text-align:right;">${I18N.t('stat_daily_expenses') || 'Expenses'}</th>
               <th style="text-align:right;">${I18N.t('shift_expected_cash') || 'Expected Cash'}</th>
               <th style="text-align:right; font-weight:800;">${I18N.t('shift_counted_cash') || 'Counted Cash'}</th>
               <th style="text-align:center;">${I18N.t('shift_status_verdict') || 'Status'}</th>
               <th>Special Notes</th>
-              <th style="text-align:center;">Actions</th>
+              <th class="col-sticky-action" style="text-align:center;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -5099,7 +5264,7 @@ Thank you! - ${shopName}`;
 
         const isToday = s.date === today;
         const editBtnHtml = isToday ? `
-          <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:3px 8px; margin-right:4px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:4px; cursor:pointer;">
+          <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:4px 8px; margin-right:4px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:6px; cursor:pointer;">
             ✏️ Edit
           </button>
         ` : '';
@@ -5112,33 +5277,39 @@ Thank you! - ${shopName}`;
         html += `
           <tr style="border-bottom:1px solid var(--border-glass);">
             <td>
-              <div style="font-weight:700;">${DB.formatDate(s.date)}</div>
-              <div style="font-size:0.75rem; color:var(--text-muted);">${DB.formatTime(s.timestamp)}</div>
+              <div style="font-weight:700; white-space:nowrap;">${DB.formatDate(s.date)}</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">${DB.formatTime(s.timestamp)}</div>
               ${shopBadgeHtml}
             </td>
-            <td><strong>${s.cashier || s.cashierName || '--'}</strong></td>
-            <td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td>
-            <td style="text-align:right; color:var(--accent-blue);">${DB.formatCurrency(posCash)}</td>
-            <td style="text-align:right; color:var(--accent-purple);">${DB.formatCurrency(posCard)}</td>
-            <td style="text-align:right; font-weight:800; color:var(--text-primary);">${DB.formatCurrency(posTotal)}</td>
-            <td style="text-align:right; color:var(--accent-red); font-weight:700;">${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td>
-            <td style="text-align:right; font-weight:600;">${DB.formatCurrency(s.expectedCash || 0)}</td>
-            <td style="text-align:right; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td>
-            <td style="text-align:center;">${badgeHtml}</td>
-            <td>
-              ${(s.specialNotes || s.cashNote) ? `<span style="color:var(--accent-purple); font-weight:600; font-size:0.8rem;" title="${s.specialNotes || s.cashNote}">📝 ${(s.specialNotes || s.cashNote).length > 25 ? (s.specialNotes || s.cashNote).substring(0, 25) + '...' : (s.specialNotes || s.cashNote)}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">--</span>'}
+            <td><strong style="white-space:nowrap;">${s.cashier || s.cashierName || '--'}</strong></td>
+            <td style="text-align:right; white-space:nowrap;">${DB.formatCurrency(s.openingFloat || 0)}</td>
+            <td style="text-align:right; color:var(--accent-blue); white-space:nowrap;">${DB.formatCurrency(posCash)}</td>
+            <td style="text-align:right; color:var(--accent-purple); white-space:nowrap;">${DB.formatCurrency(posCard)}</td>
+            <td style="text-align:right; font-weight:800; color:var(--text-primary); white-space:nowrap;">${DB.formatCurrency(posTotal)}</td>
+            <td style="text-align:right; color:var(--accent-red); font-weight:700; white-space:nowrap;">${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td>
+            <td style="text-align:right; font-weight:600; white-space:nowrap;">${DB.formatCurrency(s.expectedCash || 0)}</td>
+            <td style="text-align:right; font-weight:800; color:var(--accent-green); white-space:nowrap;">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td>
+            <td style="text-align:center; white-space:nowrap;">${badgeHtml}</td>
+            <td style="max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              ${(s.specialNotes || s.cashNote) ? `<span style="color:var(--accent-purple); font-weight:600; font-size:0.8rem;" title="${s.specialNotes || s.cashNote}">📝 ${(s.specialNotes || s.cashNote)}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">--</span>'}
             </td>
-            <td style="text-align:center; white-space:nowrap;">
+            <td class="col-sticky-action" style="text-align:center; white-space:nowrap;">
               ${editBtnHtml}
-              <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:3px 8px; margin-right:4px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">📄 PDF</button>
-              <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:3px 8px; margin-right:4px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.3);">📲 WhatsApp</button>
-              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:3px 7px;">🗑️</button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:4px 8px; margin-right:4px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <span style="font-size:0.95rem; line-height:1;">📄</span> <span>PDF</span>
+              </button>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:4px 8px; margin-right:4px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <span style="font-size:0.95rem; line-height:1;">💬</span> <span>WhatsApp</span>
+              </button>
+              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:4px 7px; border-radius:6px;">
+                <span style="font-size:0.95rem; line-height:1;">🗑️</span>
+              </button>
             </td>
           </tr>
         `;
       });
 
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`;
       tableContainer.innerHTML = html;
     } else if (this.currentShiftTab === 'bank-handover') {
       // Bank Deposits & Cash Handovers table
@@ -5186,6 +5357,7 @@ Thank you! - ${shopName}`;
           </button>
         </div>
 
+        <div class="data-table-container">
         <table class="data-table" style="width:100%; min-width:850px;">
           <thead>
             <tr>
@@ -5197,7 +5369,7 @@ Thank you! - ${shopName}`;
               <th>${I18N.currentLang === 'si' ? 'භාරදුන් / යැවූ කෙනා' : 'Staff / Cashier'}</th>
               <th style="text-align:center;">${I18N.currentLang === 'si' ? 'ස්ලිප් / රිසිට්පත' : 'Slip / Receipt'}</th>
               <th>${I18N.currentLang === 'si' ? 'විස්තරය / සටහන්' : 'Remarks / Notes'}</th>
-              <th style="text-align:center;">${I18N.currentLang === 'si' ? 'ක්‍රියා' : 'Actions'}</th>
+              <th class="col-sticky-action" style="text-align:center;">${I18N.currentLang === 'si' ? 'ක්‍රියා' : 'Actions'}</th>
             </tr>
           </thead>
           <tbody>
@@ -5240,14 +5412,14 @@ Thank you! - ${shopName}`;
             <td style="font-weight:600;">${b.depositedBy || '--'}</td>
             <td style="text-align:center;">${slipHtml}</td>
             <td style="font-size:0.8rem; color:var(--text-secondary); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${b.note || ''}">${b.note || '--'}</td>
-            <td style="text-align:center;">
+            <td class="col-sticky-action" style="text-align:center;">
               <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteBankTransaction('${b.id}')" title="Delete Record">🗑️</button>
             </td>
           </tr>
         `;
       });
 
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`;
       tableContainer.innerHTML = html;
     } else {
       // Expenses table
@@ -5258,6 +5430,7 @@ Thank you! - ${shopName}`;
       }
 
       let html = `
+        <div class="data-table-container">
         <table class="data-table" style="width:100%; min-width:700px;">
           <thead>
             <tr>
@@ -5267,7 +5440,7 @@ Thank you! - ${shopName}`;
               <th>${I18N.t('exp_col_paid_from') || 'Paid From'}</th>
               <th style="text-align:center;">${I18N.t('exp_col_drawer_deduct') || 'Drawer Deduct'}</th>
               <th style="text-align:right;">${I18N.t('exp_col_amount') || 'Amount'}</th>
-              <th style="text-align:center;">Actions</th>
+              <th class="col-sticky-action" style="text-align:center;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -5291,14 +5464,14 @@ Thank you! - ${shopName}`;
             <td><span class="date-pill" style="font-size:0.75rem;">${paidFromLabel}</span></td>
             <td style="text-align:center;">${e.deductFromDrawer || e.deductFromBalance ? '✅ Yes' : '➖ No'}</td>
             <td style="text-align:right; font-weight:800; color:var(--accent-red);">${DB.formatCurrency(e.amount || 0)}</td>
-            <td style="text-align:center;">
+            <td class="col-sticky-action" style="text-align:center;">
               <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteExpense('${e.id}')" title="Delete Expense">🗑️</button>
             </td>
           </tr>
         `;
       });
 
-      html += `</tbody></table>`;
+      html += `</tbody></table></div>`;
       tableContainer.innerHTML = html;
     }
   },

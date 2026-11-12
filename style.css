@@ -66,7 +66,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', 'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Segoe UI Emoji', 'Segoe UI Symbol', 'Apple Color Emoji', 'Noto Color Emoji', 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
@@ -1542,6 +1542,112 @@ select option {
 .ledger-table tr:hover td {
   background: var(--bg-glass-hover);
 }
+
+/* ---- Universal Data Table Styling (Auto-Adjusts to Any PC/Mobile Display) ---- */
+.data-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  border-radius: var(--radius-sm);
+}
+
+.data-table-container::-webkit-scrollbar,
+#shiftsTableContainer::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.data-table-container::-webkit-scrollbar-track,
+#shiftsTableContainer::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+.data-table-container::-webkit-scrollbar-thumb,
+#shiftsTableContainer::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.45);
+  border-radius: 4px;
+}
+.data-table-container::-webkit-scrollbar-thumb:hover,
+#shiftsTableContainer::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.75);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.data-table th {
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border-glass);
+}
+
+.data-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-glass);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.data-table tr:hover td {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* Sticky Action Column so it is NEVER cut off on any PC screen width */
+.data-table th.col-sticky-action,
+.data-table td.col-sticky-action {
+  position: sticky;
+  right: 0;
+  background: var(--bg-card);
+  box-shadow: -6px 0 14px rgba(0, 0, 0, 0.28);
+  z-index: 2;
+  text-align: center;
+}
+
+.data-table tr:hover td.col-sticky-action {
+  background: var(--bg-card);
+}
+
+/* Shift Summary Cards (for Auto-Responsive mode or density toggle) */
+.shift-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.shift-closing-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: var(--transition);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.shift-closing-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+}
+
+@media (max-width: 1200px) {
+  .data-table {
+    font-size: 0.8rem;
+  }
+  .data-table th, .data-table td {
+    padding: 8px 8px;
+  }
+}
+
 
 .status-badge {
   display: inline-flex;

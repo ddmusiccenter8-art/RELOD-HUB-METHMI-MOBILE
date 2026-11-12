@@ -1489,9 +1489,13 @@ const DB = {
 
   // ---- Daily Evening Shift Summaries & POS Tally ----
   getShifts(shopId = null) {
-    let list = JSON.parse(localStorage.getItem(this.SHIFTS_KEY) || '[]');
-    if (shopId) list = list.filter(s => s.shopId === shopId);
-    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    let list = this._getStorage(this.SHIFTS_KEY, []);
+    if (shopId) {
+      const activeShops = this.getShops(false);
+      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
+      list = list.filter(s => s.shopId === shopId || (isFirstShop && (!s.shopId || s.shopId === 'main')));
+    }
+    return list.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
   },
 
   getShiftsForShop(shopId) {
@@ -1722,10 +1726,14 @@ const DB = {
 
   // ---- Daily Expenses & Owner Wallet ----
   getExpenses(shopId = null, date = null) {
-    let list = JSON.parse(localStorage.getItem(this.EXPENSES_KEY) || '[]');
-    if (shopId) list = list.filter(e => e.shopId === shopId);
+    let list = this._getStorage(this.EXPENSES_KEY, []);
+    if (shopId) {
+      const activeShops = this.getShops(false);
+      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
+      list = list.filter(e => e.shopId === shopId || (isFirstShop && (!e.shopId || e.shopId === 'main')));
+    }
     if (date) list = list.filter(e => e.date === date);
-    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return list.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
   },
 
   getExpensesForShop(shopId) {
@@ -2652,9 +2660,13 @@ const DB = {
   // ---- Bank Deposits & Cash Outs ----
   getBankTransactions(shopId = null, date = null) {
     let list = this._getStorage(this.BANK_TRANSACTIONS_KEY, []);
-    if (shopId) list = list.filter(t => t.shopId === shopId);
+    if (shopId) {
+      const activeShops = this.getShops(false);
+      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
+      list = list.filter(t => t.shopId === shopId || (isFirstShop && (!t.shopId || t.shopId === 'main')));
+    }
     if (date) list = list.filter(t => t.date === date);
-    return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return list.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
   },
 
   saveBankTransactions(list) {

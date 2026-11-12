@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=41.0">
+  <link rel="stylesheet" href="style.css?v=42.0">
 </head>
 <body>
 
@@ -132,9 +132,12 @@
       <!-- Top Quick Action Card Box (Neat, unified layout) -->
       <div class="card" id="topQuickActionCard" style="margin-bottom: 20px; padding: 14px 18px; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: var(--radius-lg); box-shadow: 0 4px 18px rgba(0,0,0,0.06);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 8px;">
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <span style="font-size:1.15rem;">⚡</span>
             <span style="font-weight:800; font-size:0.92rem; color:var(--text-primary); text-transform:uppercase; letter-spacing:0.5px;">Quick Shop Actions (ක්ෂණික මෙහෙයුම්)</span>
+            <span class="active-shop-badge" style="background:rgba(2,132,199,0.15); color:var(--accent-blue); border:1px solid rgba(2,132,199,0.35); padding:2px 8px; border-radius:12px; font-weight:800; font-size:0.78rem; display:inline-flex; align-items:center; gap:4px; margin-left:4px;">
+              🏪 <span id="quickActionsActiveShopName">Main Shop</span>
+            </span>
           </div>
           <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">1-Tap Operations</span>
         </div>
@@ -743,7 +746,12 @@
       <div class="page" id="page-shifts">
         <div class="page-header">
           <div>
-            <h1><span class="header-icon">🏪</span> <span data-i18n="shift_title">Shop Drawer & Shift Reconciliation</span></h1>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h1><span class="header-icon">🏪</span> <span data-i18n="shift_title">Shop Drawer & Shift Reconciliation</span></h1>
+              <span class="active-shop-badge shifts-active-shop-pill" style="background:rgba(2,132,199,0.15); color:var(--accent-blue); border:1px solid rgba(2,132,199,0.4); padding:4px 12px; border-radius:20px; font-weight:800; font-size:0.88rem; display:inline-flex; align-items:center; gap:6px;">
+                🏪 <span class="shifts-active-shop-name">Main Shop</span>
+              </span>
+            </div>
             <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="shift_subtitle">Morning opening note float, evening POS sales reconciliation, day expenses, and remote Super Admin reporting</p>
           </div>
           <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -810,6 +818,10 @@
               <button type="button" class="btn btn-ghost btn-sm shift-tab-btn" data-tab="bank-handover" onclick="App.setShiftTab('bank-handover')" data-i18n="tab_bank_handover">🏦 Bank Deposits & Cash Handovers</button>
             </div>
             <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <div class="btn-group" style="display:inline-flex; border:1px solid var(--border-glass); border-radius:var(--radius-sm); overflow:hidden;">
+                <button type="button" id="shiftViewModeTableBtn" class="btn btn-xs btn-primary" onclick="App.setShiftViewMode('table')" style="padding:6px 11px; font-weight:700;">📊 Table</button>
+                <button type="button" id="shiftViewModeCardsBtn" class="btn btn-xs btn-ghost" onclick="App.setShiftViewMode('cards')" style="padding:6px 11px; font-weight:700;">🗂️ Cards</button>
+              </div>
               <input type="date" class="form-input" id="shiftDateFilter" style="width:auto; padding:6px 10px;">
               <button type="button" class="btn btn-ghost btn-sm" onclick="App.resetShiftDateFilter()" data-i18n="hist_btn_all">View All</button>
               <button type="button" class="btn btn-primary btn-sm" onclick="App.showQuickAddBankDepositModal()" style="background:var(--accent-purple); border-color:var(--accent-purple); font-weight:700;">+ Record Bank / Cash Handover</button>
@@ -1035,10 +1047,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=41.0"></script>
-  <script src="firebase-init.js?v=41.0"></script>
-  <script src="data.js?v=41.0"></script>
-  <script src="app.js?v=41.0"></script>
+  <script src="i18n.js?v=42.0"></script>
+  <script src="firebase-init.js?v=42.0"></script>
+  <script src="data.js?v=42.0"></script>
+  <script src="app.js?v=42.0"></script>
   
   <!-- Register Service Worker -->
   <script>
