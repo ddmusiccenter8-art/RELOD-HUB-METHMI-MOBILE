@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=44.0">
+  <link rel="stylesheet" href="style.css?v=45.0">
 </head>
 <body>
 
@@ -422,11 +422,11 @@
           <div class="form-row">
             <div class="form-group">
               <label class="form-label" data-i18n="upd_emp_name">Employee Name</label>
-              <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="Employee Name" required>
+              <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="Employee Name (Type 1st letter to auto-fill)" list="employeeNameSuggestions" autocomplete="off" required>
             </div>
             <div class="form-group">
               <label class="form-label" data-i18n="upd_job_role">Job Role</label>
-              <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="Job Role (e.g. Cashier)">
+              <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="Job Role (e.g. OWNER, Cashier)" list="employeeRoleSuggestions" autocomplete="off">
             </div>
           </div>
 
@@ -1054,10 +1054,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=44.0"></script>
-  <script src="firebase-init.js?v=44.0"></script>
-  <script src="data.js?v=44.0"></script>
-  <script src="app.js?v=44.0"></script>
+  <script src="i18n.js?v=45.0"></script>
+  <script src="firebase-init.js?v=45.0"></script>
+  <script src="data.js?v=45.0"></script>
+  <script src="app.js?v=45.0"></script>
   
   <!-- Register Service Worker -->
   <script>
@@ -1073,5 +1073,8 @@
     }
   </script>
 
+  <!-- Employee & Designation Autocomplete Datalists -->
+  <datalist id="employeeNameSuggestions"></datalist>
+  <datalist id="employeeRoleSuggestions"></datalist>
 </body>
 </html>

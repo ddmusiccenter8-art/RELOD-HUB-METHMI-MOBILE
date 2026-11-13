@@ -49,6 +49,7 @@ const App = {
     this.setupReportsPage();
     this.setupExportImport();
     this.setupMobileMenu();
+    this.setupEmployeeAutocomplete();
     this.setupCloudListeners();
 
     // Quick Add Shop
@@ -359,6 +360,51 @@ const App = {
     if (so) so.classList.toggle('open');
   },
 
+    refreshEmployeeDatalist() {
+    if (typeof DB === 'undefined' || !DB.getEmployees) return;
+    const employees = DB.getEmployees();
+
+    let dlName = document.getElementById('employeeNameSuggestions');
+    if (!dlName) {
+      dlName = document.createElement('datalist');
+      dlName.id = 'employeeNameSuggestions';
+      document.body.appendChild(dlName);
+    }
+    dlName.innerHTML = employees.map(e => `<option value="${e.name}">${e.name} ${e.role ? '(' + e.role + ')' : ''}</option>`).join('');
+
+    let dlRole = document.getElementById('employeeRoleSuggestions');
+    if (!dlRole) {
+      dlRole = document.createElement('datalist');
+      dlRole.id = 'employeeRoleSuggestions';
+      document.body.appendChild(dlRole);
+    }
+    const roles = Array.from(new Set(employees.map(e => e.role).filter(Boolean)));
+    dlRole.innerHTML = roles.map(r => `<option value="${r}">${r}</option>`).join('');
+  },
+
+  setupEmployeeAutocomplete() {
+    this.refreshEmployeeDatalist();
+
+    const nameInput = document.getElementById('empName');
+    const roleInput = document.getElementById('jobRole');
+    if (!nameInput) return;
+
+    const autofillRole = () => {
+      const val = nameInput.value.trim().toLowerCase();
+      if (!val) return;
+      const employees = DB.getEmployees();
+      const match = employees.find(e => e.name.toLowerCase() === val || e.name.toLowerCase().startsWith(val));
+      if (match && roleInput) {
+        if (!roleInput.value || roleInput.value.trim() === '' || roleInput.value.trim().toLowerCase() !== match.role.toLowerCase()) {
+          roleInput.value = match.role;
+        }
+      }
+    };
+
+    nameInput.addEventListener('input', autofillRole);
+    nameInput.addEventListener('change', autofillRole);
+  },
+
   setupMobileMenu() {
     const toggleMenu = () => this.toggleSidebarMenu();
     const hb = document.getElementById('hamburgerBtn');
@@ -460,23 +506,26 @@ const App = {
     const shop = DB.getShop(shopId);
     const shopName = shop ? shop.name : (DB.getShops(false)[0]?.name || 'Shop');
 
-    // 1. Sync all shop selector dropdowns and mobile chips
+    // 1. Sync sidebar dropdown value without DOM recreation jitter
     this.refreshShopSelector();
 
-    // 2. Sync branch filter on Device Credits
+    // 2. Sync branch filter on Shifts page and state
+    this.shiftShopFilter = shopId;
+    const shiftShopSelect = document.getElementById('shiftShopFilter');
+    if (shiftShopSelect) shiftShopSelect.value = shopId;
+
+    // 3. Sync branch filter on Device Credits
     this.devCreditShopFilter = shopId;
     const devFilterEl = document.getElementById('devCreditShopFilter');
     if (devFilterEl) devFilterEl.value = shopId;
 
-    // 3. Reset shift date filter so all shifts for the newly selected shop are immediately visible
+    // 4. Reset shift date filter so all shifts for the newly selected shop are immediately visible
     this.shiftDateFilter = '';
     const shiftDateInp = document.getElementById('shiftDateFilter');
     if (shiftDateInp) shiftDateInp.value = '';
 
-    // 4. Update top bar badges
+    // 5. Update top bar badges & headers
     this.updateTopBarBadges();
-
-    // 5. Update active shop indicator badges across all page headers
     this.updateActiveShopHeaderBadges();
 
     // 6. Instantly re-render the current page
@@ -527,25 +576,13 @@ const App = {
       activeId = shops[0].id;
       DB.setActiveShop(activeId);
     }
-    sel.innerHTML = '';
-    shops.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.id;
-      opt.textContent = '🏪 ' + s.name;
-      if (s.id === activeId) opt.selected = true;
-      sel.appendChild(opt);
-    });
-    if (shops.length === 0) {
-      sel.innerHTML = `<option value="">${I18N.t('select_shop') || '-- Select Shop --'}</option>`;
+    const currentValues = Array.from(sel.options).map(o => o.value).join(',');
+    const newValues = shops.map(s => s.id).join(',');
+    if (currentValues !== newValues || sel.options.length === 0) {
+      sel.innerHTML = shops.map(s => `<option value="${s.id}">🏪 ${s.name}</option>`).join('');
+      if (shops.length === 0) sel.innerHTML = `<option value="">-- Select Shop --</option>`;
     }
-
-    const activeShop = shops.find(s => s.id === activeId);
-    const mShopEl = document.getElementById('mobileActiveShopName');
-    if (mShopEl) {
-      mShopEl.textContent = activeShop ? activeShop.name : (shops[0] ? shops[0].name : 'Main Shop');
-    }
-    this.updateActiveShopHeaderBadges();
-    this.updateTopBarBadges();
+    sel.value = activeId;
   },
 
   // ---- Period Summary (Today, Yesterday, Week, Month, Year, All) ----
@@ -1998,6 +2035,10 @@ const App = {
 
     const empName = document.getElementById('empName').value.trim();
     const jobRole = document.getElementById('jobRole').value.trim();
+    if (empName) {
+      DB.saveEmployee(empName, jobRole);
+      this.refreshEmployeeDatalist();
+    }
 
     if (!empName) {
       this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න' : 'Please enter Employee Name', 'error');
@@ -5023,6 +5064,12 @@ Thank you! - ${shopName}`;
 
   setShiftShopFilter(val) {
     this.shiftShopFilter = val;
+    if (val !== 'all') {
+      DB.setActiveShop(val);
+      this.refreshShopSelector();
+      this.updateActiveShopHeaderBadges();
+      this.updateTopBarBadges();
+    }
     this.renderShiftsPage();
   },
 
@@ -5365,14 +5412,14 @@ setShiftViewMode(mode) {
             <button type="button" class="btn btn-xs btn-ghost" onclick="const c=document.querySelector('.data-table-container'); if(c) c.scrollBy({left:250, behavior:'smooth'});" style="padding:2px 8px; font-weight:700; border:1px solid rgba(0,0,0,0.15); border-radius:4px; cursor:pointer;" title="Scroll Right">දකුණට ▶️</button>
           </div>
           <div style="color:var(--accent-blue); font-weight:700;">
-            ✅ 1st Column & Sticky Actions: [✏️ Edit (අද)] &bull; [📄 PDF] &bull; [📲 WhatsApp]
+            ✅ Quick Actions: [✏️ Edit (අද)] &bull; [📄 PDF] &bull; [📲 WA] &bull; [🗑️ Delete]
           </div>
         </div>
         <div class="data-table-container ${this.shiftDensity === 'compact' ? 'compact-density' : ''}">
         <table class="data-table" style="width:100%; min-width:880px;">
           <thead>
             <tr>
-              <th style="min-width:160px; max-width:180px;">Date & Quick Actions</th>
+              <th style="min-width:175px;">Date & Quick Actions</th>
               <th>Cashier</th>
               <th style="text-align:right;">Float</th>
               <th style="text-align:right;">POS Cash</th>
@@ -5383,7 +5430,6 @@ setShiftViewMode(mode) {
               <th style="text-align:right; font-weight:800;">Counted Cash</th>
               <th style="text-align:center;">Status</th>
               <th>Notes</th>
-              <th class="col-sticky-action" style="text-align:center; min-width:160px;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -5413,19 +5459,22 @@ setShiftViewMode(mode) {
 
         // Immediate Action Bar in First Column (GUARANTEED NEVER TO BE CUT OFF)
         const firstColActions = `
-          <div style="margin-top:6px; display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
+          <div style="margin-top:5px; display:flex; gap:3px; align-items:center; flex-wrap:wrap;">
             ${isToday ? `
-              <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:3px 8px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:4px; cursor:pointer;">
+              <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:2px 7px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:4px; cursor:pointer;">
                 ✏️ Edit
               </button>
             ` : `
               <span style="font-size:0.68rem; color:var(--text-muted); background:rgba(0,0,0,0.05); padding:2px 5px; border-radius:4px;" title="Past shift - Locked">🔒 Closed</span>
             `}
-            <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:3px 8px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.4); border-radius:4px; cursor:pointer;">
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:2px 6px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.4); border-radius:4px; cursor:pointer;">
               📄 PDF
             </button>
-            <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:3px 8px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.4); border-radius:4px; cursor:pointer;">
-              📲 WhatsApp
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:2px 6px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.4); border-radius:4px; cursor:pointer;">
+              📲 WA
+            </button>
+            <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift (Admin Password Required)" style="padding:2px 6px; border-radius:4px; cursor:pointer; background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35); color:var(--accent-red);">
+              🗑️
             </button>
           </div>
         `;
@@ -5450,22 +5499,7 @@ setShiftViewMode(mode) {
             <td style="max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
               ${(s.specialNotes || s.cashNote) ? `<span style="color:var(--accent-purple); font-weight:600; font-size:0.8rem;" title="${s.specialNotes || s.cashNote}">📝 ${(s.specialNotes || s.cashNote)}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">--</span>'}
             </td>
-            <td class="col-sticky-action" style="text-align:center; white-space:nowrap;">
-              ${isToday ? `
-                <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:4px 8px; margin-right:4px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:6px; cursor:pointer;">
-                  ✏️ Edit
-                </button>
-              ` : ''}
-              <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:4px 8px; margin-right:4px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                <span style="font-size:0.95rem; line-height:1;">📄</span> <span>PDF</span>
-              </button>
-              <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:4px 8px; margin-right:4px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
-                <span style="font-size:0.95rem; line-height:1;">💬</span> <span>WhatsApp</span>
-              </button>
-              <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:4px 7px; border-radius:6px;">
-                <span style="font-size:0.95rem; line-height:1;">🗑️</span>
-              </button>
-            </td>
+            
           </tr>
         `;
       });
@@ -5701,7 +5735,7 @@ setShiftViewMode(mode) {
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label" style="font-size:0.75rem; margin-bottom:2px;">${I18N.t('upd_emp_name') || 'Cashier Name'} *</label>
-            <input type="text" class="form-input" id="shiftModalCashier" placeholder="e.g. HR GOMAS" value="${initialCashier}" style="padding:6px 8px; font-size:0.85rem; height:34px;" required>
+            <input type="text" class="form-input" id="shiftModalCashier" placeholder="e.g. HR GOMAS" list="employeeNameSuggestions" autocomplete="off" value="${initialCashier}" style="padding:6px 8px; font-size:0.85rem; height:34px;" required>
           </div>
         </div>
 
@@ -5869,6 +5903,8 @@ setShiftViewMode(mode) {
 
     const shiftType = document.getElementById('shiftModalType')?.value || 'evening';
     const cashier = document.getElementById('shiftModalCashier')?.value?.trim() || 'Cashier';
+    DB.saveEmployee(cashier, 'Cashier');
+    this.refreshEmployeeDatalist();
     const openingFloat = parseFloat(document.getElementById('shiftModalFloat')?.value) || 0;
     const posGrossSales = parseFloat(document.getElementById('shiftModalPosCash')?.value) || 0;
     const posCardSales = parseFloat(document.getElementById('shiftModalPosCard')?.value) || 0;
@@ -5941,15 +5977,12 @@ setShiftViewMode(mode) {
   },
 
     promptDeleteShift(shiftId) {
-    const pin = prompt(I18N.t('admin_prompt') || 'Enter Admin PIN to delete (Default: 1234):');
-    if (pin !== '1234') {
-      this.showToast(I18N.t('admin_incorrect') || 'Incorrect PIN', 'error');
-      return;
-    }
-    DB.deleteShift(shiftId);
-    this.showToast('✅ Shift record deleted', 'info');
-    this.renderShiftsPage();
-    this.renderDashboard();
+    this.showAdminPasswordModal(() => {
+      DB.deleteShift(shiftId);
+      this.showToast(I18N.currentLang === 'si' ? '✅ ශිෆ්ට් සටහන සාර්ථකව මකා දමන ලදී' : '✅ Shift record deleted', 'info');
+      this.renderShiftsPage();
+      this.renderDashboard();
+    });
   },
 
   shareShiftViaWhatsApp(shiftId) {
@@ -6680,7 +6713,7 @@ setShiftViewMode(mode) {
         </div>
         <div class="form-group">
           <label class="form-label">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
-          <input type="text" class="form-input" id="morningCashierName" placeholder="e.g. Kasun (Morning Shift)" required>
+          <input type="text" class="form-input" id="morningCashierName" placeholder="e.g. Kasun" list="employeeNameSuggestions" autocomplete="off" required>
         </div>
         <div class="form-group">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -6736,6 +6769,8 @@ setShiftViewMode(mode) {
     if (!shopId) return;
 
     const cashier = document.getElementById('morningCashierName')?.value?.trim() || '';
+    DB.saveEmployee(cashier, 'Staff');
+    this.refreshEmployeeDatalist();
     const openingFloat = parseFloat(document.getElementById('morningFloatInput')?.value) || 0;
     const note = document.getElementById('morningShiftNotes')?.value?.trim() || '';
 

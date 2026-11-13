@@ -97,6 +97,7 @@ const DB = {
   BANK_TRANSACTIONS_KEY: 'spt_bank_transactions',
   DEVICE_CREDITS_KEY: 'spt_device_credits',
   REP_CREDITS_KEY: 'spt_rep_credits_v1',
+  EMPLOYEES_KEY: 'spt_employees',
   cloudStatus: navigator.onLine ? 'online' : 'offline',
   setCloudStatus(isOnline) {
     this.cloudStatus = isOnline ? 'online' : 'offline';
@@ -174,6 +175,7 @@ const DB = {
     await restoreKey(this.REP_CREDITS_KEY);
     await restoreKey(this.BANK_TRANSACTIONS_KEY);
     await restoreKey(this.DEVICE_CREDITS_KEY);
+    await restoreKey(this.EMPLOYEES_KEY);
 
     try {
       let lsActive = localStorage.getItem(this.ACTIVE_SHOP_KEY);
@@ -2749,6 +2751,65 @@ const DB = {
     this.saveBankTransactions(list);
     this._deleteFromFirebase('payment_tracker_updates', id);
     return true;
+  },
+
+  // ---- Employee Management & Suggestions ----
+  getEmployees() {
+    let list = this._getStorage(this.EMPLOYEES_KEY, null);
+    if (!list || !Array.isArray(list) || list.length === 0) {
+      const harvested = new Map();
+      harvested.set('HR GOMAS', { name: 'HR GOMAS', role: 'OWNER' });
+      harvested.set('S S W MUNASINGHA', { name: 'S S W MUNASINGHA', role: 'STAFF' });
+      harvested.set('Thulsi thathsara', { name: 'Thulsi thathsara', role: 'Cashier' });
+      harvested.set('Kasun', { name: 'Kasun', role: 'Staff' });
+
+      try {
+        const updates = this.getUpdates();
+        updates.forEach(u => {
+          if (u.empName && typeof u.empName === 'string' && u.empName.trim()) {
+            const n = u.empName.trim();
+            if (!harvested.has(n)) {
+              harvested.set(n, { name: n, role: u.jobRole || 'Staff' });
+            }
+          }
+        });
+      } catch (e) {}
+
+      try {
+        const shifts = this.getShifts(null);
+        shifts.forEach(s => {
+          const c = (s.cashier || s.cashierName || '').trim();
+          if (c && !harvested.has(c)) {
+            harvested.set(c, { name: c, role: 'Cashier' });
+          }
+        });
+      } catch (e) {}
+
+      list = Array.from(harvested.values());
+      this._dualSave(this.EMPLOYEES_KEY, list);
+    }
+    return list;
+  },
+
+  saveEmployee(name, role) {
+    if (!name || typeof name !== 'string' || !name.trim()) return;
+    const cleanName = name.trim();
+    const cleanRole = (role || 'Staff').trim();
+    let list = this.getEmployees();
+    const idx = list.findIndex(e => e.name.toLowerCase() === cleanName.toLowerCase());
+    if (idx >= 0) {
+      if (cleanRole && (!list[idx].role || list[idx].role === 'Staff' || list[idx].role === '')) {
+        list[idx].role = cleanRole;
+      }
+    } else {
+      list.push({ name: cleanName, role: cleanRole });
+    }
+    this._dualSave(this.EMPLOYEES_KEY, list);
+    this._syncToFirebase('payment_tracker_employees', cleanName.replace(/[^a-zA-Z0-9_-]/g, '_'), {
+      name: cleanName,
+      role: cleanRole,
+      updatedAt: new Date().toISOString()
+    }).catch(() => {});
   },
 
 };

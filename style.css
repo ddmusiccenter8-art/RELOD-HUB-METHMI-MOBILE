@@ -1603,20 +1603,7 @@ select option {
   background: rgba(255, 255, 255, 0.035);
 }
 
-/* Sticky Action Column so it is NEVER cut off on any PC screen width */
-.data-table th.col-sticky-action,
-.data-table td.col-sticky-action {
-  position: sticky;
-  right: 0;
-  background: var(--bg-card);
-  box-shadow: -6px 0 14px rgba(0, 0, 0, 0.28);
-  z-index: 2;
-  text-align: center;
-}
-
-.data-table tr:hover td.col-sticky-action {
-  background: var(--bg-card);
-}
+/* Action buttons placed cleanly in Column 1 */
 
 /* Shift Summary Cards (for Auto-Responsive mode or density toggle) */
 .shift-card-grid {
@@ -2920,19 +2907,7 @@ select option {
   border-bottom: 1px solid var(--border-glass, #f1f5f9) !important;
 }
 
-.data-table th.col-sticky-action,
-.data-table td.col-sticky-action {
-  position: sticky !important;
-  right: 0 !important;
-  background: var(--bg-card, #ffffff) !important;
-  box-shadow: -6px 0 14px rgba(0, 0, 0, 0.16) !important;
-  z-index: 15 !important;
-  text-align: center !important;
-}
-
-.data-table tr:hover td.col-sticky-action {
-  background: var(--bg-glass-hover, #f8fafc) !important;
-}
+/* Right sticky action removed per user request - Actions cleanly consolidated in Column 1 */
 
 /* Constrain container so horizontal scrollbar is ALWAYS visible above the screen bottom */
 #shiftsTableContainer,
@@ -2952,8 +2927,8 @@ select option {
 
 #shiftsTableContainer::-webkit-scrollbar,
 .data-table-container::-webkit-scrollbar {
-  height: 12px !important;
-  width: 10px !important;
+  height: 10px !important; /* Horizontal Scrollbar */
+  width: 10px !important;  /* Vertical Scrollbar */
 }
 
 #shiftsTableContainer::-webkit-scrollbar-track,
