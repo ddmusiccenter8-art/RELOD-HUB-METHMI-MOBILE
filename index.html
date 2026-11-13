@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=46.0">
+  <link rel="stylesheet" href="style.css?v=47.0">
 </head>
 <body>
 
@@ -420,11 +420,15 @@
             <div class="divider-line"></div>
           </div>
           <div class="form-row">
-            <div class="form-group">
+            <div class="form-group" style="flex: 1.2; min-width: 170px;">
+              <label class="form-label" style="font-weight:700; color:var(--accent-blue);" data-i18n="upd_date">📅 Update Date (දිනය)</label>
+              <input type="date" class="form-input" id="updateDateInput" required>
+            </div>
+            <div class="form-group" style="flex: 2; min-width: 200px;">
               <label class="form-label" data-i18n="upd_emp_name">Employee Name</label>
               <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="Employee Name (Type 1st letter to auto-fill)" list="employeeNameSuggestions" autocomplete="off" required>
             </div>
-            <div class="form-group">
+            <div class="form-group" style="flex: 1.2; min-width: 150px;">
               <label class="form-label" data-i18n="upd_job_role">Job Role</label>
               <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="Job Role (e.g. OWNER, Cashier)" list="employeeRoleSuggestions" autocomplete="off">
             </div>
@@ -1054,10 +1058,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=46.0"></script>
-  <script src="firebase-init.js?v=46.0"></script>
-  <script src="data.js?v=46.0"></script>
-  <script src="app.js?v=46.0"></script>
+  <script src="i18n.js?v=47.0"></script>
+  <script src="firebase-init.js?v=47.0"></script>
+  <script src="data.js?v=47.0"></script>
+  <script src="app.js?v=47.0"></script>
   
   <!-- Register Service Worker -->
   <script>

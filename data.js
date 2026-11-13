@@ -824,6 +824,7 @@ const DB = {
   addUpdate(updateData) {
     const updates = this.getUpdates(true);
     const now = new Date();
+    const targetDate = updateData.date || this.getTodayDate();
 
     const reloadDialog = parseFloat(updateData.reload?.dialog) || 0;
     const reloadMobitel = parseFloat(updateData.reload?.mobitel) || 0;
@@ -880,7 +881,7 @@ const DB = {
       network: c.network || 'Dialog',
       amount: parseFloat(c.amount) || 0,
       timestamp: now.toISOString(),
-      date: now.toISOString().split('T')[0],
+      date: targetDate,
       status: 'pending',
       note: (c.note || '').trim()
     })).filter(c => c.amount > 0 && c.customerName) : [];
@@ -893,7 +894,7 @@ const DB = {
       network: r.network || 'Dialog',
       amount: parseFloat(r.amount) || 0,
       timestamp: now.toISOString(),
-      date: now.toISOString().split('T')[0],
+      date: targetDate,
       note: (r.note || '').trim()
     })).filter(r => r.amount > 0) : [];
 
@@ -905,7 +906,7 @@ const DB = {
       networkOrBank: t.networkOrBank || 'Dialog',
       amount: parseFloat(t.amount) || 0,
       timestamp: now.toISOString(),
-      date: now.toISOString().split('T')[0],
+      date: targetDate,
       note: (t.note || '').trim()
     })).filter(t => t.amount > 0) : [];
 
@@ -918,7 +919,7 @@ const DB = {
       shopId: updateData.shopId,
       empName: updateData.empName || '',
       jobRole: updateData.jobRole || '',
-      date: now.toISOString().split('T')[0],
+      date: targetDate,
       timestamp: now.toISOString(),
       reload: {
         dialog: reloadDialog,
@@ -988,6 +989,10 @@ const DB = {
 
     const existingUpdate = updates[index];
 
+    if (updateData.date) {
+      existingUpdate.date = updateData.date;
+    }
+    existingUpdate.updatedAt = new Date().toISOString();
     existingUpdate.empName = updateData.empName || existingUpdate.empName;
     existingUpdate.jobRole = updateData.jobRole || existingUpdate.jobRole;
 
@@ -1069,6 +1074,24 @@ const DB = {
     return existingUpdate;
   },
 
+  changeUpdateDate(updateId, newDate) {
+    if (!newDate) return null;
+    const updates = this.getUpdates(true);
+    const idx = updates.findIndex(u => u.id === updateId);
+    if (idx === -1) return null;
+
+    updates[idx].date = newDate;
+    updates[idx].updatedAt = new Date().toISOString();
+
+    const prevUpdate = this.getLastUpdateBefore(updates[idx].shopId, updates[idx].timestamp);
+    updates[idx].comparison = this.calculateComparison(updates[idx], prevUpdate);
+
+    this.saveUpdates(updates);
+    this._syncToFirebase('payment_tracker_updates', updates[idx].id, updates[idx]);
+    this.autoBackup();
+    return updates[idx];
+  },
+
   deleteUpdate(updateId) {
     let updates = this.getUpdates(true);
     updates = updates.filter(u => u.id !== updateId);
@@ -1100,7 +1123,7 @@ const DB = {
       network: creditData.network || 'Dialog',
       amount: parseFloat(creditData.amount) || 0,
       timestamp: creditData.timestamp || now.toISOString(),
-      date: creditData.date || now.toISOString().split('T')[0],
+      date: creditData.date || this.getTodayDate(),
       status: 'pending',
       note: (creditData.note || '').trim()
     };
@@ -1336,7 +1359,7 @@ const DB = {
       amount: parseFloat(data.amount) || 0,
       deductSource: data.deductSource || 'none',
       timestamp: data.timestamp || now.toISOString(),
-      date: data.date || now.toISOString().split('T')[0],
+      date: data.date || this.getTodayDate(),
       note: (data.note || '').trim()
     };
     item.docType = 'router_expense';
@@ -1726,7 +1749,7 @@ const DB = {
   addShift(data) {
     const list = this.getShifts(null);
     const now = new Date();
-    const targetDate = data.date || now.toISOString().split('T')[0];
+    const targetDate = data.date || this.getTodayDate();
     const targetShopId = data.shopId || this.getActiveShopId();
 
     // Check if a shift already exists for this shop on this date!
@@ -2109,7 +2132,7 @@ const DB = {
   autoBackup() {
     const lastBackup = localStorage.getItem(this.BACKUP_KEY);
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    const today = this.getTodayDate();
 
     // Auto-download backup once per day (first update of the day)
     if (!lastBackup || !lastBackup.startsWith(today)) {

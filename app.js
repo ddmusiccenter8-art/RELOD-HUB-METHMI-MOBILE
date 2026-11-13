@@ -1423,6 +1423,8 @@ const App = {
     if (clearBtn) {
       clearBtn.addEventListener('click', () => {
         updateForm.reset();
+        const dateEl = document.getElementById('updateDateInput');
+        if (dateEl) dateEl.value = DB.getTodayDate();
         const noteEl = document.getElementById('updateNoteInput');
         if (noteEl) noteEl.value = '';
         this.editingUpdateId = null;
@@ -1741,6 +1743,11 @@ const App = {
     const shopId = DB.getActiveShopId();
     if (!shopId) return;
 
+    const dateEl = document.getElementById('updateDateInput');
+    if (dateEl && (!this.editingUpdateId || !dateEl.value)) {
+      dateEl.value = DB.getTodayDate();
+    }
+
     const prevUpdate = DB.getLastUpdate(shopId);
 
     // Show previous update info & hints
@@ -2045,6 +2052,8 @@ const App = {
       return;
     }
 
+    const dateInput = document.getElementById('updateDateInput');
+    const updateDate = (dateInput && dateInput.value) ? dateInput.value : DB.getTodayDate();
     const notes = document.getElementById('updateNoteInput')?.value.trim() || '';
 
     // Section 1: Reload inputs
@@ -2119,6 +2128,7 @@ const App = {
       shopId,
       empName,
       jobRole,
+      date: updateDate,
       reload: {
         dialog,
         mobitel,
@@ -2430,7 +2440,11 @@ const App = {
     updates.forEach(u => {
       if (u.date !== currentDate) {
         currentDate = u.date;
-        html += `<div class="date-pill" style="margin-bottom:8px;margin-top:12px;">📅 ${DB.formatDate(u.date)}</div>`;
+        const isToday = u.date === DB.getTodayDate();
+        html += `<div class="date-pill" style="margin-bottom:8px; margin-top:12px; display:inline-flex; align-items:center; gap:8px; ${isToday ? 'background:rgba(37,99,235,0.15); border:1px solid rgba(37,99,235,0.4); font-weight:800;' : ''}">
+          <span>📅 ${DB.formatDate(u.date)}</span>
+          ${isToday ? '<span class="badge" style="background:#2563eb; color:#ffffff; font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:12px;">✨ TODAY (අද)</span>' : ''}
+        </div>`;
       }
 
       const vals = DB.extractValues(u);
@@ -2462,9 +2476,11 @@ const App = {
               <div class="update-time">🕐 ${DB.formatTime(u.timestamp)}</div>
               ${u.empName ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? '(' + u.jobRole + ')' : ''}</div>` : ''}
             </div>
-            <div style="display:flex; gap:6px; align-items:center;">
+            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+              <button type="button" class="btn btn-warning btn-xs" onclick="event.stopPropagation(); App.promptEditUpdate('${u.id}');" style="padding:4px 9px; font-size:0.75rem; font-weight:700; border-radius:6px; background:#f59e0b; color:#fff; border:none; cursor:pointer;" title="Edit this update">✏️ Edit</button>
+              <button type="button" class="btn btn-primary btn-xs" onclick="event.stopPropagation(); App.promptChangeUpdateDate('${u.id}', '${u.date}');" style="padding:4px 9px; font-size:0.75rem; font-weight:700; border-radius:6px; background:#2563eb; color:#fff; border:none; cursor:pointer;" title="Change date of this update">📅 දිනය මාරු</button>
               <button type="button" class="btn btn-xs" onclick="event.stopPropagation(); App.shareUpdateViaWhatsApp('${u.id}');" style="background:#16a34a; color:#fff; font-weight:700; padding:4px 9px; font-size:0.75rem; border:none; border-radius:6px; cursor:pointer;" title="Share this update to WhatsApp">📲 WhatsApp</button>
-              <button type="button" class="btn btn-danger btn-sm" onclick="event.stopPropagation(); App.confirmDeleteUpdate('${u.id}');" style="padding:4px 10px;font-size:0.75rem;">🗑️</button>
+              <button type="button" class="btn btn-danger btn-sm" onclick="event.stopPropagation(); App.confirmDeleteUpdate('${u.id}');" style="padding:4px 10px;font-size:0.75rem;" title="Delete update">🗑️</button>
             </div>
           </div>
           <div class="update-totals">
@@ -2758,6 +2774,66 @@ const App = {
     );
   },
 
+  promptChangeUpdateDate(updateId, currentDate) {
+    const today = DB.getTodayDate();
+    const isToday = currentDate === today;
+    const isSi = I18N.currentLang === 'si';
+
+    const html = `
+      <div style="padding:8px 0;">
+        <div style="font-size:0.95rem; color:var(--text-muted); margin-bottom:12px;">
+          ${isSi ? 'දැනට සටහන්ව ඇති දිනය:' : 'Current recorded date:'} <strong style="color:var(--text-primary); font-size:1.05rem;">📅 ${DB.formatDate(currentDate)}</strong>
+        </div>
+
+        ${!isToday ? `
+          <button type="button" class="btn btn-primary btn-block" style="margin-bottom:14px; background:#2563eb; color:#fff; font-weight:800; padding:10px 14px; border:none; border-radius:8px; cursor:pointer; width:100%;" onclick="document.getElementById('newUpdateDateInput').value = '${today}';">
+            ✨ අද දිනය (${DB.formatDate(today)}) තෝරන්න (Set to Today)
+          </button>
+        ` : ''}
+
+        <div class="form-group" style="margin-bottom:14px;">
+          <label class="form-label" style="font-weight:700;">${isSi ? 'අලුත් දිනය තෝරන්න (Select New Date)' : 'Select New Date'}</label>
+          <input type="date" id="newUpdateDateInput" class="form-input" value="${currentDate}" style="font-weight:700; font-size:1rem;">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-weight:700; color:var(--accent-red);">${isSi ? 'Admin PIN අංකය (1234)' : 'Admin PIN (1234)'}</label>
+          <input type="password" id="changeDateAdminPin" class="form-input" placeholder="1234" autofocus>
+        </div>
+      </div>
+    `;
+
+    this.showModal(
+      isSi ? '📅 Update දිනය වෙනස් කරන්න' : '📅 Change Update Date',
+      html,
+      [
+        { text: isSi ? 'අවලංගුයි (Cancel)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? '💾 දිනය සුරකින්න (Save Date)' : '💾 Save Date', class: 'btn-primary', onClick: () => {
+            const pin = (document.getElementById('changeDateAdminPin')?.value || '').trim();
+            if (pin !== '1234') {
+              this.showToast(isSi ? 'මුරපදය වැරදියි (Incorrect PIN: 1234)' : 'Incorrect PIN (1234)', 'error');
+              return;
+            }
+            const newDate = document.getElementById('newUpdateDateInput')?.value;
+            if (!newDate) {
+              this.showToast(isSi ? 'කරුණාකර දිනයක් තෝරන්න' : 'Please select a valid date', 'error');
+              return;
+            }
+            const updated = DB.changeUpdateDate(updateId, newDate);
+            if (updated) {
+              this.closeModal();
+              this.showToast(isSi ? `✅ Update දිනය සාර්ථකව ${DB.formatDate(newDate)} ලෙස වෙනස් විය!` : `✅ Update date changed to ${DB.formatDate(newDate)}!`, 'success');
+              this.renderHistory();
+              if (this.currentPage === 'dashboard') this.renderDashboard();
+            } else {
+              this.showToast('Failed to update date', 'error');
+            }
+          }
+        }
+      ]
+    );
+  },
+
   promptEditUpdate(updateId) {
     this.showModal(
       '🔐 Enter Admin Password',
@@ -2793,6 +2869,8 @@ const App = {
 
     document.getElementById('empName').value = update.empName || '';
     document.getElementById('jobRole').value = update.jobRole || '';
+    const dateInput = document.getElementById('updateDateInput');
+    if (dateInput) dateInput.value = update.date || DB.getTodayDate();
     const noteEl = document.getElementById('updateNoteInput');
     if (noteEl) noteEl.value = update.notes || '';
 
