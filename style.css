@@ -1641,10 +1641,10 @@ select option {
 
 @media (max-width: 1200px) {
   .data-table {
-    font-size: 0.8rem;
+    font-size: 0.74rem;
   }
   .data-table th, .data-table td {
-    padding: 8px 8px;
+    padding: 5px 6px;
   }
 }
 
@@ -2885,10 +2885,39 @@ select option {
 
 
 
-/* --- Fix Chrome/Edge sticky action column & high visibility scrollbar --- */
+/* --- Universal Data Table, Sticky Header/Action & Always-Visible Scrollbar (v44.0) --- */
 .data-table {
   border-collapse: separate !important;
   border-spacing: 0 !important;
+  font-size: 0.78rem !important;
+  line-height: 1.35 !important;
+  width: 100% !important;
+}
+
+.data-table th {
+  padding: 7px 8px !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.3px !important;
+  white-space: nowrap !important;
+}
+
+.data-table thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  background: var(--bg-card, #f8fafc) !important;
+  border-bottom: 2px solid var(--border-glass, #cbd5e1) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+.data-table td {
+  padding: 6px 8px !important;
+  font-size: 0.78rem !important;
+  color: var(--text-primary) !important;
+  vertical-align: middle !important;
+  border-bottom: 1px solid var(--border-glass, #f1f5f9) !important;
 }
 
 .data-table th.col-sticky-action,
@@ -2896,8 +2925,8 @@ select option {
   position: sticky !important;
   right: 0 !important;
   background: var(--bg-card, #ffffff) !important;
-  box-shadow: -6px 0 14px rgba(0, 0, 0, 0.22) !important;
-  z-index: 5 !important;
+  box-shadow: -6px 0 14px rgba(0, 0, 0, 0.16) !important;
+  z-index: 15 !important;
   text-align: center !important;
 }
 
@@ -2905,23 +2934,31 @@ select option {
   background: var(--bg-glass-hover, #f8fafc) !important;
 }
 
+/* Constrain container so horizontal scrollbar is ALWAYS visible above the screen bottom */
 #shiftsTableContainer,
 .data-table-container {
+  max-height: calc(100vh - 330px) !important;
+  min-height: 250px !important;
   overflow-x: auto !important;
-  overflow-y: visible !important;
-  scrollbar-width: thin !important;
+  overflow-y: auto !important;
+  scrollbar-width: auto !important;
   scrollbar-color: #2563eb rgba(0, 0, 0, 0.08) !important;
   -webkit-overflow-scrolling: touch !important;
+  border: 1px solid var(--border-glass, #e2e8f0) !important;
+  border-radius: var(--radius-sm, 8px) !important;
+  position: relative !important;
+  background: var(--bg-card, #ffffff) !important;
 }
 
 #shiftsTableContainer::-webkit-scrollbar,
 .data-table-container::-webkit-scrollbar {
-  height: 10px !important;
+  height: 12px !important;
+  width: 10px !important;
 }
 
 #shiftsTableContainer::-webkit-scrollbar-track,
 .data-table-container::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.06) !important;
+  background: rgba(0, 0, 0, 0.08) !important;
   border-radius: 6px !important;
 }
 
@@ -2929,5 +2966,36 @@ select option {
 .data-table-container::-webkit-scrollbar-thumb {
   background: #2563eb !important;
   border-radius: 6px !important;
-  border: 2px solid #fff !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.4) !important;
+}
+
+#shiftsTableContainer::-webkit-scrollbar-thumb:hover,
+.data-table-container::-webkit-scrollbar-thumb:hover {
+  background: #1d4ed8 !important;
+}
+
+/* Compact Density (85% Scaling) for small screens and laptops */
+.data-table-container.compact-density .data-table {
+  font-size: 0.73rem !important;
+}
+
+.data-table-container.compact-density .data-table th {
+  padding: 5px 6px !important;
+  font-size: 0.69rem !important;
+}
+
+.data-table-container.compact-density .data-table td {
+  padding: 4px 6px !important;
+  font-size: 0.74rem !important;
+}
+
+.data-table-container.compact-density .btn-xs {
+  padding: 2px 5px !important;
+  font-size: 0.69rem !important;
+}
+
+.data-table-container.compact-density .tally-badge {
+  padding: 2px 5px !important;
+  font-size: 0.68rem !important;
 }
