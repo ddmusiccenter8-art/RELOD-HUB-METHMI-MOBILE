@@ -1489,13 +1489,55 @@ const DB = {
 
   // ---- Daily Evening Shift Summaries & POS Tally ----
   getShifts(shopId = null) {
-    let list = this._getStorage(this.SHIFTS_KEY, []);
-    if (shopId) {
-      const activeShops = this.getShops(false);
-      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
-      list = list.filter(s => s.shopId === shopId || (isFirstShop && (!s.shopId || s.shopId === 'main')));
-    }
-    return list.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
+    let list = JSON.parse(localStorage.getItem(this.SHIFTS_KEY) || '[]');
+    if (shopId) list = list.filter(s => s.shopId === shopId);
+    if (!Array.isArray(list) || list.length === 0) return [];
+
+    // Automatic unified grouping by (shopId, date) to prevent duplicate daily rows
+    const groups = new Map();
+    list.forEach(s => {
+      const key = (s.shopId || '') + '_' + (s.date || '');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
+    });
+
+    const unified = [];
+    groups.forEach(group => {
+      if (group.length === 1) {
+        unified.push(group[0]);
+      } else {
+        // Sort so the entry with POS sales or latest evening shift comes first
+        group.sort((a, b) => {
+          const aSales = parseFloat(a.posGrossSales || a.posSales || 0);
+          const bSales = parseFloat(b.posGrossSales || b.posSales || 0);
+          if (bSales !== aSales) return bSales - aSales;
+          return new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date);
+        });
+        const primary = { ...group[0] };
+        // Check for openingFloat from morning shift
+        const morning = group.find(s => s.shiftType === 'morning' || (parseFloat(s.openingFloat) || 0) > 0);
+        if (morning && (!primary.openingFloat || primary.openingFloat === 0)) {
+          primary.openingFloat = morning.openingFloat;
+        }
+        // Check for drawerExpenses
+        const expEntry = group.find(s => (parseFloat(s.drawerExpenses || s.totalExpenses) || 0) > 0);
+        if (expEntry && (!primary.drawerExpenses || primary.drawerExpenses === 0)) {
+          primary.drawerExpenses = expEntry.drawerExpenses || expEntry.totalExpenses;
+          primary.totalExpenses = primary.drawerExpenses;
+        }
+        // Recalculate tally
+        const posCash = primary.posCashSales || 0;
+        const expenses = primary.drawerExpenses || primary.totalExpenses || 0;
+        primary.expectedCash = (primary.openingFloat || 0) + posCash - expenses;
+        primary.difference = (primary.countedCash || primary.actualCountedCash || 0) - primary.expectedCash;
+        if (primary.difference > 0.01) primary.status = 'excess';
+        else if (primary.difference < -0.01) primary.status = 'shortage';
+        else primary.status = 'balanced';
+        unified.push(primary);
+      }
+    });
+
+    return unified.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
   },
 
   getShiftsForShop(shopId) {

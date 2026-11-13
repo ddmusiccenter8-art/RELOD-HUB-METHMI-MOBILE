@@ -5130,14 +5130,69 @@ Thank you! - ${shopName}`;
 
     if (this.currentShiftTab === 'closings') {
       const shiftsToShow = filterDate ? allShifts.filter(s => s.date === filterDate) : allShifts;
+
+      // -------------------------------------------------------------------
+      // 1. TOP BANNER: Today's Shift & Direct 1-Click WhatsApp / PDF Bar
+      // -------------------------------------------------------------------
+      let topBannerHtml = '';
+      if (latestShiftToday) {
+        const todayShop = DB.getShop(latestShiftToday.shopId);
+        const shopTitle = todayShop ? todayShop.name : 'Shop';
+        const diff = latestShiftToday.difference || 0;
+        const statusBadge = latestShiftToday.status === 'balanced'
+          ? '<span class="tally-badge balanced">✅ 100% Balanced</span>'
+          : (latestShiftToday.status === 'excess'
+            ? `<span class="tally-badge excess">🟢 Excess (+${DB.formatCurrency(diff)})</span>`
+            : `<span class="tally-badge shortage">🔴 Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`);
+
+        topBannerHtml = `
+          <div style="background:linear-gradient(135deg, rgba(37,99,235,0.08), rgba(22,163,74,0.08)); border:2px solid #2563eb; border-radius:var(--radius-md); padding:14px 18px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; box-shadow:0 2px 8px rgba(37,99,235,0.1);">
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; font-weight:800; color:var(--accent-blue); letter-spacing:0.5px; display:flex; align-items:center; gap:8px;">
+                <span>🌟 අද දින ශිෆ්ට් සටහන (Today's Shift)</span>
+                ${statusBadge}
+              </div>
+              <div style="font-size:1.1rem; font-weight:900; margin-top:3px;">
+                🏪 <strong>${shopTitle}</strong> | 👤 Cashier: <strong>${latestShiftToday.cashier || latestShiftToday.cashierName || 'Staff'}</strong> | 💵 ගැණූ මුදල: <strong style="color:var(--accent-green);">Rs. ${DB.formatCurrency(latestShiftToday.countedCash || latestShiftToday.actualCountedCash || 0)}</strong>
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button type="button" class="btn btn-sm" onclick="App.editShift('${latestShiftToday.id}')" title="Edit Today's Shift" style="background:#f59e0b; color:#000; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+                ✏️ Edit Shift
+              </button>
+              <button type="button" class="btn btn-sm" onclick="App.printShiftSlip('${latestShiftToday.id}')" title="Download / Print PDF Slip" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+                📄 PDF Slip
+              </button>
+              <button type="button" class="btn btn-sm" onclick="App.shareShiftViaWhatsApp('${latestShiftToday.id}')" title="Share directly to Super Admin WhatsApp Group" style="background:#16a34a; color:#fff; font-weight:800; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(22,163,74,0.3);">
+                📲 WhatsApp Share (Group)
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        topBannerHtml = `
+          <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div style="font-size:0.85rem; color:var(--text-secondary);">
+              ℹ️ <strong>අද දින (${DB.formatDate(today)})</strong> ශිෆ්ට් එක තවම සටහන් කර නොමැත. (No shift recorded yet today)
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-sm btn-primary" onclick="App.showMorningShiftModal()" style="background:#f59e0b; border-color:#f59e0b; color:#000; font-weight:700;">🌅 Record Morning Float</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal()" style="background:#2563eb; border-color:#2563eb; font-weight:700;">🌙 Close Today's Shift</button>
+            </div>
+          </div>
+        `;
+      }
+
       if (shiftsToShow.length === 0) {
-        tableContainer.innerHTML = `<div class="empty-state" style="padding:32px;"><div class="empty-icon">🌙</div><div class="empty-text">${I18N.t('shift_no_shifts') || 'No shift reconciliation records found'}</div></div>`;
+        tableContainer.innerHTML = topBannerHtml + `<div class="empty-state" style="padding:32px;"><div class="empty-icon">🌙</div><div class="empty-text">${I18N.t('shift_no_shifts') || 'No shift reconciliation records found'}</div></div>`;
         return;
       }
 
+      // -------------------------------------------------------------------
+      // 2. CARDS VIEW (if selected)
+      // -------------------------------------------------------------------
       if (this.shiftViewMode === 'cards') {
-        // Render Responsive Cards View (Auto-adjusts with zero horizontal scroll)
-        let cardsHtml = `<div class="shift-card-grid">`;
+        let cardsHtml = topBannerHtml + `<div class="shift-card-grid">`;
         shiftsToShow.forEach(s => {
           const diff = s.difference || 0;
           let badgeHtml = '';
@@ -5159,13 +5214,15 @@ Thank you! - ${shopName}`;
             <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:5px 12px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:6px; cursor:pointer;">
               ✏️ Edit
             </button>
-          ` : '';
+          ` : `
+            <span style="font-size:0.75rem; color:var(--text-muted); background:rgba(0,0,0,0.05); padding:3px 8px; border-radius:4px;" title="Past shift - Locked">🔒 Closed</span>
+          `;
 
           const sShop = DB.getShop(s.shopId);
           const shopName = sShop ? sShop.name : (s.shopId || 'Shop');
 
           cardsHtml += `
-            <div class="shift-closing-card">
+            <div class="shift-closing-card" style="background:var(--bg-card); border:1px solid var(--border-glass); border-radius:var(--radius-md); padding:16px;">
               <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; border-bottom:1px solid var(--border-glass); padding-bottom:10px;">
                 <div>
                   <div style="display:flex; align-items:center; gap:8px;">
@@ -5206,10 +5263,10 @@ Thank you! - ${shopName}`;
 
               <div style="display:flex; gap:8px; justify-content:flex-end; align-items:center; border-top:1px solid var(--border-glass); padding-top:10px;">
                 ${editBtnHtml}
-                <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:5px 10px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:5px 12px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
                   📄 PDF
                 </button>
-                <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:5px 10px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:5px 12px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
                   💬 WhatsApp
                 </button>
                 <button type="button" class="btn btn-xs btn-danger" onclick="App.promptDeleteShift('${s.id}')" title="Delete Shift" style="padding:5px 8px; border-radius:6px;">
@@ -5224,12 +5281,19 @@ Thank you! - ${shopName}`;
         return;
       }
 
-      let html = `
+      // -------------------------------------------------------------------
+      // 3. TABLE VIEW (Enhanced with Actions in 1st Column + Sticky Actions Column)
+      // -------------------------------------------------------------------
+      let html = topBannerHtml + `
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:0.75rem; color:var(--text-muted);">
+          <span>👉 සම්පූර්ණ තොරතුරු බැලීමට වගුව දකුණට ස්ක්‍රෝල් (Scroll Right) කරන්න</span>
+          <span style="color:var(--accent-blue); font-weight:700;">✅ PDF සහ WhatsApp බොත්තම් පළමු තීරුවේද ඇත</span>
+        </div>
         <div class="data-table-container">
-        <table class="data-table" style="width:100%; min-width:920px;">
+        <table class="data-table" style="width:100%; min-width:980px;">
           <thead>
             <tr>
-              <th>${I18N.t('hist_col_date') || 'Date / Time'}</th>
+              <th style="min-width:210px;">${I18N.t('hist_col_date') || 'Date / Branch'} & Quick Actions</th>
               <th>${I18N.t('upd_emp_name') || 'Cashier'}</th>
               <th style="text-align:right;">${I18N.t('shift_opening_float') || 'Opening Float'}</th>
               <th style="text-align:right;">${I18N.t('shift_pos_cash') || 'POS Cash'}</th>
@@ -5240,7 +5304,7 @@ Thank you! - ${shopName}`;
               <th style="text-align:right; font-weight:800;">${I18N.t('shift_counted_cash') || 'Counted Cash'}</th>
               <th style="text-align:center;">${I18N.t('shift_status_verdict') || 'Status'}</th>
               <th>Special Notes</th>
-              <th class="col-sticky-action" style="text-align:center;">Actions</th>
+              <th class="col-sticky-action" style="text-align:center; min-width:180px;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -5263,16 +5327,29 @@ Thank you! - ${shopName}`;
         const posTotal = s.posGrossSales || s.posSales || (posCash + posCard + posCheque);
 
         const isToday = s.date === today;
-        const editBtnHtml = isToday ? `
-          <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:4px 8px; margin-right:4px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:6px; cursor:pointer;">
-            ✏️ Edit
-          </button>
-        ` : '';
-
         const sShop = DB.getShop(s.shopId);
         const shopBadgeHtml = (selectedShop === 'all' && sShop) ? `
           <div style="margin-top:2px;"><span class="badge" style="background:rgba(59,130,246,0.12); color:var(--accent-blue); padding:1px 6px; border-radius:8px; font-size:0.7rem; font-weight:700;">🏪 ${sShop.name}</span></div>
         ` : '';
+
+        // Immediate Action Bar in First Column (GUARANTEED NEVER TO BE CUT OFF)
+        const firstColActions = `
+          <div style="margin-top:6px; display:flex; gap:4px; align-items:center; flex-wrap:wrap;">
+            ${isToday ? `
+              <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:3px 8px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:4px; cursor:pointer;">
+                ✏️ Edit
+              </button>
+            ` : `
+              <span style="font-size:0.68rem; color:var(--text-muted); background:rgba(0,0,0,0.05); padding:2px 5px; border-radius:4px;" title="Past shift - Locked">🔒 Closed</span>
+            `}
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:3px 8px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.4); border-radius:4px; cursor:pointer;">
+              📄 PDF
+            </button>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.shareShiftViaWhatsApp('${s.id}')" title="Share via WhatsApp" style="padding:3px 8px; font-weight:700; color:#16a34a; border:1px solid rgba(34,197,94,0.4); border-radius:4px; cursor:pointer;">
+              📲 WhatsApp
+            </button>
+          </div>
+        `;
 
         html += `
           <tr style="border-bottom:1px solid var(--border-glass);">
@@ -5280,6 +5357,7 @@ Thank you! - ${shopName}`;
               <div style="font-weight:700; white-space:nowrap;">${DB.formatDate(s.date)}</div>
               <div style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">${DB.formatTime(s.timestamp)}</div>
               ${shopBadgeHtml}
+              ${firstColActions}
             </td>
             <td><strong style="white-space:nowrap;">${s.cashier || s.cashierName || '--'}</strong></td>
             <td style="text-align:right; white-space:nowrap;">${DB.formatCurrency(s.openingFloat || 0)}</td>
@@ -5294,7 +5372,11 @@ Thank you! - ${shopName}`;
               ${(s.specialNotes || s.cashNote) ? `<span style="color:var(--accent-purple); font-weight:600; font-size:0.8rem;" title="${s.specialNotes || s.cashNote}">📝 ${(s.specialNotes || s.cashNote)}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">--</span>'}
             </td>
             <td class="col-sticky-action" style="text-align:center; white-space:nowrap;">
-              ${editBtnHtml}
+              ${isToday ? `
+                <button type="button" class="btn btn-xs" onclick="App.editShift('${s.id}')" title="Edit Today's Shift" style="padding:4px 8px; margin-right:4px; font-weight:800; background:#f59e0b; color:#000; border:none; border-radius:6px; cursor:pointer;">
+                  ✏️ Edit
+                </button>
+              ` : ''}
               <button type="button" class="btn btn-xs btn-ghost" onclick="App.printShiftSlip('${s.id}')" title="Download / Print PDF Slip" style="padding:4px 8px; margin-right:4px; font-weight:700; color:var(--accent-blue); border:1px solid rgba(59,130,246,0.35); border-radius:6px; display:inline-flex; align-items:center; gap:4px;">
                 <span style="font-size:0.95rem; line-height:1;">📄</span> <span>PDF</span>
               </button>

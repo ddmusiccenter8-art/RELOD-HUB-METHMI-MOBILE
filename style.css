@@ -2883,3 +2883,51 @@ select option {
   100% { transform: translateX(200%); }
 }
 
+
+
+/* --- Fix Chrome/Edge sticky action column & high visibility scrollbar --- */
+.data-table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.data-table th.col-sticky-action,
+.data-table td.col-sticky-action {
+  position: sticky !important;
+  right: 0 !important;
+  background: var(--bg-card, #ffffff) !important;
+  box-shadow: -6px 0 14px rgba(0, 0, 0, 0.22) !important;
+  z-index: 5 !important;
+  text-align: center !important;
+}
+
+.data-table tr:hover td.col-sticky-action {
+  background: var(--bg-glass-hover, #f8fafc) !important;
+}
+
+#shiftsTableContainer,
+.data-table-container {
+  overflow-x: auto !important;
+  overflow-y: visible !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #2563eb rgba(0, 0, 0, 0.08) !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+#shiftsTableContainer::-webkit-scrollbar,
+.data-table-container::-webkit-scrollbar {
+  height: 10px !important;
+}
+
+#shiftsTableContainer::-webkit-scrollbar-track,
+.data-table-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-radius: 6px !important;
+}
+
+#shiftsTableContainer::-webkit-scrollbar-thumb,
+.data-table-container::-webkit-scrollbar-thumb {
+  background: #2563eb !important;
+  border-radius: 6px !important;
+  border: 2px solid #fff !important;
+}
