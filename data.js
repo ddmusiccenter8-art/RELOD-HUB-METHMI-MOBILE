@@ -1538,10 +1538,10 @@ const DB = {
     groups.forEach(group => {
       if (group.length === 1) {
         const item = { ...group[0] };
-        if ((item.openingFloat || 0) === 0 && (item.countedCash || 0) === 0 && (item.posGrossSales || item.posSales || 0) === 0) {
-          item.status = 'unsettled';
-        } else if (item.shiftType === 'morning' || item.status === 'morning_active') {
+        if (item.shiftType === 'morning' || item.status === 'morning_active') {
           item.status = 'morning_active';
+        } else if ((item.openingFloat || 0) === 0 && (item.countedCash || 0) === 0 && (item.posGrossSales || item.posSales || 0) === 0) {
+          item.status = 'unsettled';
         }
         unified.push(item);
       } else {
@@ -1569,10 +1569,10 @@ const DB = {
         const expenses = primary.drawerExpenses || primary.totalExpenses || 0;
         primary.expectedCash = (primary.openingFloat || 0) + posCash - expenses;
         primary.difference = (primary.countedCash || primary.actualCountedCash || 0) - primary.expectedCash;
-        if ((primary.openingFloat || 0) === 0 && (primary.countedCash || 0) === 0 && (primary.posGrossSales || primary.posSales || 0) === 0) {
-          primary.status = 'unsettled';
-        } else if (primary.shiftType === 'morning' || primary.status === 'morning_active') {
+        if (primary.shiftType === 'morning' || primary.status === 'morning_active') {
           primary.status = 'morning_active';
+        } else if ((primary.openingFloat || 0) === 0 && (primary.countedCash || 0) === 0 && (primary.posGrossSales || primary.posSales || 0) === 0) {
+          primary.status = 'unsettled';
         } else if (primary.difference > 0.01) {
           primary.status = 'excess';
         } else if (primary.difference < -0.01) {
@@ -1680,10 +1680,10 @@ const DB = {
           const expenses = primary.drawerExpenses || primary.totalExpenses || 0;
           primary.expectedCash = (primary.openingFloat || 0) + posCash - expenses;
           primary.difference = (primary.countedCash || primary.actualCountedCash || 0) - primary.expectedCash;
-        if ((primary.openingFloat || 0) === 0 && (primary.countedCash || 0) === 0 && (primary.posGrossSales || primary.posSales || 0) === 0) {
-          primary.status = 'unsettled';
-        } else if (primary.shiftType === 'morning' || primary.status === 'morning_active') {
+        if (primary.shiftType === 'morning' || primary.status === 'morning_active') {
           primary.status = 'morning_active';
+        } else if ((primary.openingFloat || 0) === 0 && (primary.countedCash || 0) === 0 && (primary.posGrossSales || primary.posSales || 0) === 0) {
+          primary.status = 'unsettled';
         } else if (primary.difference > 0.01) {
           primary.status = 'excess';
         } else if (primary.difference < -0.01) {
@@ -1732,10 +1732,10 @@ const DB = {
     const expectedCash = openingFloat + posCash - drawerExpenses;
     const difference = countedCash - expectedCash;
     let status = 'balanced';
-    if (openingFloat === 0 && countedCash === 0 && posGross === 0) {
-      status = 'unsettled';
-    } else if (shiftData.shiftType === 'morning' || shiftData.status === 'morning_active') {
+    if (shiftData.shiftType === 'morning' || shiftData.status === 'morning_active') {
       status = 'morning_active';
+    } else if (openingFloat === 0 && countedCash === 0 && posGross === 0) {
+      status = 'unsettled';
     } else if (difference > 0.01) {
       status = 'excess';
     } else if (difference < -0.01) {
@@ -1805,10 +1805,10 @@ const DB = {
     const expectedCash = openingFloat + posCash - drawerExpenses;
     const difference = countedCash - expectedCash;
     let status = 'balanced';
-    if (openingFloat === 0 && countedCash === 0 && posGross === 0) {
-      status = 'unsettled';
-    } else if (shiftData.shiftType === 'morning' || shiftData.status === 'morning_active') {
+    if (data.shiftType === 'morning' || data.status === 'morning_active') {
       status = 'morning_active';
+    } else if (openingFloat === 0 && countedCash === 0 && posTotal === 0) {
+      status = 'unsettled';
     } else if (difference > 0.01) {
       status = 'excess';
     } else if (difference < -0.01) {

@@ -2537,7 +2537,7 @@ const App = {
       const diff = s.difference || 0;
       const posTotal = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
       const counted = s.countedCash || s.actualCountedCash || 0;
-      const isMorningOnly = s.shiftType === 'morning';
+      const isMorningOnly = s.shiftType === 'morning' || s.status === 'morning_active';
 
       if (badgeEl) {
         if (isMorningOnly) {
@@ -2562,17 +2562,34 @@ const App = {
       }
 
       if (actionsEl) {
-        actionsEl.innerHTML = `
-          <button type="button" class="btn btn-sm" onclick="App.editShift('${s.id}')" style="background:#f59e0b; color:#000; font-weight:800; border:none; border-radius:6px; padding:6px 12px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
-            ✏️ Edit Today's Shift
-          </button>
-          <button type="button" class="btn btn-sm btn-ghost" onclick="App.printShiftSlip('${s.id}')" style="border:1px solid rgba(0,0,0,0.15); font-weight:700; color:var(--accent-blue);">
-            📄 PDF Slip
-          </button>
-          <button type="button" class="btn btn-sm btn-success" onclick="App.shareShiftViaWhatsApp('${s.id}')" style="background:#16a34a; border-color:#16a34a; color:#fff; font-weight:700;">
-            📲 WhatsApp
-          </button>
-        `;
+        if (isMorningOnly) {
+          actionsEl.innerHTML = `
+            <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal()" style="background:#2563eb; color:#fff; font-weight:800; border:none; border-radius:6px; padding:7px 14px; cursor:pointer; box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+              🌙 Close Shift (සවස ශිෆ්ට් එක Close කරන්න)
+            </button>
+            <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal()" style="background:#f59e0b; color:#000; font-weight:800; border:none; border-radius:6px; padding:7px 12px; cursor:pointer;">
+              ✏️ Edit Morning Float
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="App.printShiftSlip('${s.id}')" style="border:1px solid rgba(0,0,0,0.15); font-weight:700; color:var(--accent-blue);">
+              📄 PDF Slip
+            </button>
+            <button type="button" class="btn btn-sm btn-success" onclick="App.shareShiftViaWhatsApp('${s.id}')" style="background:#16a34a; border-color:#16a34a; color:#fff; font-weight:700;">
+              📲 WhatsApp
+            </button>
+          `;
+        } else {
+          actionsEl.innerHTML = `
+            <button type="button" class="btn btn-sm" onclick="App.editShift('${s.id}')" style="background:#f59e0b; color:#000; font-weight:800; border:none; border-radius:6px; padding:6px 12px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+              ✏️ Edit Today's Shift
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" onclick="App.printShiftSlip('${s.id}')" style="border:1px solid rgba(0,0,0,0.15); font-weight:700; color:var(--accent-blue);">
+              📄 PDF Slip
+            </button>
+            <button type="button" class="btn btn-sm btn-success" onclick="App.shareShiftViaWhatsApp('${s.id}')" style="background:#16a34a; border-color:#16a34a; color:#fff; font-weight:700;">
+              📲 WhatsApp
+            </button>
+          `;
+        }
       }
     } else {
       if (badgeEl) {
@@ -5443,9 +5460,18 @@ setShiftViewMode(mode) {
                 </div>
               </div>
               <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <button type="button" class="btn btn-sm" onclick="App.editShift('${latestShiftToday.id}')" title="Edit Today's Shift" style="background:#f59e0b; color:#000; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
-                  ✏️ Edit Shift
-                </button>
+                ${(latestShiftToday.shiftType === 'morning' || latestShiftToday.status === 'morning_active') ? `
+                  <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal()" title="Close Today's Shift" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+                    🌙 Close Shift (සවස ශිෆ්ට් එක Close කරන්න)
+                  </button>
+                  <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal()" title="Edit Morning Float" style="background:#f59e0b; color:#000; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer;">
+                    ✏️ Edit Morning Float
+                  </button>
+                ` : `
+                  <button type="button" class="btn btn-sm" onclick="App.editShift('${latestShiftToday.id}')" title="Edit Today's Shift" style="background:#f59e0b; color:#000; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+                    ✏️ Edit Shift
+                  </button>
+                `}
                 <button type="button" class="btn btn-sm" onclick="App.printShiftSlip('${latestShiftToday.id}')" title="Download / Print PDF Slip" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
                   📄 PDF Slip
                 </button>
@@ -6042,18 +6068,24 @@ setShiftViewMode(mode) {
       </form>
     `;
 
-    const title = isEditMode
-      ? `✏️ Edit Today's Shift Closing - ${shop ? shop.name : ''}`
-      : `🌙 ${I18N.t('shift_evening_close_title') || 'Evening Shift Close & POS Tally'}`;
+    const title = isMorningOnlyTarget
+      ? `🌙 Evening Shift Close & Cash Tally (සවස ශිෆ්ට් එක Close කිරීම) - ${shop ? shop.name : ''}`
+      : (isEditMode ? `✏️ Edit Today's Shift Closing - ${shop ? shop.name : ''}` : `🌙 ${I18N.t('shift_evening_close_title') || 'Evening Shift Close & POS Tally'}`);
+
+    const saveBtnText = isMorningOnlyTarget
+      ? '🌙 Close & Save Shift (සවස ශිෆ්ට් එක Close කරන්න)'
+      : (isEditMode ? '💾 Update Shift (යාවත්කාලීන කරන්න)' : '🌙 Close & Save Shift (ශිෆ්ට් එක Close කර සුරකින්න)');
+    const saveBtnBg = isMorningOnlyTarget ? '#2563eb' : (isEditMode ? '#f59e0b' : '#2563eb');
+    const saveBtnColor = isMorningOnlyTarget ? '#fff' : (isEditMode ? '#000' : '#fff');
 
     this.showModal(
       title,
       bodyHtml,
       `
-        <button type="button" class="btn btn-ghost" onclick="App.closeModal(); App.editingShiftId = null;">${I18N.t('btn_cancel') || 'Cancel'}</button>
-        <button type="button" class="btn btn-primary" onclick="App.saveShiftSummaryModal('save')" style="font-weight:800; background:${isEditMode ? '#f59e0b' : '#2563eb'}; border-color:${isEditMode ? '#f59e0b' : '#2563eb'}; color:${isEditMode ? '#000' : '#fff'};">💾 ${isEditMode ? 'Update Shift (යාවත්කාලීන කරන්න)' : 'Save Shift Record'}</button>
-        <button type="button" class="btn btn-success" onclick="App.saveShiftSummaryModal('whatsapp')" style="background:#16a34a; border-color:#16a34a; font-weight:800;">📲 ${isEditMode ? 'Update & WhatsApp' : 'Save & WhatsApp'}</button>
-        <button type="button" class="btn btn-info" onclick="App.saveShiftSummaryModal('pdf')" style="font-weight:800;">📄 Save & Print PDF</button>
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal(); App.editingShiftId = null;">❌ ${I18N.currentLang === 'si' ? 'වසන්න (Close)' : 'Close'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.saveShiftSummaryModal('save')" style="font-weight:800; background:${saveBtnBg}; border-color:${saveBtnBg}; color:${saveBtnColor};">${saveBtnText}</button>
+        <button type="button" class="btn btn-success" onclick="App.saveShiftSummaryModal('whatsapp')" style="background:#16a34a; border-color:#16a34a; font-weight:800;">📲 ${isMorningOnlyTarget ? 'Close & WhatsApp' : (isEditMode ? 'Update & WhatsApp' : 'Close & WhatsApp')}</button>
+        <button type="button" class="btn btn-info" onclick="App.saveShiftSummaryModal('pdf')" style="font-weight:800;">📄 ${isMorningOnlyTarget ? 'Close & Print PDF' : (isEditMode ? 'Update & Print PDF' : 'Close & Print PDF')}</button>
       `
     );
 
@@ -6210,6 +6242,7 @@ setShiftViewMode(mode) {
       this.renderShiftsPage();
     }
     this.renderDashboard();
+    this.updateDashboardShiftStatusBanner();
 
     if (action === 'pdf' && savedShift) {
       setTimeout(() => this.printShiftSlip(savedShift.id), 300);
@@ -7010,8 +7043,8 @@ setShiftViewMode(mode) {
       `🌅 ${I18N.t('shift_morning_open_title') || 'Morning Shift Open (Cash Drawer Float)'}`,
       bodyHtml,
       `
-        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">${I18N.t('btn_cancel') || 'Cancel'}</button>
-        <button type="button" class="btn btn-primary" onclick="App.saveMorningShift()" style="background:var(--accent-gold); border-color:var(--accent-gold); color:#000; font-weight:800;">💾 Save Morning Shift</button>
+        <button type="button" class="btn btn-ghost" onclick="App.closeModal()">❌ ${I18N.currentLang === 'si' ? 'වසන්න (Close)' : 'Close'}</button>
+        <button type="button" class="btn btn-primary" onclick="App.saveMorningShift()" style="background:var(--accent-gold); border-color:var(--accent-gold); color:#000; font-weight:800; padding:8px 16px;">💾 ${I18N.currentLang === 'si' ? 'ආරම්භක මුදල සුරකින්න (Save Shift)' : 'Save Morning Shift'}</button>
       `
     );
   },
@@ -7041,67 +7074,75 @@ setShiftViewMode(mode) {
   },
 
   saveMorningShift() {
-    const shopSelectEl = document.getElementById('morningShiftShopSelect');
-    const shopId = (shopSelectEl && shopSelectEl.value) ? shopSelectEl.value : DB.getActiveShopId();
-    if (!shopId) return;
+    try {
+      const shopSelectEl = document.getElementById('morningShiftShopSelect');
+      const shopId = (shopSelectEl && shopSelectEl.value) ? shopSelectEl.value : DB.getActiveShopId();
+      if (!shopId) return;
 
-    const cashierInput = document.getElementById('morningCashierName');
-    let cashier = cashierInput?.value?.trim() || '';
-    if (!cashier) {
-      const activeEmp = DB.getEmployees()[0]?.name;
-      if (activeEmp) {
-        cashier = activeEmp;
-        if (cashierInput) cashierInput.value = cashier;
+      const cashierInput = document.getElementById('morningCashierName');
+      let cashier = cashierInput?.value?.trim() || '';
+      if (!cashier) {
+        const activeEmp = DB.getEmployees()[0]?.name;
+        if (activeEmp) {
+          cashier = activeEmp;
+          if (cashierInput) cashierInput.value = cashier;
+        }
       }
-    }
 
-    if (!cashier) {
-      if (cashierInput) {
-        cashierInput.style.borderColor = 'var(--accent-red)';
-        cashierInput.focus();
+      if (!cashier) {
+        if (cashierInput) {
+          cashierInput.style.borderColor = 'var(--accent-red)';
+          cashierInput.focus();
+        }
+        this.showToast('කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න (Please enter Cashier Name)', 'error');
+        return;
       }
-      this.showToast('කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න (Please enter Cashier Name)', 'error');
-      return;
+      DB.saveEmployee(cashier, 'Staff');
+      this.refreshEmployeeDatalist();
+      const openingFloat = parseFloat(document.getElementById('morningFloatInput')?.value) || 0;
+      const note = document.getElementById('morningShiftNotes')?.value?.trim() || '';
+
+      const today = DB.getTodayDate();
+      const todayShifts = DB.getShiftsForShopByDate(shopId, today);
+
+      if (todayShifts.length > 0) {
+        // Update existing today's shift instead of creating duplicate!
+        DB.updateShift(todayShifts[0].id, {
+          cashierName: cashier,
+          cashier,
+          openingFloat,
+          actualCountedCash: (todayShifts[0].actualCountedCash && todayShifts[0].actualCountedCash !== todayShifts[0].openingFloat) ? todayShifts[0].actualCountedCash : openingFloat,
+          countedCash: (todayShifts[0].countedCash && todayShifts[0].countedCash !== todayShifts[0].openingFloat) ? todayShifts[0].countedCash : openingFloat,
+          denominations: this.lastMorningDenominations || null,
+          note: note || todayShifts[0].note,
+          status: (todayShifts[0].countedCash && todayShifts[0].countedCash !== openingFloat) ? todayShifts[0].status : 'morning_active'
+        });
+        this.showToast(`🌅 අද දින ආරම්භක මුදල (${DB.formatCurrency(openingFloat)}) යාවත්කාලීන විය!`, 'success');
+      } else {
+        DB.addShift({
+          shopId,
+          shiftName: 'Morning Shift Open',
+          shiftType: 'morning',
+          cashierName: cashier,
+          cashier,
+          openingFloat,
+          actualCountedCash: openingFloat,
+          countedCash: openingFloat,
+          denominations: this.lastMorningDenominations || null,
+          note,
+          status: 'morning_active'
+        });
+        this.showToast(`🌅 උදෑසන ආරම්භක මුදල (${DB.formatCurrency(openingFloat)}) සාර්ථකව සටහන් විය!`, 'success');
+      }
+
+      this.lastMorningDenominations = null;
+      this.closeModal();
+      this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
+    } catch (err) {
+      console.error('saveMorningShift error:', err);
+      this.showToast('දෝෂයක් සිදුවිය: ' + (err.message || err), 'error');
     }
-    DB.saveEmployee(cashier, 'Staff');
-    this.refreshEmployeeDatalist();
-    const openingFloat = parseFloat(document.getElementById('morningFloatInput')?.value) || 0;
-    const note = document.getElementById('morningShiftNotes')?.value?.trim() || '';
-
-    const today = DB.getTodayDate();
-    const todayShifts = DB.getShiftsForShopByDate(shopId, today);
-
-    if (todayShifts.length > 0) {
-      // Update existing today's shift instead of creating duplicate!
-      DB.updateShift(todayShifts[0].id, {
-        cashierName: cashier,
-        cashier,
-        openingFloat,
-        denominations: this.lastMorningDenominations || null,
-        note: note || todayShifts[0].note,
-        status: (todayShifts[0].countedCash && todayShifts[0].countedCash !== openingFloat) ? todayShifts[0].status : 'morning_active'
-      });
-      this.showToast(`🌅 අද දින ආරම්භක මුදල (${DB.formatCurrency(openingFloat)}) යාවත්කාලීන විය!`, 'success');
-    } else {
-      DB.addShift({
-        shopId,
-        shiftName: 'Morning Shift Open',
-        shiftType: 'morning',
-        cashierName: cashier,
-        cashier,
-        openingFloat,
-        actualCountedCash: openingFloat,
-        countedCash: openingFloat,
-        denominations: this.lastMorningDenominations || null,
-        note,
-        status: 'morning_active'
-      });
-      this.showToast(`🌅 උදෑසන ආරම්භක මුදල (${DB.formatCurrency(openingFloat)}) සාර්ථකව සටහන් විය!`, 'success');
-    }
-
-    this.lastMorningDenominations = null;
-    this.closeModal();
-    this.refreshPage(this.currentPage);
   },
 
   // ================================================================
