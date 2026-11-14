@@ -1225,128 +1225,7 @@ const App = {
     container.innerHTML = html;
   },
 
-  updateDashboardShiftStatusBanner() {
-    const banner = document.getElementById('dashShiftStatusBanner');
-    if (!banner) return;
-    const shopId = DB.getActiveShopId();
-    const today = DB.getTodayDate();
-    const todayShifts = shopId ? DB.getShiftsForShopByDate(shopId, today) : DB.getShiftsByDate(today);
 
-    const subEl = document.getElementById('dashShiftStatusSubtitle');
-    const badgeEl = document.getElementById('dashShiftStatusBadge');
-    const actionsEl = document.getElementById('dashShiftStatusActions');
-
-    if (todayShifts.length > 0) {
-      const s = todayShifts[0];
-      const diff = s.difference || 0;
-      const posTotal = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
-      const counted = s.countedCash || s.actualCountedCash || 0;
-      const isMorningOnly = s.shiftType === 'morning';
-
-      if (badgeEl) {
-        if (isMorningOnly) {
-          badgeEl.className = 'tally-badge';
-          badgeEl.style.background = '#f59e0b';
-          badgeEl.style.color = '#000';
-          badgeEl.textContent = '🌅 MORNING FLOAT ONLY';
-        } else if (s.status === 'balanced') {
-          badgeEl.className = 'tally-badge balanced';
-          badgeEl.textContent = '✅ BALANCED (Rs. 0.00)';
-        } else if (s.status === 'excess') {
-          badgeEl.className = 'tally-badge excess';
-          badgeEl.textContent = `🟢 CASH EXCESS (+${DB.formatCurrency(diff)})`;
-        } else {
-          badgeEl.className = 'tally-badge shortage';
-          badgeEl.textContent = `🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})`;
-        }
-      }
-
-      if (subEl) {
-        subEl.innerHTML = `Cashier: <strong>${s.cashier || s.cashierName || 'Staff'}</strong> | Counted Cash: <strong>${DB.formatCurrency(counted)}</strong> | POS Gross: <strong>${DB.formatCurrency(posTotal)}</strong>`;
-      }
-
-      if (actionsEl) {
-        actionsEl.innerHTML = `
-          <button type="button" class="btn btn-sm" onclick="App.editShift('${s.id}')" style="background:#f59e0b; color:#000; font-weight:800; border:none; border-radius:6px; padding:6px 12px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,0.15);">
-            ✏️ Edit Today's Shift
-          </button>
-          <button type="button" class="btn btn-sm btn-ghost" onclick="App.printShiftSlip('${s.id}')" style="border:1px solid rgba(0,0,0,0.15); font-weight:700; color:var(--accent-blue);">
-            📄 PDF Slip
-          </button>
-          <button type="button" class="btn btn-sm btn-success" onclick="App.shareShiftViaWhatsApp('${s.id}')" style="background:#16a34a; border-color:#16a34a; color:#fff; font-weight:700;">
-            📲 WhatsApp
-          </button>
-        `;
-      }
-    } else {
-      if (badgeEl) {
-        badgeEl.className = 'tally-badge shortage';
-        badgeEl.textContent = '⏳ Not Closed Today';
-      }
-      if (subEl) {
-        subEl.textContent = I18N.currentLang === 'si' ? 'අද දවසේ හවස සමරි එක තවම ගලපා නැත. ආරම්භ කිරීමට බොත්තම ඔබන්න.' : 'Evening shift reconciliation not closed yet today. Click button to tally.';
-      }
-      if (actionsEl) {
-        actionsEl.innerHTML = `
-          <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal()" style="background:#f59e0b; color:#000; font-weight:700; border:none; border-radius:6px; padding:6px 12px; cursor:pointer;">
-            🌅 Morning Float
-          </button>
-          <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal()" style="font-weight:700;">
-            🌙 Close Shift Now
-          </button>
-        `;
-      }
-    }
-  },
-
-  filterDashboardView(view) {
-    const banner = document.getElementById('dashShiftStatusBanner');
-    const summaryCards = document.getElementById('summaryCards');
-    const chartCard = document.getElementById('dashAnalyticsChartCard');
-    const compSection = document.getElementById('dashComparisonSection');
-    const updatesSection = document.getElementById('dashRecentUpdates')?.closest('.card');
-
-    if (!summaryCards) return;
-
-    if (view === 'all') {
-      if (banner) banner.style.display = 'block';
-      summaryCards.style.display = 'grid';
-      if (chartCard) chartCard.style.display = 'block';
-      if (compSection) compSection.style.display = 'block';
-      if (updatesSection) updatesSection.style.display = 'block';
-      summaryCards.querySelectorAll('.card').forEach(c => c.style.display = 'block');
-    } else if (view === 'shifts') {
-      if (banner) {
-        banner.style.display = 'block';
-        banner.scrollIntoView({ behavior: 'smooth' });
-      }
-      summaryCards.style.display = 'grid';
-      summaryCards.querySelectorAll('.card').forEach(c => {
-        const isCash = c.classList.contains('accent-gold') || c.classList.contains('accent-green');
-        c.style.display = isCash ? 'block' : 'none';
-      });
-      if (chartCard) chartCard.style.display = 'block';
-      if (compSection) compSection.style.display = 'none';
-    } else if (view === 'reload') {
-      summaryCards.style.display = 'grid';
-      summaryCards.querySelectorAll('.card').forEach(c => {
-        const isReload = c.classList.contains('accent-blue') || c.classList.contains('accent-green');
-        c.style.display = isReload ? 'block' : 'none';
-      });
-      if (compSection) compSection.style.display = 'block';
-      if (banner) banner.style.display = 'none';
-    } else if (view === 'bank') {
-      summaryCards.style.display = 'grid';
-      summaryCards.querySelectorAll('.card').forEach(c => {
-        const isBank = c.classList.contains('accent-purple') || c.classList.contains('accent-green');
-        c.style.display = isBank ? 'block' : 'none';
-      });
-      if (compSection) compSection.style.display = 'block';
-      if (banner) banner.style.display = 'none';
-    } else if (view === 'credits') {
-      this.navigateTo('credits');
-    }
-  },
 
   // ================================================================
   // UPDATE FORM (2-TRACK SYSTEM)
@@ -1739,7 +1618,27 @@ const App = {
     this.calculateLiveBalances();
   },
 
+  populateUpdateShopSelect() {
+    const sel = document.getElementById('updateShopSelect');
+    if (!sel) return;
+    const shops = DB.getShops(false);
+    const activeId = DB.getActiveShopId();
+    sel.innerHTML = shops.map(s => `<option value="${s.id}" ${s.id === activeId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('');
+    if (!sel._hasChangeListener) {
+      sel._hasChangeListener = true;
+      sel.addEventListener('change', (e) => {
+        const newShopId = e.target.value;
+        if (newShopId) {
+          DB.setActiveShop(newShopId);
+          this.updateShopSelectorUI();
+          this.renderUpdateForm();
+        }
+      });
+    }
+  },
+
   renderUpdateForm() {
+    this.populateUpdateShopSelect();
     const shopId = DB.getActiveShopId();
     if (!shopId) return;
 
@@ -2034,7 +1933,8 @@ const App = {
   },
 
   submitUpdate(action = 'save_only') {
-    const shopId = DB.getActiveShopId();
+    const shopSelectEl = document.getElementById('updateShopSelect');
+    const shopId = (shopSelectEl && shopSelectEl.value) ? shopSelectEl.value : DB.getActiveShopId();
     if (!shopId) {
       this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න (Please select a shop)' : 'Please select a shop first', 'error');
       return;
@@ -2399,42 +2299,101 @@ const App = {
   // HISTORY
   // ================================================================
   setupHistoryPage() {
-    document.getElementById('historyDateFilter').addEventListener('change', () => this.renderHistory());
-    document.getElementById('historyTodayBtn').addEventListener('click', () => {
-      document.getElementById('historyDateFilter').value = DB.getTodayDate();
-      this.renderHistory();
-    });
-    document.getElementById('historyAllBtn').addEventListener('click', () => {
-      document.getElementById('historyDateFilter').value = '';
-      this.renderHistory();
-    });
+    // Populate branch filter
+    const shopFilterEl = document.getElementById('historyShopFilter');
+    if (shopFilterEl) {
+      const shops = DB.getShops(false);
+      shopFilterEl.innerHTML = '<option value="">🏪 All Branches (සියලු ශාඛා)</option>' +
+        shops.map(s => `<option value="${s.id}">🏪 ${s.name}</option>`).join('');
+      shopFilterEl.addEventListener('change', () => this.renderHistory());
+    }
 
-    document.getElementById('historyDateFilter').value = DB.getTodayDate();
+    const dateInput = document.getElementById('historyDateFilter');
+    if (dateInput) {
+      dateInput.addEventListener('change', () => this.renderHistory());
+    }
+
+    const limitFilterEl = document.getElementById('historyLimitFilter');
+    if (limitFilterEl) {
+      limitFilterEl.addEventListener('change', () => this.renderHistory());
+    }
+
+    const todayBtn = document.getElementById('historyTodayBtn');
+    if (todayBtn) {
+      todayBtn.addEventListener('click', () => {
+        if (dateInput) dateInput.value = DB.getTodayDate();
+        this.renderHistory();
+      });
+    }
+
+    const yestBtn = document.getElementById('historyYesterdayBtn');
+    if (yestBtn) {
+      yestBtn.addEventListener('click', () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        const yDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (dateInput) dateInput.value = yDate;
+        this.renderHistory();
+      });
+    }
+
+    const weekBtn = document.getElementById('historyWeekBtn');
+    if (weekBtn) {
+      weekBtn.addEventListener('click', () => {
+        if (dateInput) dateInput.value = '';
+        if (limitFilterEl) limitFilterEl.value = '50';
+        this.renderHistory();
+      });
+    }
+
+    const allBtn = document.getElementById('historyAllBtn');
+    if (allBtn) {
+      allBtn.addEventListener('click', () => {
+        if (dateInput) dateInput.value = '';
+        if (limitFilterEl) limitFilterEl.value = 'all';
+        this.renderHistory();
+      });
+    }
+
+    // Default: Date filter is empty so Recent 10 are immediately shown (No blank page!)
+    if (dateInput) dateInput.value = '';
   },
 
   renderHistory() {
-    const shopId = DB.getActiveShopId();
     const container = document.getElementById('historyList');
+    if (!container) return;
 
-    if (!shopId) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'කරුණාකර සාප්පුවක් තෝරන්න' : 'Please select a shop'}</div></div>`;
-      return;
-    }
+    const shopFilter = document.getElementById('historyShopFilter')?.value || '';
+    const dateFilter = document.getElementById('historyDateFilter')?.value || '';
+    const limitFilter = document.getElementById('historyLimitFilter')?.value || '10';
 
-    const dateFilter = document.getElementById('historyDateFilter').value;
-    let updates;
+    let updates = shopFilter ? DB.getUpdatesForShop(shopFilter) : DB.getUpdates();
     if (dateFilter) {
-      updates = DB.getUpdatesForShopByDate(shopId, dateFilter);
-    } else {
-      updates = DB.getUpdatesForShop(shopId);
+      updates = updates.filter(u => u.date === dateFilter);
     }
+    updates.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     if (updates.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${I18N.currentLang === 'si' ? 'Updates නැහැ' : 'No updates found'}</div></div>`;
+      container.innerHTML = `
+        <div class="empty-state" style="padding:36px 16px;">
+          <div class="empty-icon">📭</div>
+          <div class="empty-text">${I18N.currentLang === 'si' ? 'මෙම දිනයට හෝ ශාඛාවට Updates සටහන්ව නැත.' : 'No updates recorded for this date or branch.'}</div>
+          <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('historyDateFilter').value=''; document.getElementById('historyLimitFilter').value='25'; App.renderHistory();" style="margin-top:14px; font-weight:700;">
+            🔄 View Recent History (මෑත සටහන් බලන්න)
+          </button>
+        </div>`;
       return;
     }
 
-    let html = '<div class="update-list">';
+    const totalCount = updates.length;
+    if (limitFilter !== 'all') {
+      const limitNum = parseInt(limitFilter, 10) || 10;
+      updates = updates.slice(0, limitNum);
+    }
+
+    let html = `<div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:8px; font-weight:600;">
+      Showing ${updates.length} of ${totalCount} updates ${shopFilter ? '' : '(Across All Branches)'}
+    </div><div class="update-list">`;
     let currentDate = '';
 
     updates.forEach(u => {
@@ -2449,6 +2408,8 @@ const App = {
 
       const vals = DB.extractValues(u);
       const comp = u.comparison;
+      const shop = DB.getShop(u.shopId);
+      const shopName = shop ? shop.name : (u.shopName || 'Main Shop');
 
       let diffBadges = '';
       if (comp && !comp.isFirst) {
@@ -2471,10 +2432,13 @@ const App = {
 
       html += `
         <div class="update-item" onclick="App.showUpdateDetail('${u.id}')">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
             <div>
-              <div class="update-time">🕐 ${DB.formatTime(u.timestamp)}</div>
-              ${u.empName ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">🧑‍💼 ${u.empName} ${u.jobRole ? '(' + u.jobRole + ')' : ''}</div>` : ''}
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span class="update-time">🕐 ${DB.formatTime(u.timestamp)}</span>
+                <span class="badge" style="background:rgba(79,70,229,0.12); color:#4f46e5; border:1px solid rgba(79,70,229,0.3); font-size:0.75rem; font-weight:800; padding:2px 8px; border-radius:12px;">🏪 ${shopName}</span>
+              </div>
+              ${u.empName ? `<div style="font-size:0.75rem; color:var(--text-muted); margin-top:3px;">🧑‍💼 ${u.empName} ${u.jobRole ? '(' + u.jobRole + ')' : ''}</div>` : ''}
             </div>
             <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
               <button type="button" class="btn btn-warning btn-xs" onclick="event.stopPropagation(); App.promptEditUpdate('${u.id}');" style="padding:4px 9px; font-size:0.75rem; font-weight:700; border-radius:6px; background:#f59e0b; color:#fff; border:none; cursor:pointer;" title="Edit this update">✏️ Edit</button>
@@ -2509,6 +2473,27 @@ const App = {
     container.innerHTML = html;
   },
 
+  sendUnclosedShiftAlertWhatsApp(shiftId) {
+    const shift = DB.getShifts(null).find(s => s.id === shiftId);
+    if (!shift) return;
+    const shop = DB.getShop(shift.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+    const cashierName = shift.cashier || shift.cashierName || 'Staff';
+
+    let msg = `🚨 *METHMI MOBILE - UNCLOSED SHIFT ALERT*\n`;
+    msg += `⚠️ Attention: ${cashierName} / Branch Manager\n`;
+    msg += `🏪 Branch: ${shopName.toUpperCase()}\n`;
+    msg += `📅 Shift Date: ${DB.formatDate(shift.date)}\n`;
+    msg += `⏰ Status: ⚠️ Night shift was not closed before 12:00 AM midnight!\n`;
+    msg += `💵 Opening Float recorded: Rs. ${DB.formatCurrency(shift.openingFloat || 0)}\n`;
+    msg += `=================================\n`;
+    msg += `Please reconcile the cash drawer, enter POS sales, and close the shift immediately.\n`;
+    msg += `Generated via Methmi Shop Management System`;
+
+    const url = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
   updateDashboardShiftStatusBanner() {
     const banner = document.getElementById('dashShiftStatusBanner');
     if (!banner) return;
@@ -2519,6 +2504,33 @@ const App = {
     const subEl = document.getElementById('dashShiftStatusSubtitle');
     const badgeEl = document.getElementById('dashShiftStatusBadge');
     const actionsEl = document.getElementById('dashShiftStatusActions');
+
+    // Check for any unclosed expired shift from yesterday
+    const allShopShifts = DB.getShifts(shopId);
+    const expiredYesterday = allShopShifts.find(s => s.status === 'unclosed_expired' && s.date < today);
+    let expiredAlertEl = document.getElementById('dashExpiredShiftAlert');
+    if (!expiredAlertEl && banner.parentNode) {
+      expiredAlertEl = document.createElement('div');
+      expiredAlertEl.id = 'dashExpiredShiftAlert';
+      banner.parentNode.insertBefore(expiredAlertEl, banner);
+    }
+    if (expiredAlertEl) {
+      if (expiredYesterday) {
+        expiredAlertEl.style.display = 'block';
+        expiredAlertEl.innerHTML = `
+          <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <span style="font-weight:800; color:var(--accent-red); font-size:0.9rem;">🚨 ඊයේ (${DB.formatDate(expiredYesterday.date)}) ෂිෆ්ට් එක රාත්‍රී 12ට පෙර ක්ලෝස් කර නැත!</span>
+              <span style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">(Cashier: ${expiredYesterday.cashier || 'Staff'} | Float: Rs. ${DB.formatCurrency(expiredYesterday.openingFloat || 0)})</span>
+            </div>
+            <button type="button" class="btn btn-xs btn-success" onclick="App.sendUnclosedShiftAlertWhatsApp('${expiredYesterday.id}')" style="background:#16a34a; font-weight:800; padding:5px 12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">
+              📲 WhatsApp Alert යවන්න
+            </button>
+          </div>`;
+      } else {
+        expiredAlertEl.style.display = 'none';
+      }
+    }
 
     if (todayShifts.length > 0) {
       const s = todayShifts[0];
@@ -4948,7 +4960,10 @@ Thank you! - ${shopName}`;
         counts = this.lastReloadDenominations;
       } else if (typeof targetInputIdOrFn === 'string' && targetInputIdOrFn === 'reloadHubCashInput' && this.lastHubDenominations) {
         counts = this.lastHubDenominations;
-      } else {
+      } else if (typeof targetInputIdOrFn === 'function') {
+        counts = this.lastShiftDenominations || this.lastMorningDenominations || null;
+      }
+      if (!counts) {
         counts = { n5000: 0, n2000: 0, n1000: 0, n500: 0, n100: 0, n50: 0, n20: 0, n10: 0, coins: 0 };
       }
     }
@@ -5850,12 +5865,14 @@ setShiftViewMode(mode) {
     }
   },
 
-  showShiftSummaryModal(existingShift = null) {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) {
-      this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
+  showShiftSummaryModal(existingShift = null, targetShopId = null) {
+    const activeId = targetShopId || existingShift?.shopId || DB.getActiveShopId();
+    const shops = DB.getShops(false);
+    if (!activeId || shops.length === 0) {
+      this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error');
       return;
     }
+    const shopId = activeId;
     const shop = DB.getShop(shopId);
     const today = DB.getTodayDate();
 
@@ -5900,10 +5917,16 @@ setShiftViewMode(mode) {
     }
     const initialSpecialNotes = targetShift ? (targetShift.specialNotes || targetShift.cashNote || '') : '';
     const initialNotes = targetShift ? (targetShift.notes || targetShift.note || '') : '';
-    this.lastShiftDenominations = (targetShift && !isMorningOnlyTarget) ? targetShift.denominations : null;
+    this.lastShiftDenominations = (targetShift && targetShift.denominations) ? targetShift.denominations : (morningShift?.denominations || null);
 
     const bodyHtml = `
       <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:10px;">
+        <div class="form-group" style="margin-bottom:2px; background:rgba(79,70,229,0.06); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid rgba(79,70,229,0.25);">
+          <label class="form-label" style="font-weight:800; color:var(--accent-purple); margin-bottom:4px;">🏪 Branch / Shop (ශාඛාව)</label>
+          <select class="form-input" id="shiftModalShopSelect" style="font-weight:700;" onchange="App.showShiftSummaryModal(null, this.value)">
+            ${shops.map(s => `<option value="${s.id}" ${s.id === shopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+          </select>
+        </div>
         <div style="font-size:0.82rem; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center; padding-bottom:6px; border-bottom:1px solid var(--border-glass);">
           <div>🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)} ${isEditMode ? '<span class="badge" style="background:#f59e0b; color:#000; font-weight:800; margin-left:6px; padding:2px 6px;">✏️ EDITING TODAY</span>' : ''}</div>
           <button type="button" class="btn btn-xs btn-ghost" onclick="App.showAddExpenseModal(true)" style="font-size:0.75rem; color:var(--accent-red); border:1px solid rgba(228,0,43,0.3); padding:2px 8px;">+ Add Expense</button>
@@ -6111,7 +6134,8 @@ setShiftViewMode(mode) {
   },
 
   saveShiftSummaryModal(action = 'pdf') {
-    const shopId = DB.getActiveShopId();
+    const shopSelectEl = document.getElementById('shiftModalShopSelect');
+    const shopId = (shopSelectEl && shopSelectEl.value) ? shopSelectEl.value : DB.getActiveShopId();
     if (!shopId) return;
 
     const shiftType = document.getElementById('shiftModalType')?.value || 'evening';
@@ -6913,12 +6937,14 @@ setShiftViewMode(mode) {
   // ================================================================
   // MORNING SHIFT OPEN (CASH DRAWER FLOAT & NOTE COUNTER)
   // ================================================================
-  showMorningShiftModal() {
-    const shopId = DB.getActiveShopId();
-    if (!shopId) {
+  showMorningShiftModal(targetShopId = null) {
+    const activeId = targetShopId || DB.getActiveShopId();
+    const shops = DB.getShops(false);
+    if (!activeId || shops.length === 0) {
       this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
       return;
     }
+    const shopId = activeId;
     const shop = DB.getShop(shopId);
     const today = DB.getTodayDate();
 
@@ -6926,14 +6952,29 @@ setShiftViewMode(mode) {
     const shopShifts = DB.getShiftsForShop(shopId);
     const prevShift = shopShifts.find(s => s.date < today && (parseFloat(s.countedCash || s.actualCountedCash || s.openingFloat) || 0) > 0);
     const prevClosingCash = prevShift ? (parseFloat(prevShift.countedCash || prevShift.actualCountedCash) || 0) : 0;
+    
+    // Float starts blank/0 so staff must count or tap yesterday reference
     const defaultMorningFloat = (todayShifts.length > 0 && (parseFloat(todayShifts[0].openingFloat) || 0) > 0)
       ? todayShifts[0].openingFloat
-      : (prevClosingCash > 0 ? prevClosingCash : '');
+      : '';
+    
+    // Retain denominations if previously entered today
+    if (todayShifts.length > 0 && todayShifts[0].denominations) {
+      this.lastMorningDenominations = todayShifts[0].denominations;
+    } else if (defaultMorningFloat === '') {
+      this.lastMorningDenominations = null;
+    }
 
     const bodyHtml = `
       <form id="morningShiftForm" style="display:flex; flex-direction:column; gap:12px;">
-        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:4px;">
-          🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)}
+        <div class="form-group" style="margin-bottom:0; background:rgba(79,70,229,0.06); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid rgba(79,70,229,0.25);">
+          <label class="form-label" style="font-weight:800; color:var(--accent-purple); margin-bottom:4px;">🏪 Branch / Shop (ශාඛාව)</label>
+          <select class="form-input" id="morningShiftShopSelect" style="font-weight:700;" onchange="App.showMorningShiftModal(this.value)">
+            ${shops.map(s => `<option value="${s.id}" ${s.id === shopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+          </select>
+        </div>
+        <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:2px;">
+          📅 Date: <strong>${DB.formatDate(today)}</strong>
         </div>
         <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-gold);">
           🌅 උදෑසන සාප්පුව විවෘත කිරීමේදී ලාච්චුවේ ඇති ආරම්භක මුදල් (Float) නෝට්ටු කවුන්ටරය මගින් ඇතුළත් කරන්න.
@@ -6996,23 +7037,36 @@ setShiftViewMode(mode) {
         if (denoms.coins) parts.push(`Coins: ${denoms.coins}`);
         sumEl.textContent = `📋 ` + parts.join(', ');
       }
-    });
+    }, this.lastMorningDenominations || null);
   },
 
   saveMorningShift() {
-    const shopId = DB.getActiveShopId();
+    const shopSelectEl = document.getElementById('morningShiftShopSelect');
+    const shopId = (shopSelectEl && shopSelectEl.value) ? shopSelectEl.value : DB.getActiveShopId();
     if (!shopId) return;
 
-    const cashier = document.getElementById('morningCashierName')?.value?.trim() || '';
+    const cashierInput = document.getElementById('morningCashierName');
+    let cashier = cashierInput?.value?.trim() || '';
+    if (!cashier) {
+      const activeEmp = DB.getEmployees()[0]?.name;
+      if (activeEmp) {
+        cashier = activeEmp;
+        if (cashierInput) cashierInput.value = cashier;
+      }
+    }
+
+    if (!cashier) {
+      if (cashierInput) {
+        cashierInput.style.borderColor = 'var(--accent-red)';
+        cashierInput.focus();
+      }
+      this.showToast('කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න (Please enter Cashier Name)', 'error');
+      return;
+    }
     DB.saveEmployee(cashier, 'Staff');
     this.refreshEmployeeDatalist();
     const openingFloat = parseFloat(document.getElementById('morningFloatInput')?.value) || 0;
     const note = document.getElementById('morningShiftNotes')?.value?.trim() || '';
-
-    if (!cashier) {
-      this.showToast('කරුණාකර සේවකයාගේ නම ඇතුළත් කරන්න (Please enter Cashier Name)', 'error');
-      return;
-    }
 
     const today = DB.getTodayDate();
     const todayShifts = DB.getShiftsForShopByDate(shopId, today);

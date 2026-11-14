@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=47.0">
+  <link rel="stylesheet" href="style.css?v=48.0">
 </head>
 <body>
 
@@ -420,15 +420,19 @@
             <div class="divider-line"></div>
           </div>
           <div class="form-row">
-            <div class="form-group" style="flex: 1.2; min-width: 170px;">
+            <div class="form-group" style="flex: 1.3; min-width: 180px;">
+              <label class="form-label" style="font-weight:800; color:var(--accent-purple);">🏪 Branch / Shop (ශාඛාව)</label>
+              <select class="form-input" id="updateShopSelect" style="font-weight:700;"></select>
+            </div>
+            <div class="form-group" style="flex: 1.1; min-width: 160px;">
               <label class="form-label" style="font-weight:700; color:var(--accent-blue);" data-i18n="upd_date">📅 Update Date (දිනය)</label>
               <input type="date" class="form-input" id="updateDateInput" required>
             </div>
-            <div class="form-group" style="flex: 2; min-width: 200px;">
+            <div class="form-group" style="flex: 1.8; min-width: 190px;">
               <label class="form-label" data-i18n="upd_emp_name">Employee Name</label>
               <input type="text" class="form-input" id="empName" data-i18n="upd_emp_name" placeholder="Employee Name (Type 1st letter to auto-fill)" list="employeeNameSuggestions" autocomplete="off" required>
             </div>
-            <div class="form-group" style="flex: 1.2; min-width: 150px;">
+            <div class="form-group" style="flex: 1.1; min-width: 140px;">
               <label class="form-label" data-i18n="upd_job_role">Job Role</label>
               <input type="text" class="form-input" id="jobRole" data-i18n="upd_job_role" placeholder="Job Role (e.g. OWNER, Cashier)" list="employeeRoleSuggestions" autocomplete="off">
             </div>
@@ -646,10 +650,27 @@
           <h1><span class="header-icon">📜</span> <span data-i18n="hist_title">Update History</span></h1>
         </div>
 
-        <div class="filter-bar">
-          <input type="date" class="form-input" id="historyDateFilter">
-          <button class="btn btn-ghost btn-sm" id="historyTodayBtn" data-i18n="rep_preset_today">Today</button>
-          <button class="btn btn-ghost btn-sm" id="historyAllBtn" data-i18n="hist_btn_all">View All</button>
+        <div class="filter-bar" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:var(--bg-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="min-width:180px;">
+            <select class="form-input" id="historyShopFilter" style="font-weight:700; width:100%;"></select>
+          </div>
+          <div style="min-width:140px;">
+            <input type="date" class="form-input" id="historyDateFilter" style="width:100%;">
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" id="historyTodayBtn">✨ Today</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="historyYesterdayBtn">Yesterday</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="historyWeekBtn">Last 7 Days</button>
+          <button type="button" class="btn btn-primary btn-sm" id="historyAllBtn">All History</button>
+          <div style="display:flex; align-items:center; gap:6px; margin-left:auto;">
+            <label style="font-size:0.8rem; font-weight:700; color:var(--text-muted);">Rows:</label>
+            <select class="form-input" id="historyLimitFilter" style="width:auto; padding:4px 8px; font-weight:700;">
+              <option value="10" selected>Recent 10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="all">All</option>
+            </select>
+          </div>
         </div>
 
         <div id="historyList">
@@ -1058,10 +1079,10 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=47.0"></script>
-  <script src="firebase-init.js?v=47.0"></script>
-  <script src="data.js?v=47.0"></script>
-  <script src="app.js?v=47.0"></script>
+  <script src="i18n.js?v=48.0"></script>
+  <script src="firebase-init.js?v=48.0"></script>
+  <script src="data.js?v=48.0"></script>
+  <script src="app.js?v=48.0"></script>
   
   <!-- Register Service Worker -->
   <script>

@@ -415,7 +415,12 @@ const DB = {
 
       if (window.App) {
         window.App.updateTopBarBadges();
-        window.App.refreshPage(window.App.currentPage);
+        if (this._refreshDebounceTimer) clearTimeout(this._refreshDebounceTimer);
+        this._refreshDebounceTimer = setTimeout(() => {
+          if (window.App && window.App.refreshPage) {
+            window.App.refreshPage(window.App.currentPage);
+          }
+        }, 150);
       }
     } catch (err) {
       console.error('Error processing Firestore updates snapshot:', err);
@@ -631,6 +636,9 @@ const DB = {
   },
 
   getUpdatesForShop(shopId) {
+    if (!shopId || shopId === 'all') {
+      return this.getUpdates().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
     return this.getUpdates()
       .filter(u => u.shopId === shopId)
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -1584,6 +1592,7 @@ const DB = {
   },
 
   getShiftsForShopByDate(shopId, date) {
+    if (!shopId || shopId === 'all') return this.getShiftsByDate(date);
     return this.getShifts(shopId).filter(s => s.date === date);
   },
 
@@ -1593,6 +1602,33 @@ const DB = {
 
   saveShifts(list) {
     this._dualSave(this.SHIFTS_KEY, list);
+  },
+
+  checkAndExpireYesterdayShifts() {
+    const today = this.getTodayDate();
+    let shifts = this.getShifts(null);
+    let modified = false;
+    const expiredList = [];
+
+    shifts.forEach(s => {
+      if (s.date && s.date < today) {
+        if (s.shiftType === 'morning' || s.status === 'morning_active' || s.status === 'unsettled') {
+          s.status = 'unclosed_expired';
+          s.expiredAt = new Date().toISOString();
+          s.note = (s.note ? s.note + ' | ' : '') + '⚠️ Automatically expired at midnight (Not closed before 12 AM)';
+          modified = true;
+          expiredList.push(s);
+        }
+      }
+    });
+
+    if (modified) {
+      this.saveShifts(shifts);
+      expiredList.forEach(s => {
+        this._syncToFirebase('payment_tracker_updates', 'shift_' + s.id, s);
+      });
+    }
+    return expiredList;
   },
 
   _deduplicateLegacyShifts() {
