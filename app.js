@@ -670,7 +670,7 @@ const App = {
         const sign = rd.diff >= 0 ? '+' : '';
         const icon = rd.type === 'profit' ? '▲ ' : rd.type === 'loss' ? '▼ ' : '➖ ';
         const color = rd.type === 'profit' ? 'var(--accent-green)' : rd.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
-        rEl.textContent = `${icon}${sign}Rs.${DB.formatCurrency(rd.diff)}`;
+        rEl.textContent = `${icon}${sign}${DB.formatCurrency(rd.diff)}`;
         rEl.style.color = color;
       }
       const bEl = document.getElementById('dashBankMarginDiff');
@@ -678,7 +678,7 @@ const App = {
         const sign = bd.diff >= 0 ? '+' : '';
         const icon = bd.type === 'profit' ? '▲ ' : bd.type === 'loss' ? '▼ ' : '➖ ';
         const color = bd.type === 'profit' ? 'var(--accent-green)' : bd.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
-        bEl.textContent = `${icon}${sign}Rs.${DB.formatCurrency(bd.diff)}`;
+        bEl.textContent = `${icon}${sign}${DB.formatCurrency(bd.diff)}`;
         bEl.style.color = color;
       }
       const cEl = document.getElementById('dashCashMarginDiff');
@@ -686,7 +686,7 @@ const App = {
         const sign = cd.diff >= 0 ? '+' : '';
         const icon = cd.type === 'profit' ? '▲ ' : cd.type === 'loss' ? '▼ ' : '➖ ';
         const color = cd.type === 'profit' ? 'var(--accent-green)' : cd.type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
-        cEl.textContent = `${icon}${sign}Rs.${DB.formatCurrency(cd.diff)}`;
+        cEl.textContent = `${icon}${sign}${DB.formatCurrency(cd.diff)}`;
         cEl.style.color = color;
       }
     } else {
@@ -1852,7 +1852,7 @@ const App = {
         const color = type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)';
         const bg = type === 'profit' ? 'rgba(16,185,129,0.08)' : type === 'loss' ? 'rgba(239,68,68,0.08)' : 'rgba(100,116,139,0.08)';
         const border = type === 'profit' ? 'rgba(16,185,129,0.3)' : type === 'loss' ? 'rgba(239,68,68,0.3)' : 'rgba(100,116,139,0.25)';
-        const textVal = `${icon}Rs.${DB.formatCurrency(Math.abs(diff))}`;
+        const textVal = `${icon}${DB.formatCurrency(Math.abs(diff))}`;
         const statusLabel = type === 'profit' ? 'Profit (ලාභ)' : type === 'loss' ? 'Loss (අලාභ)' : 'Balanced (සමබරයි)';
         return { type, icon, color, bg, border, textVal, statusLabel };
       };
@@ -1882,7 +1882,7 @@ const App = {
                 ${rCard.textVal}
               </div>
               <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
-                Reload Total: Rs.${DB.formatCurrency(reloadFullTotal)}
+                Reload Total: ${DB.formatCurrency(reloadFullTotal)}
               </div>
             </div>
 
@@ -1896,7 +1896,7 @@ const App = {
                 ${bCard.textVal}
               </div>
               <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
-                Bank Total: Rs.${DB.formatCurrency(bankGrandTotal)}
+                Bank Total: ${DB.formatCurrency(bankGrandTotal)}
               </div>
             </div>
 
@@ -1910,7 +1910,7 @@ const App = {
                 ${cCard.textVal}
               </div>
               <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
-                Drawer Cash: Rs.${DB.formatCurrency(totalCashInDrawer)}
+                Drawer Cash: ${DB.formatCurrency(totalCashInDrawer)}
               </div>
             </div>
 
@@ -1924,7 +1924,7 @@ const App = {
                 ${netCard.textVal}
               </div>
               <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
-                Grand Capital: Rs.${DB.formatCurrency(physicalCapital)}
+                Grand Capital: ${DB.formatCurrency(physicalCapital)}
               </div>
             </div>
           </div>
@@ -2196,40 +2196,40 @@ const App = {
 
     // 1. Reload SIMs Track
     msg += `🔄 *1. RELOAD SIMS BALANCE:*\n`;
-    msg += `• Dialog SIM: Rs. ${DB.formatCurrency(vals.dialog)}\n`;
-    msg += `• Mobitel SIM: Rs. ${DB.formatCurrency(vals.mobitel)}\n`;
-    msg += `• Airtel SIM: Rs. ${DB.formatCurrency(vals.airtel)}\n`;
-    msg += `• Hutch SIM: Rs. ${DB.formatCurrency(vals.hutch)}\n`;
+    msg += `• Dialog SIM: ${DB.formatCurrency(vals.dialog)}\n`;
+    msg += `• Mobitel SIM: ${DB.formatCurrency(vals.mobitel)}\n`;
+    msg += `• Airtel SIM: ${DB.formatCurrency(vals.airtel)}\n`;
+    msg += `• Hutch SIM: ${DB.formatCurrency(vals.hutch)}\n`;
     if (vals.ezcash > 0) {
-      msg += `• eZ Cash: Rs. ${DB.formatCurrency(vals.ezcash)}\n`;
+      msg += `• eZ Cash: ${DB.formatCurrency(vals.ezcash)}\n`;
     }
-    msg += `👉 *Total SIMs Balance:* *Rs. ${DB.formatCurrency(vals.simTotal)}*\n\n`;
+    msg += `👉 *Total SIMs Balance:* *${DB.formatCurrency(vals.simTotal)}*\n\n`;
 
     // 2. Reload Cash Drawer
     msg += `💵 *2. RELOAD CASH DRAWER:*\n`;
-    msg += `• Reload Physical Cash: Rs. ${DB.formatCurrency(vals.reloadCash)}\n`;
+    msg += `• Reload Physical Cash: ${DB.formatCurrency(vals.reloadCash)}\n`;
     if (vals.hubCash > 0) {
-      msg += `• Hub / Floating Cash: Rs. ${DB.formatCurrency(vals.hubCash)}\n`;
+      msg += `• Hub / Floating Cash: ${DB.formatCurrency(vals.hubCash)}\n`;
     }
-    msg += `👉 *Reload Drawer Total:* *Rs. ${DB.formatCurrency(vals.reloadDrawerTotal)}*\n`;
-    msg += `👉 *Combined Reload Track (SIMs + Drawer Cash):* *Rs. ${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
+    msg += `👉 *Reload Drawer Total:* *${DB.formatCurrency(vals.reloadDrawerTotal)}*\n`;
+    msg += `👉 *Combined Reload Track (SIMs + Drawer Cash):* *${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
 
     // 3. Bank Track
     msg += `🏦 *3. BANK PAYMENTS & ACCOUNTS:*\n`;
     if (vals.banks && vals.banks.length > 0) {
       vals.banks.forEach(b => {
-        msg += `• ${b.bank}: Acct Rs. ${DB.formatCurrency(b.accountAmount)} | Cash Rs. ${DB.formatCurrency(b.cashInDrawer)}\n`;
+        msg += `• ${b.bank}: Acct${DB.formatCurrency(b.accountAmount)} | Cash${DB.formatCurrency(b.cashInDrawer)}\n`;
       });
     }
-    msg += `• Total Bank Accounts: Rs. ${DB.formatCurrency(vals.totalBankAcct)}\n`;
-    msg += `• Total Bank Cash in Drawer: Rs. ${DB.formatCurrency(vals.totalBankCash)}\n`;
-    msg += `👉 *Total Bank Track:* *Rs. ${DB.formatCurrency(vals.bankTotal)}*\n\n`;
+    msg += `• Total Bank Accounts: ${DB.formatCurrency(vals.totalBankAcct)}\n`;
+    msg += `• Total Bank Cash in Drawer: ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    msg += `👉 *Total Bank Track:* *${DB.formatCurrency(vals.bankTotal)}*\n\n`;
 
     // 4. Combined Physical Cash in Drawer
     msg += `💼 *4. TOTAL PHYSICAL CASH IN DRAWER:*\n`;
-    msg += `• Reload Drawer Cash: Rs. ${DB.formatCurrency(vals.reloadDrawerTotal)}\n`;
-    msg += `• Bank Drawer Cash: Rs. ${DB.formatCurrency(vals.totalBankCash)}\n`;
-    msg += `👉 *Total Cash in Drawer:* *Rs. ${DB.formatCurrency(vals.totalCash)}*\n`;
+    msg += `• Reload Drawer Cash: ${DB.formatCurrency(vals.reloadDrawerTotal)}\n`;
+    msg += `• Bank Drawer Cash: ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    msg += `👉 *Total Cash in Drawer:* *${DB.formatCurrency(vals.totalCash)}*\n`;
 
     // Note denomination breakdown if present
     const denoms = u.reload?.denominations;
@@ -2252,7 +2252,7 @@ const App = {
 
     // 5. Grand Total Capital
     msg += `=================================\n`;
-    msg += `💰 *GRAND TOTAL CAPITAL:* *Rs. ${DB.formatCurrency(vals.totalCapital)}*\n`;
+    msg += `💰 *GRAND TOTAL CAPITAL:* *${DB.formatCurrency(vals.totalCapital)}*\n`;
     msg += `(SIMs: ${DB.formatCurrency(vals.simTotal)} + Total Cash: ${DB.formatCurrency(vals.totalCash)} + Banks: ${DB.formatCurrency(vals.totalBankAcct)})\n`;
     msg += `=================================\n\n`;
 
@@ -2266,20 +2266,20 @@ const App = {
       const prevTime = comp.previousUpdateTime ? DB.formatTime(comp.previousUpdateTime) : 'Previous';
 
       msg += `📊 *INDEPENDENT MARGINS (VS ${prevTime.toUpperCase()}):*\n`;
-      msg += `• 🔄 Reload Track Margin: ${rDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(rDiff)}\n`;
-      msg += `• 🏦 Bank Track Margin: ${bDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(bDiff)}\n`;
-      msg += `• 💵 Cash Drawer Flow: ${cDiff >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(cDiff)}\n`;
+      msg += `• 🔄 Reload Track Margin: ${rDiff >= 0 ? '+' : ''}${DB.formatCurrency(rDiff)}\n`;
+      msg += `• 🏦 Bank Track Margin: ${bDiff >= 0 ? '+' : ''}${DB.formatCurrency(bDiff)}\n`;
+      msg += `• 💵 Cash Drawer Flow: ${cDiff >= 0 ? '+' : ''}${DB.formatCurrency(cDiff)}\n`;
 
       if (oType === 'profit') {
-        msg += `👉 *NET OPERATING PROFIT: +Rs. ${DB.formatCurrency(oDiff)}* ✅\n`;
+        msg += `👉 *NET OPERATING PROFIT: +${DB.formatCurrency(oDiff)}* ✅\n`;
       } else if (oType === 'loss') {
-        msg += `👉 *NET OPERATING LOSS: -Rs. ${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
+        msg += `👉 *NET OPERATING LOSS: -${DB.formatCurrency(Math.abs(oDiff))}* ❌\n`;
       } else {
         msg += `👉 *NET OPERATING BALANCE: Rs. 0.00* ➖ (Balanced)\n`;
       }
 
       if (u.adjustments && (u.adjustments.creditsTotal > 0 || u.adjustments.routersTotal > 0 || u.adjustments.topupsTotal > 0)) {
-        msg += `⚖️ *Adjustments:* Credits +Rs. ${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +Rs. ${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -Rs. ${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
+        msg += `⚖️ *Adjustments:* Credits +${DB.formatCurrency(u.adjustments.creditsTotal || 0)} | Routers +${DB.formatCurrency(u.adjustments.routersTotal || 0)} | Top-ups -${DB.formatCurrency(u.adjustments.topupsTotal || 0)}\n`;
       }
     } else {
       msg += `📌 *Status:* First Opening Capital Recorded\n`;
@@ -2486,7 +2486,7 @@ const App = {
     msg += `🏪 Branch: ${shopName.toUpperCase()}\n`;
     msg += `📅 Shift Date: ${DB.formatDate(shift.date)}\n`;
     msg += `⏰ Status: ⚠️ Night shift was not closed before 12:00 AM midnight!\n`;
-    msg += `💵 Opening Float recorded: Rs. ${DB.formatCurrency(shift.openingFloat || 0)}\n`;
+    msg += `💵 Opening Float recorded: ${DB.formatCurrency(shift.openingFloat || 0)}\n`;
     msg += `=================================\n`;
     msg += `Please reconcile the cash drawer, enter POS sales, and close the shift immediately.\n`;
     msg += `Generated via Methmi Shop Management System`;
@@ -2522,7 +2522,7 @@ const App = {
           <div style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); border-radius:var(--radius-sm); padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div>
               <span style="font-weight:800; color:var(--accent-red); font-size:0.9rem;">🚨 ඊයේ (${DB.formatDate(expiredYesterday.date)}) ෂිෆ්ට් එක රාත්‍රී 12ට පෙර ක්ලෝස් කර නැත!</span>
-              <span style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">(Cashier: ${expiredYesterday.cashier || 'Staff'} | Float: Rs. ${DB.formatCurrency(expiredYesterday.openingFloat || 0)})</span>
+              <span style="font-size:0.8rem; color:var(--text-muted); margin-left:6px;">(Cashier: ${expiredYesterday.cashier || 'Staff'} | Float: ${DB.formatCurrency(expiredYesterday.openingFloat || 0)})</span>
             </div>
             <button type="button" class="btn btn-xs btn-success" onclick="App.sendUnclosedShiftAlertWhatsApp('${expiredYesterday.id}')" style="background:#16a34a; font-weight:800; padding:5px 12px; border-radius:6px; color:#fff; border:none; cursor:pointer;">
               📲 WhatsApp Alert යවන්න
@@ -5167,8 +5167,7 @@ Thank you! - ${shopName}`;
     const shopSelect = document.getElementById('shiftShopFilter');
     if (shopSelect) {
       shopSelect.addEventListener('change', () => {
-        this.shiftShopFilter = shopSelect.value;
-        this.renderShiftsPage();
+        this.setShiftShopFilter(shopSelect.value);
       });
     }
   },
@@ -5237,7 +5236,7 @@ Thank you! - ${shopName}`;
       actualCountedCash: counted,
       status: 'balanced'
     });
-    this.showToast(`✅ ඊයේ දින ලාච්චුවේ මුදල (Rs. ${DB.formatCurrency(amount)}) ආරම්භක Float ලෙස යාවත්කාලීන විය!`, 'success');
+    this.showToast(`✅ ඊයේ දින ලාච්චුවේ මුදල (${DB.formatCurrency(amount)}) ආරම්භක Float ලෙස යාවත්කාලීන විය!`, 'success');
     this.renderShiftsPage();
     this.renderDashboard();
   },
@@ -5312,6 +5311,8 @@ setShiftViewMode(mode) {
     }
 
     const targetShopId = selectedShop === 'all' ? null : selectedShop;
+    const targetShop = targetShopId ? DB.getShop(targetShopId) : null;
+    const targetShopName = targetShop ? targetShop.name : (selectedShop === 'all' ? (I18N.currentLang === 'si' ? 'සියලුම ශාඛා' : 'All Branches') : 'Shop');
 
     // Fetch shifts & expenses safely based on selected shop filter
     const allShifts = targetShopId ? DB.getShiftsForShop(targetShopId) : DB.getShifts();
@@ -5425,13 +5426,13 @@ setShiftViewMode(mode) {
                 </div>
                 <div style="font-size:0.95rem; font-weight:700; margin-top:4px; color:var(--text-primary);">
                   🏪 <strong>${shopTitle}</strong> | 👤 Cashier: <strong>${latestShiftToday.cashier || latestShiftToday.cashierName || 'Staff'}</strong>
-                  ${prevClosingCash > 0 ? ` | 💡 ඊයේ දින ලාච්චුවේ අවසාන ශේෂය: <strong style="color:var(--accent-gold);">Rs. ${DB.formatCurrency(prevClosingCash)}</strong>` : ''}
+                  ${prevClosingCash > 0 ? ` | 💡 ඊයේ දින ලාච්චුවේ අවසාන ශේෂය: <strong style="color:var(--accent-gold);">${DB.formatCurrency(prevClosingCash)}</strong>` : ''}
                 </div>
               </div>
               <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
                 ${prevClosingCash > 0 ? `
                   <button type="button" class="btn btn-sm btn-primary" onclick="App.applyYesterdayFloatToTodayShift('${latestShiftToday.id}', ${prevClosingCash})" style="background:#f59e0b; border-color:#f59e0b; color:#000; font-weight:800; padding:8px 14px; cursor:pointer;">
-                    🔄 ඊයේ මුදල Float ලෙස යොදන්න (Rs. ${DB.formatCurrency(prevClosingCash)})
+                    🔄 ඊයේ මුදල Float ලෙස යොදන්න (${DB.formatCurrency(prevClosingCash)})
                   </button>
                 ` : ''}
                 <button type="button" class="btn btn-sm btn-primary" onclick="App.editShift('${latestShiftToday.id}')" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 14px; cursor:pointer;">
@@ -5451,21 +5452,21 @@ setShiftViewMode(mode) {
                 <div style="font-size:1.05rem; font-weight:900; margin-top:4px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
                   <span>🏪 <strong>${shopTitle}</strong></span>
                   <span>👤 <strong>${latestShiftToday.cashier || latestShiftToday.cashierName || 'Staff'}</strong></span>
-                  <span>🌅 Float: <strong style="color:var(--accent-gold);">Rs. ${DB.formatCurrency(floatVal)}</strong></span>
-                  ${posCashVal > 0 ? `<span>🛒 POS: <strong style="color:var(--accent-blue);">+Rs. ${DB.formatCurrency(posCashVal)}</strong></span>` : ''}
-                  ${expVal > 0 ? `<span>💸 වියදම්: <strong style="color:var(--accent-red);">-Rs. ${DB.formatCurrency(expVal)}</strong></span>` : ''}
-                  <span>💵 ගැණූ මුදල: <strong style="color:var(--accent-green);">Rs. ${DB.formatCurrency(countedVal)}</strong></span>
+                  <span>🌅 Float: <strong style="color:var(--accent-gold);">${DB.formatCurrency(floatVal)}</strong></span>
+                  ${posCashVal > 0 ? `<span>🛒 POS: <strong style="color:var(--accent-blue);">+${DB.formatCurrency(posCashVal)}</strong></span>` : ''}
+                  ${expVal > 0 ? `<span>💸 වියදම්: <strong style="color:var(--accent-red);">-${DB.formatCurrency(expVal)}</strong></span>` : ''}
+                  <span>💵 ගැණූ මුදල: <strong style="color:var(--accent-green);">${DB.formatCurrency(countedVal)}</strong></span>
                   <span style="background:rgba(37,99,235,0.1); padding:2px 8px; border-radius:6px; font-size:0.85rem; color:var(--accent-blue); font-weight:800;">
-                    📈 Margin: <strong>${netMargin >= 0 ? '+' : ''}Rs. ${DB.formatCurrency(netMargin)}</strong>
+                    📈 Margin: <strong>${netMargin >= 0 ? '+' : ''}${DB.formatCurrency(netMargin)}</strong>
                   </span>
                 </div>
               </div>
               <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                 ${(latestShiftToday.shiftType === 'morning' || latestShiftToday.status === 'morning_active') ? `
-                  <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal()" title="Close Today's Shift" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(37,99,235,0.3);">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal(null, '${targetShopId || ''}')" title="Close Today's Shift" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 16px; border:none; border-radius:6px; cursor:pointer; box-shadow:0 2px 6px rgba(37,99,235,0.3);">
                     🌙 Close Shift (සවස ශිෆ්ට් එක Close කරන්න)
                   </button>
-                  <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal()" title="Edit Morning Float" style="background:#f59e0b; color:#000; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer;">
+                  <button type="button" class="btn btn-sm" onclick="App.showMorningShiftModal('${targetShopId || ''}')" title="Edit Morning Float" style="background:#f59e0b; color:#000; font-weight:800; padding:8px 14px; border:none; border-radius:6px; cursor:pointer;">
                     ✏️ Edit Morning Float
                   </button>
                 ` : `
@@ -5485,14 +5486,14 @@ setShiftViewMode(mode) {
         }
       } else {
         topBannerHtml = `
-          <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div style="background:rgba(245,158,11,0.08); border:1.5px solid rgba(245,158,11,0.4); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div style="font-size:0.85rem; color:var(--text-secondary);">
-              ℹ️ <strong>අද දින (${DB.formatDate(today)})</strong> ශිෆ්ට් එක තවම සටහන් කර නොමැත. (No shift recorded yet today)
-              ${prevClosingCash > 0 ? `<div style="font-size:0.78rem; color:var(--accent-gold); font-weight:700; margin-top:2px;">💡 ඊයේ දින ලාච්චුවේ අවසාන ශේෂය: Rs. ${DB.formatCurrency(prevClosingCash)}</div>` : ''}
+              ℹ️ <strong>${targetShopId ? `🏪 ${targetShopName} | ` : ''}අද දින (${DB.formatDate(today)})</strong> ශිෆ්ට් එක තවම සටහන් කර නොමැත. (No shift recorded yet today)
+              ${prevClosingCash > 0 ? `<div style="font-size:0.78rem; color:var(--accent-gold); font-weight:700; margin-top:2px;">💡 ඊයේ දින ලාච්චුවේ අවසාන ශේෂය: ${DB.formatCurrency(prevClosingCash)}</div>` : ''}
             </div>
             <div style="display:flex; gap:8px;">
-              <button type="button" class="btn btn-sm btn-primary" onclick="App.showMorningShiftModal()" style="background:#f59e0b; border-color:#f59e0b; color:#000; font-weight:700;">🌅 Record Morning Float</button>
-              <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal()" style="background:#2563eb; border-color:#2563eb; font-weight:700;">🌙 Close Today's Shift</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="App.showMorningShiftModal('${targetShopId || ''}')" style="background:#f59e0b; border-color:#f59e0b; color:#000; font-weight:700;">🌅 Record Morning Float</button>
+              <button type="button" class="btn btn-sm btn-primary" onclick="App.showShiftSummaryModal(null, '${targetShopId || ''}')" style="background:#2563eb; border-color:#2563eb; font-weight:700;">🌙 Close Today's Shift</button>
             </div>
           </div>
         `;
@@ -5631,7 +5632,7 @@ setShiftViewMode(mode) {
               <th>Cashier</th>
               <th style="text-align:right;">Float</th>
               <th style="text-align:right;">POS Cash</th>
-              <th style="text-align:right;">POS Card</th>
+              <th style="text-align:right;" title="Card & Online Transactions (Cards, QR, Bank Transfers)">Card / Online</th>
               <th style="text-align:right; font-weight:800;">Gross POS</th>
               <th style="text-align:right;">Expenses</th>
               <th style="text-align:right;">Expected Cash</th>
@@ -5754,18 +5755,18 @@ setShiftViewMode(mode) {
           <div style="display:flex; flex-wrap:wrap; gap:16px; align-items:center;">
             <div>
               <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">🏦 ${I18N.currentLang === 'si' ? 'බැංකු තැන්පතු එකතුව' : 'Bank Deposits'}</span>
-              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-purple);">Rs. ${DB.formatCurrency(depTotal)}</div>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-purple);">${DB.formatCurrency(depTotal)}</div>
             </div>
             <div style="border-left:1px solid rgba(255,255,255,0.15); height:28px;"></div>
             <div>
               <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">🤝 ${I18N.currentLang === 'si' ? 'අතට භාරදුන් මුදල්' : 'Cash Handovers'}</span>
-              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-green);">Rs. ${DB.formatCurrency(handTotal)}</div>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(handTotal)}</div>
             </div>
             ${outTotal > 0 ? `
             <div style="border-left:1px solid rgba(255,255,255,0.15); height:28px;"></div>
             <div>
               <span style="font-size:0.75rem; color:var(--text-secondary); text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">💵 ${I18N.currentLang === 'si' ? 'කැෂ් අවුට්' : 'Cash Outs'}</span>
-              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-red);">Rs. ${DB.formatCurrency(outTotal)}</div>
+              <div style="font-size:1.15rem; font-weight:800; color:var(--accent-red);">${DB.formatCurrency(outTotal)}</div>
             </div>` : ''}
           </div>
           <button type="button" class="btn btn-primary btn-sm" onclick="App.showQuickAddBankDepositModal()" style="background:var(--accent-purple); border-color:var(--accent-purple); font-weight:700;">
@@ -5809,7 +5810,7 @@ setShiftViewMode(mode) {
           : `<span style="color:var(--text-muted); font-size:0.75rem;">--</span>`;
 
         const retNote = b.returnAmount > 0
-          ? `<div style="font-size:0.72rem; color:var(--text-muted);">(Sent: Rs. ${DB.formatCurrency(b.sentAmount)}, Ret: Rs. ${DB.formatCurrency(b.returnAmount)})</div>`
+          ? `<div style="font-size:0.72rem; color:var(--text-muted);">(Sent: ${DB.formatCurrency(b.sentAmount)}, Ret: ${DB.formatCurrency(b.returnAmount)})</div>`
           : '';
 
         html += `
@@ -5821,8 +5822,7 @@ setShiftViewMode(mode) {
             <td><span class="shop-badge" style="font-size:0.75rem;">🏪 ${shopName}</span></td>
             <td style="text-align:center;">${typeBadge}</td>
             <td style="font-weight:700; color:var(--text-primary);">${dest}</td>
-            <td style="text-align:right; font-weight:800; font-size:1.05rem; color:${b.type === 'cashout' ? 'var(--accent-red)' : 'var(--accent-green)'};">
-              Rs. ${DB.formatCurrency(b.amount)}
+            <td style="text-align:right; font-weight:800; font-size:1.05rem; color:${b.type === 'cashout' ? 'var(--accent-red)' : 'var(--accent-green)'};">${DB.formatCurrency(b.amount)}
               ${retNote}
             </td>
             <td style="font-weight:600;">${b.depositedBy || '--'}</td>
@@ -5961,7 +5961,7 @@ setShiftViewMode(mode) {
 
         ${isEditMode ? (isMorningOnlyTarget ? `
           <div style="background:rgba(245,158,11,0.12); border:1.5px solid #f59e0b; border-radius:var(--radius-sm); padding:10px 14px; font-size:0.84rem; color:var(--text-primary);">
-            🌅 <strong>ආරම්භක මුදල (Shift ON Float: Rs. ${DB.formatCurrency(defaultFloat)}) ස්වයංක්‍රීයව එක් කර ඇත:</strong> කරුණාකර සවස් කාලයේ සම්පූර්ණ විකුණුම් හා ලාච්චුවේ ගැණූ මුදල් (Shift OFF) ඇතුළත් කරන්න.
+            🌅 <strong>ආරම්භක මුදල (Shift ON Float: ${DB.formatCurrency(defaultFloat)}) ස්වයංක්‍රීයව එක් කර ඇත:</strong> කරුණාකර සවස් කාලයේ සම්පූර්ණ විකුණුම් හා ලාච්චුවේ ගැණූ මුදල් (Shift OFF) ඇතුළත් කරන්න.
           </div>
         ` : `
           <div style="background:rgba(245,158,11,0.12); border:1.5px solid #f59e0b; border-radius:var(--radius-sm); padding:10px 14px; font-size:0.84rem; color:var(--text-primary);">
@@ -6007,8 +6007,9 @@ setShiftViewMode(mode) {
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCash" placeholder="0.00" value="${initialPosGross}" style="padding:6px 8px; font-size:1.05rem; font-weight:800; color:var(--accent-blue); height:34px; border:1px solid rgba(59,130,246,0.4);">
             </div>
             <div class="form-group" style="margin-bottom:0;" id="shiftPosCardGroup">
-              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-purple);">3. Less: POS Card Sales (කාඩ්පත්)</label>
+              <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-purple); font-weight:700;">3. Less: Card & Online Transactions (කාඩ්පත් හා බැංකු / ඔන්ලයින් ගෙවීම්)</label>
               <input type="number" step="0.01" min="0" class="form-input" id="shiftModalPosCard" placeholder="0.00" value="${initialPosCard}" style="padding:6px 8px; font-size:0.85rem; height:34px;">
+              <div style="font-size:0.67rem; color:var(--text-muted); margin-top:2px;">(කාඩ්පත්, Bank QR, Transfers හෝ බැංකුවට ගිය බිල්පත්)</div>
             </div>
             <div class="form-group" style="margin-bottom:0;" id="shiftExpensesGroup">
               <label class="form-label" style="font-size:0.72rem; margin-bottom:2px; color:var(--accent-red); font-weight:700;">4. Less: Drawer Expenses (වියදම්)</label>
@@ -6108,7 +6109,7 @@ setShiftViewMode(mode) {
       const marginValEl = document.getElementById('shiftModalMarginVal');
       if (marginValEl) {
         const sign = netMargin >= 0 ? '+' : '';
-        marginValEl.textContent = `${sign}Rs.${DB.formatCurrency(netMargin)}`;
+        marginValEl.textContent = `${sign}${DB.formatCurrency(netMargin)}`;
         marginValEl.style.color = netMargin >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
       }
 
@@ -6117,9 +6118,9 @@ setShiftViewMode(mode) {
         if (Math.abs(diff) <= 0.01) {
           badgeEl.innerHTML = '<span class="tally-badge balanced">✅ Balanced (Rs. 0.00)</span>';
         } else if (diff > 0.01) {
-          badgeEl.innerHTML = `<span class="tally-badge excess">🟢 Excess (+Rs. ${DB.formatCurrency(diff)})</span>`;
+          badgeEl.innerHTML = `<span class="tally-badge excess">🟢 Excess (+${DB.formatCurrency(diff)})</span>`;
         } else {
-          badgeEl.innerHTML = `<span class="tally-badge shortage">🔴 Shortage (-Rs. ${DB.formatCurrency(Math.abs(diff))})</span>`;
+          badgeEl.innerHTML = `<span class="tally-badge shortage">🔴 Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`;
         }
       }
     };
@@ -6128,6 +6129,25 @@ setShiftViewMode(mode) {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', recalculate);
     });
+
+    // Invalidate stale note breakdown if user manually alters or clears counted cash
+    const countedInputEl = document.getElementById('shiftModalCounted');
+    if (countedInputEl) {
+      countedInputEl.addEventListener('input', () => {
+        const counted = parseFloat(countedInputEl.value) || 0;
+        if (this.lastShiftDenominations) {
+          const d = this.lastShiftDenominations;
+          const dSum = (d.n5000||0)*5000 + (d.n2000||0)*2000 + (d.n1000||0)*1000 +
+                       (d.n500||0)*500 + (d.n100||0)*100 + (d.n50||0)*50 +
+                       (d.n20||0)*20 + (d.n10||0)*10 + (parseFloat(d.coins)||0);
+          if (Math.abs(dSum - counted) > 0.01) {
+            this.lastShiftDenominations = null;
+            const sumEl = document.getElementById('shiftCountedDenomsSummary');
+            if (sumEl) sumEl.textContent = '';
+          }
+        }
+      });
+    }
 
     // Populate initial denominations summary if present
     if (this.lastShiftDenominations) {
@@ -6150,8 +6170,20 @@ setShiftViewMode(mode) {
   },
 
   openDenominationModalForShiftModal() {
+    const cntInp = document.getElementById('shiftModalCounted');
+    const curVal = cntInp ? (parseFloat(cntInp.value) || 0) : 0;
+    let initialDenoms = this.lastShiftDenominations || null;
+    if (initialDenoms) {
+      const d = initialDenoms;
+      const dSum = (d.n5000||0)*5000 + (d.n2000||0)*2000 + (d.n1000||0)*1000 +
+                   (d.n500||0)*500 + (d.n100||0)*100 + (d.n50||0)*50 +
+                   (d.n20||0)*20 + (d.n10||0)*10 + (parseFloat(d.coins)||0);
+      if (Math.abs(dSum - curVal) > 0.01) {
+        initialDenoms = null;
+      }
+    }
+
     this.openDenominationModal((total, denoms) => {
-      const cntInp = document.getElementById('shiftModalCounted');
       if (cntInp) {
         cntInp.value = total;
         cntInp.dispatchEvent(new Event('input', { bubbles: true }));
@@ -6159,19 +6191,10 @@ setShiftViewMode(mode) {
       this.lastShiftDenominations = denoms;
       const sumEl = document.getElementById('shiftCountedDenomsSummary');
       if (sumEl && denoms) {
-        let parts = [];
-        if (denoms.n5000) parts.push(`5000x${denoms.n5000}`);
-        if (denoms.n2000) parts.push(`2000x${denoms.n2000}`);
-        if (denoms.n1000) parts.push(`1000x${denoms.n1000}`);
-        if (denoms.n500) parts.push(`500x${denoms.n500}`);
-        if (denoms.n100) parts.push(`100x${denoms.n100}`);
-        if (denoms.n50) parts.push(`50x${denoms.n50}`);
-        if (denoms.n20) parts.push(`20x${denoms.n20}`);
-        if (denoms.n10) parts.push(`10x${denoms.n10}`);
-        if (denoms.coins) parts.push(`Coins: ${denoms.coins}`);
-        sumEl.textContent = parts.length > 0 ? `🧮 Notes: ` + parts.join(', ') : '';
+        const parts = DB.formatDenominationsText(denoms, false);
+        sumEl.textContent = (parts.length > 0 && total > 0) ? '🧮 Notes: ' + parts.join(', ') : '';
       }
-    }, this.lastShiftDenominations || null);
+    }, initialDenoms);
   },
 
   saveShiftSummaryModal(action = 'pdf') {
@@ -6197,6 +6220,7 @@ setShiftViewMode(mode) {
     // Pure Shop Cashier Tally: Float + POS Cash - Drawer Expenses (NO RELOAD)
     const expectedCash = openingFloat + posCashSales - drawerExpenses;
     const difference = countedCash - expectedCash;
+    const netMargin = countedCash - openingFloat;
     let status = 'balanced';
     if (openingFloat === 0 && countedCash === 0 && posGrossSales === 0) {
       status = 'unsettled';
@@ -6204,6 +6228,18 @@ setShiftViewMode(mode) {
       status = 'excess';
     } else if (difference < -0.01) {
       status = 'shortage';
+    }
+
+    // Validate that stored note count matches the counted cash
+    let validDenoms = this.lastShiftDenominations || null;
+    if (validDenoms) {
+      const d = validDenoms;
+      const dSum = (d.n5000||0)*5000 + (d.n2000||0)*2000 + (d.n1000||0)*1000 +
+                   (d.n500||0)*500 + (d.n100||0)*100 + (d.n50||0)*50 +
+                   (d.n20||0)*20 + (d.n10||0)*10 + (parseFloat(d.coins)||0);
+      if (Math.abs(dSum - countedCash) > 0.01) {
+        validDenoms = null;
+      }
     }
 
     const shiftData = {
@@ -6226,12 +6262,13 @@ setShiftViewMode(mode) {
       countedCash,
       actualCountedCash: countedCash,
       difference,
+      netMargin,
       status,
       specialNotes,
       cashNote: specialNotes,
       notes,
       note: notes,
-      denominations: this.lastShiftDenominations || null
+      denominations: validDenoms
     };
 
     let savedShift;
@@ -6298,7 +6335,7 @@ setShiftViewMode(mode) {
 
     msg += `🛒 *POS MACHINE SALES:*\n`;
     msg += `• Cash Sales: ${DB.formatCurrency(posCash)}\n`;
-    msg += `• Card Sales: ${DB.formatCurrency(posCard)}\n`;
+    msg += `• Card & Online Sales: ${DB.formatCurrency(posCard)}\n`;
     if (posCheque > 0) msg += `• Cheque/QR: ${DB.formatCurrency(posCheque)}\n`;
     msg += `• *Gross Total Sales: ${DB.formatCurrency(posTotal)}*\n\n`;
 
@@ -6308,6 +6345,8 @@ setShiftViewMode(mode) {
     msg += `• 3. (-) Day Expenses: ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}\n`;
     msg += `• *Expected Cash: ${DB.formatCurrency(s.expectedCash || 0)}*\n`;
     msg += `• *Actual Counted: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n`;
+    const netMarginVal = (parseFloat(s.countedCash || s.actualCountedCash) || 0) - (parseFloat(s.openingFloat) || 0);
+    msg += `• *Net Cash Margin (වෙනස): ${netMarginVal >= 0 ? '+' : ''}${DB.formatCurrency(netMarginVal)}*\n`;
 
     const diff = s.difference || 0;
     if (Math.abs(diff) < 0.01) {
@@ -6421,7 +6460,7 @@ setShiftViewMode(mode) {
       "=================================\n\n" +
       "🛒 *POS MACHINE SALES:*\n" +
       "• Cash Sales: " + DB.formatCurrency(posCash) + "\n" +
-      "• Card Sales: " + DB.formatCurrency(posCard) + "\n" +
+      "• Card & Online Sales: " + DB.formatCurrency(posCard) + "\n" +
       "• Gross POS Sales: " + DB.formatCurrency(posTotal) + "\n\n" +
       "💵 *DRAWER CASH FLOW:*\n" +
       "• 1. Opening Float: " + DB.formatCurrency(s.openingFloat || 0) + "\n" +
@@ -6429,6 +6468,7 @@ setShiftViewMode(mode) {
       "• 3. (-) Expenses: " + DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0) + "\n" +
       "• *Expected Cash: " + DB.formatCurrency(s.expectedCash || 0) + "*\n" +
       "• *Actual Counted: " + DB.formatCurrency(s.countedCash || s.actualCountedCash || 0) + "*\n" +
+      "• *Net Cash Margin: " + (((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0)) >= 0 ? '+' : '') + DB.formatCurrency(((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0))) + "*\n" +
       "• *Status: " + (Math.abs(s.difference || 0) < 0.01 ? '✅ Balanced (Rs.0.00)' : ((s.difference || 0) > 0 ? '🟢 Excess (+' + DB.formatCurrency(s.difference) + ')' : '🔴 Shortage (-' + DB.formatCurrency(Math.abs(s.difference)) + ')')) + "*\n\n" +
       notesBlock +
       specialNoteBlock +
@@ -6491,7 +6531,7 @@ setShiftViewMode(mode) {
         <div class="section-head">🛒 POS Machine Sales Breakdown</div>
         <table>
           <tr><td>POS Cash Sales (In Drawer)</td><td style="text-align:right; font-weight:700;">${DB.formatCurrency(posCash)}</td></tr>
-          <tr><td>POS Card / Credit Sales (Bank)</td><td style="text-align:right;">${DB.formatCurrency(posCard)}</td></tr>
+          <tr><td>Card & Online Transactions (Bank)</td><td style="text-align:right;">${DB.formatCurrency(posCard)}</td></tr>
           <tr><td>POS Cheque / Bank Transfer</td><td style="text-align:right;">${DB.formatCurrency(posCheque)}</td></tr>
           <tr style="background:#f9fafb; font-weight:800;"><td>Total POS Machine Gross Sales</td><td style="text-align:right;">${DB.formatCurrency(posTotal)}</td></tr>
         </table>
@@ -6865,7 +6905,7 @@ setShiftViewMode(mode) {
     const net = Math.max(0, sent - returned);
     const disp = document.getElementById('quickDepositNetDisplay');
     if (disp) {
-      disp.textContent = `Rs. ${DB.formatCurrency(net)}`;
+      disp.textContent = `${DB.formatCurrency(net)}`;
     }
   },
 
@@ -6903,7 +6943,7 @@ setShiftViewMode(mode) {
       if (amount <= 0) amount = sentAmount;
 
       if (returnAmount > 0) {
-        const retTag = `(Sent: Rs. ${DB.formatCurrency(sentAmount)}, Returned: Rs. ${DB.formatCurrency(returnAmount)})`;
+        const retTag = `(Sent: ${DB.formatCurrency(sentAmount)}, Returned: ${DB.formatCurrency(returnAmount)})`;
         finalNote = finalNote ? `${finalNote} ${retTag}` : retTag;
       }
     } else if (mode === 'handover') {
@@ -6947,7 +6987,7 @@ setShiftViewMode(mode) {
 
     this.closeModal();
     const typeLabel = mode === 'deposit' ? 'බැංකු තැන්පතුව' : mode === 'handover' ? 'මුදල් භාරදීම' : 'කැෂ් අවුට්';
-    this.showToast(`✅ Rs. ${DB.formatCurrency(amount)} ${typeLabel} සාර්ථකව සටහන් විය!`, 'success');
+    this.showToast(`✅${DB.formatCurrency(amount)} ${typeLabel} සාර්ථකව සටහන් විය!`, 'success');
 
     if (this.currentPage === 'shifts') {
       this.renderShiftsPage();
@@ -7020,7 +7060,7 @@ setShiftViewMode(mode) {
         </div>
         <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); padding:10px 14px; font-size:0.85rem; color:var(--accent-gold);">
           🌅 උදෑසන සාප්පුව විවෘත කිරීමේදී ලාච්චුවේ ඇති ආරම්භක මුදල් (Float) නෝට්ටු කවුන්ටරය මගින් ඇතුළත් කරන්න.
-          ${prevClosingCash > 0 ? `<div style="font-weight:700; color:var(--accent-blue); margin-top:4px;">💡 ඊයේ දින (${DB.formatDate(prevShift.date)}) ලාච්චුවේ අවසාන ශේෂය: Rs. ${DB.formatCurrency(prevClosingCash)}</div>` : ''}
+          ${prevClosingCash > 0 ? `<div style="font-weight:700; color:var(--accent-blue); margin-top:4px;">💡 ඊයේ දින (${DB.formatDate(prevShift.date)}) ලාච්චුවේ අවසාන ශේෂය: ${DB.formatCurrency(prevClosingCash)}</div>` : ''}
         </div>
         <div class="form-group">
           <label class="form-label">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
@@ -7056,11 +7096,42 @@ setShiftViewMode(mode) {
         <button type="button" class="btn btn-primary" onclick="App.saveMorningShift()" style="background:var(--accent-gold); border-color:var(--accent-gold); color:#000; font-weight:800; padding:8px 16px;">💾 ${I18N.currentLang === 'si' ? 'ආරම්භක මුදල සුරකින්න (Save Shift)' : 'Save Morning Shift'}</button>
       `
     );
+
+    // Invalidate stale morning denomination breakdown if user manually alters float input
+    const mInp = document.getElementById('morningFloatInput');
+    if (mInp) {
+      mInp.addEventListener('input', () => {
+        const val = parseFloat(mInp.value) || 0;
+        if (this.lastMorningDenominations) {
+          const md = this.lastMorningDenominations;
+          const dSum = (md.n5000||0)*5000 + (md.n2000||0)*2000 + (md.n1000||0)*1000 +
+                       (md.n500||0)*500 + (md.n100||0)*100 + (md.n50||0)*50 +
+                       (md.n20||0)*20 + (md.n10||0)*10 + (parseFloat(md.coins)||0);
+          if (Math.abs(dSum - val) > 0.01) {
+            this.lastMorningDenominations = null;
+            const sumEl = document.getElementById('morningDenomsSummary');
+            if (sumEl) sumEl.textContent = '';
+          }
+        }
+      });
+    }
   },
 
   openDenominationModalForMorningModal() {
+    const inp = document.getElementById('morningFloatInput');
+    const curVal = inp ? (parseFloat(inp.value) || 0) : 0;
+    let initialDenoms = this.lastMorningDenominations || null;
+    if (initialDenoms) {
+      const md = initialDenoms;
+      const dSum = (md.n5000||0)*5000 + (md.n2000||0)*2000 + (md.n1000||0)*1000 +
+                   (md.n500||0)*500 + (md.n100||0)*100 + (md.n50||0)*50 +
+                   (md.n20||0)*20 + (md.n10||0)*10 + (parseFloat(md.coins)||0);
+      if (Math.abs(dSum - curVal) > 0.01) {
+        initialDenoms = null;
+      }
+    }
+
     this.openDenominationModal((total, denoms) => {
-      const inp = document.getElementById('morningFloatInput');
       if (inp) {
         inp.value = total;
         inp.dispatchEvent(new Event('input', { bubbles: true }));
@@ -7068,18 +7139,10 @@ setShiftViewMode(mode) {
       this.lastMorningDenominations = denoms;
       const sumEl = document.getElementById('morningDenomsSummary');
       if (sumEl && denoms) {
-        let parts = [];
-        if (denoms.n5000) parts.push(`5000x${denoms.n5000}`);
-        if (denoms.n2000) parts.push(`2000x${denoms.n2000}`);
-        if (denoms.n1000) parts.push(`1000x${denoms.n1000}`);
-        if (denoms.n500) parts.push(`500x${denoms.n500}`);
-        if (denoms.n100) parts.push(`100x${denoms.n100}`);
-        if (denoms.n50) parts.push(`50x${denoms.n50}`);
-        if (denoms.n20) parts.push(`20x${denoms.n20}`);
-        if (denoms.coins) parts.push(`Coins: ${denoms.coins}`);
-        sumEl.textContent = `📋 ` + parts.join(', ');
+        const parts = DB.formatDenominationsText(denoms, false);
+        sumEl.textContent = (parts.length > 0 && total > 0) ? '📋 ' + parts.join(', ') : '';
       }
-    }, this.lastMorningDenominations || null);
+    }, initialDenoms);
   },
 
   saveMorningShift() {
@@ -7111,6 +7174,18 @@ setShiftViewMode(mode) {
       const openingFloat = parseFloat(document.getElementById('morningFloatInput')?.value) || 0;
       const note = document.getElementById('morningShiftNotes')?.value?.trim() || '';
 
+      // Validate that stored note count matches the morning float
+      let validDenoms = this.lastMorningDenominations || null;
+      if (validDenoms) {
+        const md = validDenoms;
+        const dSum = (md.n5000||0)*5000 + (md.n2000||0)*2000 + (md.n1000||0)*1000 +
+                     (md.n500||0)*500 + (md.n100||0)*100 + (md.n50||0)*50 +
+                     (md.n20||0)*20 + (md.n10||0)*10 + (parseFloat(md.coins)||0);
+        if (Math.abs(dSum - openingFloat) > 0.01) {
+          validDenoms = null;
+        }
+      }
+
       const today = DB.getTodayDate();
       const todayShifts = DB.getShiftsForShopByDate(shopId, today);
 
@@ -7122,7 +7197,7 @@ setShiftViewMode(mode) {
           openingFloat,
           actualCountedCash: (todayShifts[0].actualCountedCash && todayShifts[0].actualCountedCash !== todayShifts[0].openingFloat) ? todayShifts[0].actualCountedCash : openingFloat,
           countedCash: (todayShifts[0].countedCash && todayShifts[0].countedCash !== todayShifts[0].openingFloat) ? todayShifts[0].countedCash : openingFloat,
-          denominations: this.lastMorningDenominations || null,
+          denominations: validDenoms,
           note: note || todayShifts[0].note,
           status: (todayShifts[0].countedCash && todayShifts[0].countedCash !== openingFloat) ? todayShifts[0].status : 'morning_active'
         });
@@ -7137,7 +7212,7 @@ setShiftViewMode(mode) {
           openingFloat,
           actualCountedCash: openingFloat,
           countedCash: openingFloat,
-          denominations: this.lastMorningDenominations || null,
+          denominations: validDenoms,
           note,
           status: 'morning_active'
         });

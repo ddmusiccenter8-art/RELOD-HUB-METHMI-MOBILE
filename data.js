@@ -1731,6 +1731,7 @@ const DB = {
 
     const expectedCash = openingFloat + posCash - drawerExpenses;
     const difference = countedCash - expectedCash;
+    const netMargin = countedCash - openingFloat;
     let status = 'balanced';
     if (shiftData.shiftType === 'morning' || shiftData.status === 'morning_active') {
       status = 'morning_active';
@@ -1766,6 +1767,7 @@ const DB = {
       countedCash,
       actualCountedCash: countedCash,
       difference,
+      netMargin,
       status,
       denominations: (shiftData.denominations !== undefined) ? shiftData.denominations : existing.denominations,
       specialNotes: (shiftData.specialNotes !== undefined) ? shiftData.specialNotes : (existing.specialNotes || existing.cashNote || ''),
@@ -1804,6 +1806,7 @@ const DB = {
     const countedCash = parseFloat(data.actualCountedCash || data.countedCash) || 0;
     const expectedCash = openingFloat + posCash - drawerExpenses;
     const difference = countedCash - expectedCash;
+    const netMargin = countedCash - openingFloat;
     let status = 'balanced';
     if (data.shiftType === 'morning' || data.status === 'morning_active') {
       status = 'morning_active';
@@ -1839,6 +1842,7 @@ const DB = {
       actualCountedCash: countedCash,
       countedCash: countedCash,
       difference,
+      netMargin,
       status,
       denominations: data.denominations || null,
       note: (data.note || data.notes || '').trim(),
@@ -2349,10 +2353,14 @@ const DB = {
   },
 
   formatCurrency(amount) {
-    return 'Rs.' + parseFloat(amount || 0).toLocaleString('en-LK', {
+    if (typeof amount === 'string') {
+      amount = amount.replace(/Rs\.?\s*/gi, '').replace(/,/g, '').trim();
+    }
+    const num = parseFloat(amount || 0);
+    return 'Rs.' + (isNaN(num) ? '0.00' : num.toLocaleString('en-LK', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    });
+    }));
   },
 
   formatDateTime(isoString) {
