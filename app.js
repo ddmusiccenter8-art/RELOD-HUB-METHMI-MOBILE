@@ -1232,7 +1232,7 @@ const App = {
   // ================================================================
   setupUpdateForm() {
     // Inputs in Section 1 (Individual SIMs + Cash Drawer)
-    const simInputs = ['simDialog', 'simMobitel', 'simAirtel', 'simHutch', 'reloadCashInput', 'reloadHubCashInput'];
+    const simInputs = ['simDialog', 'simMobitel', 'simAirtel', 'simHutch', 'simEzcash', 'reloadCashInput', 'reloadHubCashInput'];
     simInputs.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
@@ -1705,10 +1705,11 @@ const App = {
     const mobitel = parseFloat(document.getElementById('simMobitel')?.value) || 0;
     const airtel = parseFloat(document.getElementById('simAirtel')?.value) || 0;
     const hutch = parseFloat(document.getElementById('simHutch')?.value) || 0;
+    const ezcash = parseFloat(document.getElementById('simEzcash')?.value) || 0;
     const reloadCash = parseFloat(document.getElementById('reloadCashInput')?.value) || 0;
     const reloadHubCash = parseFloat(document.getElementById('reloadHubCashInput')?.value) || 0;
 
-    const reloadSimTotal = dialog + mobitel + airtel + hutch;
+    const reloadSimTotal = dialog + mobitel + airtel + hutch + ezcash;
     const reloadDrawerTotal = reloadCash + reloadHubCash;
     const reloadFullTotal = reloadSimTotal + reloadDrawerTotal;
 
@@ -1961,7 +1962,7 @@ const App = {
     const mobitel = parseFloat(document.getElementById('simMobitel')?.value) || 0;
     const airtel = parseFloat(document.getElementById('simAirtel')?.value) || 0;
     const hutch = parseFloat(document.getElementById('simHutch')?.value) || 0;
-    const ezcash = 0;
+    const ezcash = parseFloat(document.getElementById('simEzcash')?.value) || 0;
     const reloadCash = parseFloat(document.getElementById('reloadCashInput')?.value) || 0;
     const reloadHubCash = parseFloat(document.getElementById('reloadHubCashInput')?.value) || 0;
 
@@ -2015,7 +2016,7 @@ const App = {
       }
     });
 
-    const hasReloadData = (dialog + mobitel + airtel + hutch + reloadCash + reloadHubCash) > 0;
+    const hasReloadData = (dialog + mobitel + airtel + hutch + ezcash + reloadCash + reloadHubCash) > 0;
     const hasBankData = banks.some(b => (b.accountAmount + b.cashInDrawer) > 0);
     const hasAdjData = credits.length > 0 || routers.length > 0 || topups.length > 0;
 
@@ -2034,7 +2035,7 @@ const App = {
         mobitel,
         airtel,
         hutch,
-        ezcash: 0,
+        ezcash,
         cashInDrawer: reloadCash,
         hubCash: reloadHubCash,
         drawerTotal: reloadCash + reloadHubCash,
@@ -6102,6 +6103,14 @@ setShiftViewMode(mode) {
 
       const expValEl = document.getElementById('shiftModalExpectedVal');
       if (expValEl) expValEl.textContent = DB.formatCurrency(expected);
+
+      const netMargin = counted - fl;
+      const marginValEl = document.getElementById('shiftModalMarginVal');
+      if (marginValEl) {
+        const sign = netMargin >= 0 ? '+' : '';
+        marginValEl.textContent = `${sign}Rs.${DB.formatCurrency(netMargin)}`;
+        marginValEl.style.color = netMargin >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+      }
 
       const badgeEl = document.getElementById('shiftModalVerdictBadge');
       if (badgeEl) {

@@ -2015,25 +2015,25 @@ const DB = {
         current: curr.simTotal,
         previous: prev.simTotal,
         diff: simDiff,
-        type: 'neutral' // Movement between assets is neutral, not loss!
+        type: Math.abs(simDiff) < 0.5 ? 'neutral' : (simDiff > 0 ? 'profit' : 'loss')
       },
       bank: {
         current: curr.bankTotal,
         previous: prev.bankTotal,
         diff: bankDiff,
-        type: 'neutral'
+        type: Math.abs(bankDiff) < 0.5 ? 'neutral' : (bankDiff > 0 ? 'profit' : 'loss')
       },
       cash: {
         current: curr.totalCash,
         previous: prev.totalCash,
         diff: cashDiff,
-        type: 'neutral'
+        type: Math.abs(cashDiff) < 0.5 ? 'neutral' : (cashDiff > 0 ? 'profit' : 'loss')
       },
       reload: {
         current: curr.reloadTotal,
         previous: prev.reloadTotal,
         diff: curr.reloadTotal - prev.reloadTotal,
-        type: 'neutral'
+        type: Math.abs(curr.reloadTotal - prev.reloadTotal) < 0.5 ? 'neutral' : ((curr.reloadTotal - prev.reloadTotal) > 0 ? 'profit' : 'loss')
       },
       mobileRental: {
         current: curr.bankTotal,
