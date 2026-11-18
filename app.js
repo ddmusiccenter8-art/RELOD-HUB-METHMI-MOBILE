@@ -4979,7 +4979,7 @@ Thank you! - ${shopName}`;
       } else if (typeof targetInputIdOrFn === 'string' && targetInputIdOrFn === 'reloadHubCashInput' && this.lastHubDenominations) {
         counts = this.lastHubDenominations;
       } else if (typeof targetInputIdOrFn === 'function') {
-        counts = this.lastShiftDenominations || this.lastMorningDenominations || null;
+        counts = this.lastShiftDenominations || null;
       }
       if (!counts) {
         counts = { n5000: 0, n2000: 0, n1000: 0, n500: 0, n100: 0, n50: 0, n20: 0, n10: 0, coins: 0 };
@@ -5426,15 +5426,9 @@ setShiftViewMode(mode) {
                 </div>
                 <div style="font-size:0.95rem; font-weight:700; margin-top:4px; color:var(--text-primary);">
                   🏪 <strong>${shopTitle}</strong> | 👤 Cashier: <strong>${latestShiftToday.cashier || latestShiftToday.cashierName || 'Staff'}</strong>
-                  ${prevClosingCash > 0 ? ` | 💡 ඊයේ දින ලාච්චුවේ අවසාන ශේෂය: <strong style="color:var(--accent-gold);">${DB.formatCurrency(prevClosingCash)}</strong>` : ''}
                 </div>
               </div>
               <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                ${prevClosingCash > 0 ? `
-                  <button type="button" class="btn btn-sm btn-primary" onclick="App.applyYesterdayFloatToTodayShift('${latestShiftToday.id}', ${prevClosingCash})" style="background:#f59e0b; border-color:#f59e0b; color:#000; font-weight:800; padding:8px 14px; cursor:pointer;">
-                    🔄 ඊයේ මුදල Float ලෙස යොදන්න (${DB.formatCurrency(prevClosingCash)})
-                  </button>
-                ` : ''}
                 <button type="button" class="btn btn-sm btn-primary" onclick="App.editShift('${latestShiftToday.id}')" style="background:#2563eb; color:#fff; font-weight:800; padding:8px 14px; cursor:pointer;">
                   ✏️ Edit & Balance Shift
                 </button>
@@ -5456,9 +5450,6 @@ setShiftViewMode(mode) {
                   ${posCashVal > 0 ? `<span>🛒 POS: <strong style="color:var(--accent-blue);">+${DB.formatCurrency(posCashVal)}</strong></span>` : ''}
                   ${expVal > 0 ? `<span>💸 වියදම්: <strong style="color:var(--accent-red);">-${DB.formatCurrency(expVal)}</strong></span>` : ''}
                   <span>💵 ගැණූ මුදල: <strong style="color:var(--accent-green);">${DB.formatCurrency(countedVal)}</strong></span>
-                  <span style="background:rgba(37,99,235,0.1); padding:2px 8px; border-radius:6px; font-size:0.85rem; color:var(--accent-blue); font-weight:800;">
-                    📈 Margin: <strong>${netMargin >= 0 ? '+' : ''}${DB.formatCurrency(netMargin)}</strong>
-                  </span>
                 </div>
               </div>
               <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
@@ -5489,7 +5480,6 @@ setShiftViewMode(mode) {
           <div style="background:rgba(245,158,11,0.08); border:1.5px solid rgba(245,158,11,0.4); border-radius:var(--radius-md); padding:12px 16px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div style="font-size:0.85rem; color:var(--text-secondary);">
               ℹ️ <strong>${targetShopId ? `🏪 ${targetShopName} | ` : ''}අද දින (${DB.formatDate(today)})</strong> ශිෆ්ට් එක තවම සටහන් කර නොමැත. (No shift recorded yet today)
-              ${prevClosingCash > 0 ? `<div style="font-size:0.78rem; color:var(--accent-gold); font-weight:700; margin-top:2px;">💡 ඊයේ දින ලාච්චුවේ අවසාන ශේෂය: ${DB.formatCurrency(prevClosingCash)}</div>` : ''}
             </div>
             <div style="display:flex; gap:8px;">
               <button type="button" class="btn btn-sm btn-primary" onclick="App.showMorningShiftModal('${targetShopId || ''}')" style="background:#f59e0b; border-color:#f59e0b; color:#000; font-weight:700;">🌅 Record Morning Float</button>
@@ -5521,17 +5511,13 @@ setShiftViewMode(mode) {
             badgeHtml = '<span class="tally-badge shortage" style="background:rgba(239,68,68,0.12); color:var(--accent-red); border:1px solid rgba(239,68,68,0.3);">⚠️ Unsettled (Rs.0)</span>';
           } else if (s.shiftType === 'morning' || s.status === 'morning_active' || (countedVal === floatVal && posGross === 0 && floatVal > 0 && s.date === today)) {
             badgeHtml = '<span class="tally-badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid #f59e0b;">🌅 Morning Active</span>';
-          } else if (s.status === 'balanced') {
-            badgeHtml = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'}</span>`;
-          } else if (s.status === 'excess') {
-            badgeHtml = `<span class="tally-badge excess">🟢 +${DB.formatCurrency(diff)}</span>`;
+          } else if (s.status === 'balanced' || Math.abs(diff) <= 0.01) {
+            badgeHtml = `<span class="tally-badge balanced">✅ 100% Balanced</span>`;
+          } else if (s.status === 'excess' || diff > 0.01) {
+            badgeHtml = `<span class="tally-badge excess">🟢 Excess (+${DB.formatCurrency(diff)})</span>`;
           } else {
-            badgeHtml = `<span class="tally-badge shortage">🔴 -${DB.formatCurrency(Math.abs(diff))}</span>`;
+            badgeHtml = `<span class="tally-badge shortage">🔴 Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`;
           }
-
-          const marginPill = (floatVal > 0 || countedVal > 0)
-            ? `<div style="font-size:0.7rem; font-weight:700; margin-top:2px; color:${netMargin >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};" title="Counted Cash - Opening Float">${netMargin >= 0 ? '📈' : '📉'} Margin: ${netMargin >= 0 ? '+' : ''}${DB.formatCurrency(netMargin)}</div>`
-            : '';
 
           const posCash = s.posCashSales || 0;
           const posCard = s.posCardSales || 0;
@@ -5656,17 +5642,13 @@ setShiftViewMode(mode) {
             badgeHtml = '<span class="tally-badge shortage" style="background:rgba(239,68,68,0.12); color:var(--accent-red); border:1px solid rgba(239,68,68,0.3);">⚠️ Unsettled (Rs.0)</span>';
           } else if (s.shiftType === 'morning' || s.status === 'morning_active' || (countedVal === floatVal && posGross === 0 && floatVal > 0 && s.date === today)) {
             badgeHtml = '<span class="tally-badge" style="background:rgba(245,158,11,0.12); color:#d97706; border:1px solid #f59e0b;">🌅 Morning Active</span>';
-          } else if (s.status === 'balanced') {
-            badgeHtml = `<span class="tally-badge balanced">✅ ${I18N.t('shift_balanced') || 'Balanced'}</span>`;
-          } else if (s.status === 'excess') {
-            badgeHtml = `<span class="tally-badge excess">🟢 +${DB.formatCurrency(diff)}</span>`;
+          } else if (s.status === 'balanced' || Math.abs(diff) <= 0.01) {
+            badgeHtml = `<span class="tally-badge balanced">✅ 100% Balanced</span>`;
+          } else if (s.status === 'excess' || diff > 0.01) {
+            badgeHtml = `<span class="tally-badge excess">🟢 Excess (+${DB.formatCurrency(diff)})</span>`;
           } else {
-            badgeHtml = `<span class="tally-badge shortage">🔴 -${DB.formatCurrency(Math.abs(diff))}</span>`;
+            badgeHtml = `<span class="tally-badge shortage">🔴 Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`;
           }
-
-          const marginPill = (floatVal > 0 || countedVal > 0)
-            ? `<div style="font-size:0.7rem; font-weight:700; margin-top:2px; color:${netMargin >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'};" title="Counted Cash - Opening Float">${netMargin >= 0 ? '📈' : '📉'} Margin: ${netMargin >= 0 ? '+' : ''}${DB.formatCurrency(netMargin)}</div>`
-            : '';
 
         const posCash = s.posCashSales || 0;
         const posCard = s.posCardSales || 0;
@@ -5717,7 +5699,7 @@ setShiftViewMode(mode) {
             <td style="text-align:right; color:var(--accent-red); font-weight:700; white-space:nowrap;">${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td>
             <td style="text-align:right; font-weight:600; white-space:nowrap;">${DB.formatCurrency(s.expectedCash || 0)}</td>
             <td style="text-align:right; font-weight:800; color:var(--accent-green); white-space:nowrap;">${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}</td>
-            <td style="text-align:center; white-space:nowrap;">${badgeHtml}${marginPill}</td>
+            <td style="text-align:center; white-space:nowrap;">${badgeHtml}</td>
             <td style="max-width:130px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
               ${(s.specialNotes || s.cashNote) ? `<span style="color:var(--accent-purple); font-weight:600; font-size:0.8rem;" title="${s.specialNotes || s.cashNote}">📝 ${(s.specialNotes || s.cashNote)}</span>` : '<span style="color:var(--text-muted); font-size:0.75rem;">--</span>'}
             </td>
@@ -5944,7 +5926,7 @@ setShiftViewMode(mode) {
     const initialSpecialNotes = targetShift ? (targetShift.specialNotes || targetShift.cashNote || '') : '';
     const initialNotes = targetShift ? (targetShift.notes || targetShift.note || '') : '';
     // Evening Note Counter always starts FRESH: staff counts full drawer (morning float + sales)
-    this.lastShiftDenominations = null;
+    this.lastShiftDenominations = (targetShift && !isMorningOnlyTarget && targetShift.denominations) ? targetShift.denominations : null;
 
     const bodyHtml = `
       <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:10px;">
@@ -6019,18 +6001,13 @@ setShiftViewMode(mode) {
           ` : ''}
         </div>
 
-        <!-- Expected Cash & Day Margin Grid -->
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-          <div style="background:rgba(2,132,199,0.08); border:1px solid rgba(2,132,199,0.25); border-radius:var(--radius-sm); padding:8px 12px;" id="shiftExpectedRow">
-            <div style="font-weight:700; font-size:0.78rem; color:var(--text-secondary);">Expected Cash in Drawer:</div>
-            <div style="font-size:0.68rem; color:var(--text-muted);">(Float + POS Cash - Expenses)</div>
-            <div style="font-size:1.15rem; font-weight:900; color:var(--accent-blue); margin-top:2px;" id="shiftModalExpectedVal">Rs.0.00</div>
+        <!-- Expected Cash in Drawer Breakdown -->
+        <div style="background:rgba(2,132,199,0.08); border:1.5px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); padding:10px 14px; display:flex; justify-content:space-between; align-items:center;" id="shiftExpectedRow">
+          <div>
+            <div style="font-weight:800; font-size:0.85rem; color:var(--accent-blue);">Expected Cash in Drawer (ලාච්චුවේ තිබිය යුතු මුදල):</div>
+            <div style="font-size:0.72rem; color:var(--text-muted); margin-top:2px;">[ 1. Float ] + [ 2. Total POS - 3. Card/Online ] - [ 4. Expenses ]</div>
           </div>
-          <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:var(--radius-sm); padding:8px 12px;" id="shiftMarginRow">
-            <div style="font-weight:700; font-size:0.78rem; color:var(--text-secondary);">📈 Net Cash Margin (මුදල් වෙනස):</div>
-            <div style="font-size:0.68rem; color:var(--text-muted);">(Counted Cash - Opening Float)</div>
-            <div style="font-size:1.15rem; font-weight:900; color:var(--accent-green); margin-top:2px;" id="shiftModalMarginVal">Rs.0.00</div>
-          </div>
+          <div style="font-size:1.35rem; font-weight:900; color:var(--accent-blue);" id="shiftModalExpectedVal">Rs.0.00</div>
         </div>
 
         <!-- Actual Counted Cash in Drawer -->
@@ -6101,22 +6078,14 @@ setShiftViewMode(mode) {
       const expValEl = document.getElementById('shiftModalExpectedVal');
       if (expValEl) expValEl.textContent = DB.formatCurrency(expected);
 
-      const netMargin = counted - fl;
-      const marginValEl = document.getElementById('shiftModalMarginVal');
-      if (marginValEl) {
-        const sign = netMargin >= 0 ? '+' : '';
-        marginValEl.textContent = `${sign}${DB.formatCurrency(netMargin)}`;
-        marginValEl.style.color = netMargin >= 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-      }
-
       const badgeEl = document.getElementById('shiftModalVerdictBadge');
       if (badgeEl) {
         if (Math.abs(diff) <= 0.01) {
-          badgeEl.innerHTML = '<span class="tally-badge balanced">✅ Balanced (Rs. 0.00)</span>';
+          badgeEl.innerHTML = '<span class="tally-badge balanced" style="font-size:0.9rem; padding:4px 12px;">✅ 100% Balanced (Rs. 0.00)</span>';
         } else if (diff > 0.01) {
-          badgeEl.innerHTML = `<span class="tally-badge excess">🟢 Excess (+${DB.formatCurrency(diff)})</span>`;
+          badgeEl.innerHTML = `<span class="tally-badge excess" style="font-size:0.9rem; padding:4px 12px;">🟢 Cash Excess (+${DB.formatCurrency(diff)})</span>`;
         } else {
-          badgeEl.innerHTML = `<span class="tally-badge shortage">🔴 Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`;
+          badgeEl.innerHTML = `<span class="tally-badge shortage" style="font-size:0.9rem; padding:4px 12px;">🔴 Cash Shortage (-${DB.formatCurrency(Math.abs(diff))})</span>`;
         }
       }
     };
@@ -6330,44 +6299,38 @@ setShiftViewMode(mode) {
     msg += `🔖 Shift: ${s.shiftType ? s.shiftType.toUpperCase() : 'EVENING'}\n`;
     msg += `=================================\n\n`;
 
-    msg += `🛒 *1. ERP POS SYSTEM BILLS (විකුණුම් බිල්පත්):*\n`;
+    msg += `🛒 *1. ERP POS SYSTEM BILLS (ERP විකුණුම්):*\n`;
     msg += `• Gross POS Sales (මුළු සේල් එක): ${DB.formatCurrency(posTotal)}\n`;
-    msg += `• (-) Card & Online (කාඩ්/බැංකු): ${DB.formatCurrency(posCard)}\n`;
-    if (posCheque > 0) msg += `• (-) Cheque/QR: ${DB.formatCurrency(posCheque)}\n`;
-    msg += `• *Net POS Cash Sales: ${DB.formatCurrency(posCash)}*\n\n`;
+    msg += `• (-) Card & Online (කාඩ්/බැංකු): -${DB.formatCurrency(posCard)}\n`;
+    if (posCheque > 0) msg += `• (-) Cheque / Bank Transfer: -${DB.formatCurrency(posCheque)}\n`;
+    msg += `👉 *Net POS Cash to Drawer: ${DB.formatCurrency(posCash)}*\n\n`;
 
     msg += `💵 *2. CASH DRAWER FLOW (ලාච්චුවේ මුදල් ගලායාම):*\n`;
-    msg += `• (A) Opening Float (උදෑසන ආරම්භක මුදල): ${DB.formatCurrency(s.openingFloat || 0)}\n`;
-    msg += `• (B) (+) POS Cash Sales: ${DB.formatCurrency(posCash)}\n`;
-    msg += `• (C) (-) Drawer Expenses (ලාච්චු වියදම්): ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}\n`;
-    msg += `• *Expected Drawer Cash (A+B-C): ${DB.formatCurrency(s.expectedCash || 0)}*\n\n`;
+    msg += `• (+) Opening Float (Shift ON): ${DB.formatCurrency(s.openingFloat || 0)}\n`;
+    msg += `• (+) Net POS Cash to Drawer: +${DB.formatCurrency(posCash)}\n`;
+    msg += `• (-) Drawer Expenses (ලාච්චු වියදම්): -${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}\n`;
+    msg += `👉 *EXPECTED CASH IN DRAWER: ${DB.formatCurrency(s.expectedCash || 0)}*\n\n`;
 
-    msg += `🧮 *3. ACTUAL COUNTED CASH (ලාච්චුවේ ගැණූ සැබෑ මුදල):*\n`;
-    msg += `• *Counted Cash: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n`;
-    const netMarginVal = (parseFloat(s.countedCash || s.actualCountedCash) || 0) - (parseFloat(s.openingFloat) || 0);
-    msg += `• Net Sales Margin (ශුද්ධ ආදායම): ${netMarginVal >= 0 ? '+' : ''}${DB.formatCurrency(netMarginVal)}\n`;
+    msg += `🧮 *3. ACTUAL PHYSICAL CASH COUNTED (ලාච්චුවේ ගැණූ සැබෑ මුදල):*\n`;
+    const noteLines = DB.formatDenominationsText(s.denominations, true);
+    if (noteLines.length > 0) {
+      msg += noteLines.join('\n') + '\n';
+    }
+    msg += `👉 *TOTAL PHYSICAL COUNTED: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n\n`;
 
     const diff = s.difference || 0;
     msg += `=================================\n`;
-    msg += `⚖️ *4. ERP POS vs CASH DRAWER RECONCILIATION (ශේෂ පරීක්ෂාව):*\n`;
-    msg += `• Expected: ${DB.formatCurrency(s.expectedCash || 0)} | Counted: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}\n`;
+    msg += `⚖️ *4. TALLY RECONCILIATION VERDICT (ERP POS vs CASH DRAWER):*\n`;
+    msg += `• Expected Cash: ${DB.formatCurrency(s.expectedCash || 0)} | Actual Counted: ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}\n`;
     if (Math.abs(diff) < 0.01) {
-      msg += `• *VERDICT: ✅ 100% PERFECTLY BALANCED (Rs. 0.00)*\n`;
-      msg += `• (සතයක්වත් අඩු නොවී සම්පූර්ණයෙන්ම සමබරයි)\n\n`;
+      msg += `• *VERDICT: ✅ 100% BALANCED (Diff: Rs. 0.00)*\n`;
+      msg += `• (ලාච්චුවේ මුදල් සහ ERP බිල්පත් ශතයටම සමබරයි)\n`;
     } else if (diff > 0) {
       msg += `• *VERDICT: 🟢 CASH EXCESS (+${DB.formatCurrency(diff)})*\n`;
-      msg += `• ⚠️ ලාච්චුවේ සල්ලි වැඩියි - ERP බිල් නොදා ගෙවීම් භාරගෙන ඇත හැකියාව\n\n`;
+      msg += `• ⚠️ ලාච්චුවේ මුදල් වැඩියි (ERP බිල්පත් නොදා මුදල් ලබාගැනීමක් විය හැක)\n`;
     } else {
       msg += `• *VERDICT: 🔴 CASH SHORTAGE (-${DB.formatCurrency(Math.abs(diff))})*\n`;
-      msg += `• ⚠️ ලාච්චුවේ සල්ලි අඩුයි - හිඟයක් හෝ ERP ඉක්මවා බිල් දමා ඇත\n\n`;
-    }
-
-    // COUNTED NOTES BREAKDOWN (ලාච්චුවේ ගැණූ මුදල් නෝට්ටු විස්තරය)
-    const noteLines = DB.formatDenominationsText(s.denominations, true);
-    if (noteLines.length > 0) {
-      msg += `🧮 *ලාච්චුවේ ගැණූ මුදල් නෝට්ටු විස්තරය (CASH DRAWER NOTES BREAKDOWN):*\n`;
-      msg += noteLines.join('\n') + '\n';
-      msg += `👉 *මුළු ගැණූ මුදල (Total Notes Cash): ${DB.formatCurrency(s.countedCash || s.actualCountedCash || 0)}*\n\n`;
+      msg += `• ⚠️ ලාච්චුවේ මුදල් අඩුයි (මුදල් අඩුවක් හෝ බිල්පත් වැරදීමක්)\n`;
     }
 
     if (s.specialNotes || s.cashNote) {
@@ -6457,27 +6420,37 @@ setShiftViewMode(mode) {
       "Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n" +
       "Mutur • Batticaloa Rd • Serunuwara\n" +
       "---------------------------------\n" +
-      "🌙 *DAILY CASHIER SHIFT SETTLEMENT SLIP*\n" +
+      "🌙 *DAILY CASHIER SHIFT RECONCILIATION SLIP*\n" +
       "📅 Date: " + DB.formatDate(s.date) + "\n" +
       "⏰ Time: " + DB.formatTime(s.timestamp) + "\n" +
+      "🏪 Branch: " + (shop ? shop.name : 'Shop') + "\n" +
       "🧑‍💼 Cashier: " + (s.cashier || s.cashierName || 'Staff') + "\n" +
       "🔖 Shift: " + (s.shiftType || 'EVENING').toUpperCase() + "\n" +
       "=================================\n\n" +
-      "🛒 *POS MACHINE SALES:*\n" +
-      "• Cash Sales: " + DB.formatCurrency(posCash) + "\n" +
-      "• Card & Online Sales: " + DB.formatCurrency(posCard) + "\n" +
-      "• Gross POS Sales: " + DB.formatCurrency(posTotal) + "\n\n" +
-      "💵 *DRAWER CASH FLOW:*\n" +
-      "• 1. Opening Float: " + DB.formatCurrency(s.openingFloat || 0) + "\n" +
-      "• 2. (+) POS Cash: " + DB.formatCurrency(posCash) + "\n" +
-      "• 3. (-) Expenses: " + DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0) + "\n" +
-      "• *Expected Cash: " + DB.formatCurrency(s.expectedCash || 0) + "*\n" +
-      "• *Actual Counted: " + DB.formatCurrency(s.countedCash || s.actualCountedCash || 0) + "*\n" +
-      "• *Net Cash Margin: " + (((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0)) >= 0 ? '+' : '') + DB.formatCurrency(((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0))) + "*\n" +
-      "• *Status: " + (Math.abs(s.difference || 0) < 0.01 ? '✅ Balanced (Rs.0.00)' : ((s.difference || 0) > 0 ? '🟢 Excess (+' + DB.formatCurrency(s.difference) + ')' : '🔴 Shortage (-' + DB.formatCurrency(Math.abs(s.difference)) + ')')) + "*\n\n" +
+      "🛒 *1. ERP POS SYSTEM BILLS (ERP විකුණුම්):*\n" +
+      "• Gross POS Sales: " + DB.formatCurrency(posTotal) + "\n" +
+      "• (-) Card & Online: -" + DB.formatCurrency(posCard) + "\n" +
+      (posCheque > 0 ? "• (-) Cheque / Bank Transfer: -" + DB.formatCurrency(posCheque) + "\n" : "") +
+      "👉 *Net POS Cash to Drawer: " + DB.formatCurrency(posCash) + "*\n\n" +
+      "💵 *2. CASH DRAWER FLOW (ලාච්චුවේ මුදල් ගලායාම):*\n" +
+      "• (+) Opening Float (Shift ON): " + DB.formatCurrency(s.openingFloat || 0) + "\n" +
+      "• (+) Net POS Cash to Drawer: +" + DB.formatCurrency(posCash) + "\n" +
+      "• (-) Drawer Expenses: -" + DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0) + "\n" +
+      "👉 *EXPECTED CASH IN DRAWER: " + DB.formatCurrency(s.expectedCash || 0) + "*\n\n" +
+      "🧮 *3. ACTUAL PHYSICAL CASH COUNTED (ලාච්චුවේ ගැණූ සැබෑ මුදල):*\n" +
       notesBlock +
-      specialNoteBlock +
+      "👉 *TOTAL PHYSICAL COUNTED: " + DB.formatCurrency(s.countedCash || s.actualCountedCash || 0) + "*\n\n" +
       "=================================\n" +
+      "⚖️ *4. TALLY RECONCILIATION VERDICT (ERP POS vs CASH DRAWER):*\n" +
+      "• Expected Cash: " + DB.formatCurrency(s.expectedCash || 0) + " | Actual Counted: " + DB.formatCurrency(s.countedCash || s.actualCountedCash || 0) + "\n" +
+      (Math.abs(s.difference || 0) < 0.01
+        ? "• *VERDICT: ✅ 100% BALANCED (Diff: Rs. 0.00)*\n• (ලාච්චුවේ මුදල් සහ ERP බිල්පත් ශතයටම සමබරයි)\n"
+        : ((s.difference || 0) > 0
+          ? "• *VERDICT: 🟢 CASH EXCESS (+" + DB.formatCurrency(s.difference) + ")*\n• ⚠️ ලාච්චුවේ මුදල් වැඩියි (ERP බිල්පත් නොදා මුදල් ලබාගැනීමක් විය හැක)\n"
+          : "• *VERDICT: 🔴 CASH SHORTAGE (-" + DB.formatCurrency(Math.abs(s.difference)) + ")*\n• ⚠️ ලාච්චුවේ මුදල් අඩුයි (මුදල් අඩුවක් හෝ බිල්පත් වැරදීමක්)\n")) +
+      "=================================\n\n" +
+      specialNoteBlock +
+      (s.notes || s.note ? "📌 *Remarks:* " + (s.notes || s.note) + "\n\n" : "") +
       "*METHMI MOBILE (PVT) LTD*\n" +
       "Main Street, Mutur\n" +
       "Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413";
@@ -6543,11 +6516,10 @@ setShiftViewMode(mode) {
 
         <div class="section-head">💵 Shop Cash Drawer Flow Reconciliation</div>
         <table>
-          <tr><td>1. Opening Cash Float</td><td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td></tr>
-          <tr><td>2. Add: POS Cash Sales</td><td style="text-align:right;">+ ${DB.formatCurrency(posCash)}</td></tr>
+          <tr><td>1. Opening Cash Float (Shift ON)</td><td style="text-align:right;">${DB.formatCurrency(s.openingFloat || 0)}</td></tr>
+          <tr><td>2. Add: Net POS Cash Sales</td><td style="text-align:right;">+ ${DB.formatCurrency(posCash)}</td></tr>
           <tr><td>3. Less: Daily Drawer Expenses</td><td style="text-align:right; color:#e4002b;">- ${DB.formatCurrency(s.drawerExpenses || s.totalExpenses || 0)}</td></tr>
-          <tr style="background:#f0f9ff; font-weight:800;"><td>Expected Cash in Drawer</td><td style="text-align:right; color:#0284c7;">${DB.formatCurrency(s.expectedCash || 0)}</td></tr>
-          <tr style="background:#f0fdf4; font-weight:800;"><td>Day's Net Drawer Margin (Counted - Float)</td><td style="text-align:right; color:${((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0)) >= 0 ? '#16a34a' : '#e4002b'};">${((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0)) >= 0 ? '+' : ''}${DB.formatCurrency(((s.countedCash || s.actualCountedCash || 0) - (s.openingFloat || 0)))}</td></tr>
+          <tr style="background:#f0f9ff; font-weight:800; font-size:0.95rem;"><td>Expected Cash in Drawer</td><td style="text-align:right; color:#0284c7;">${DB.formatCurrency(s.expectedCash || 0)}</td></tr>
         </table>
 
         ${(s.specialNotes || s.cashNote) ? `
