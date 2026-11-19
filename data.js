@@ -222,6 +222,12 @@ const DB = {
           await batch.commit().catch(() => {});
         }
       }
+
+      // 3. Automated background sync: push any local shifts and device credits to universal cloud updates collection
+      setTimeout(() => {
+        this.syncAllLocalShiftsToCloud().catch(e => console.warn('Background shift sync error:', e));
+        this.syncAllLocalDeviceCreditsToCloud().catch(e => console.warn('Background dev credit sync error:', e));
+      }, 1200);
     } catch (e) {
       console.error('Firebase sync setup failed:', e);
     }
@@ -281,6 +287,7 @@ const DB = {
       const devCredits = [];
       const credits = [];
       const shifts = [];
+      const employees = [];
       const expenses = [];
       const repCredits = [];
       const routerExpenses = [];
@@ -294,7 +301,7 @@ const DB = {
         const docId = doc.id;
         // Normalize ID if missing
         if (!d.id) {
-          d.id = docId.replace(/^(devcred_|shift_|exp_|cred_|repcred_|routerexp_|topup_|btx_)/, '');
+          d.id = docId.replace(/^(devcred_|shift_|exp_|cred_|repcred_|routerexp_|topup_|btx_|emp_)/, '');
         }
 
         if (d.docType === 'device_credit' || docId.startsWith('devcred_') || docId.startsWith('dc_')) {
@@ -303,6 +310,8 @@ const DB = {
           bankTransactions.push(d);
         } else if (d.docType === 'shift' || docId.startsWith('shift_')) {
           shifts.push(d);
+        } else if (d.docType === 'employee' || docId.startsWith('emp_')) {
+          employees.push(d);
         } else if (d.docType === 'expense' || docId.startsWith('exp_')) {
           expenses.push(d);
         } else if (d.docType === 'rep_credit' || docId.startsWith('repcred_')) {
@@ -329,15 +338,32 @@ const DB = {
         this._dualSave(this.UPDATES_KEY, merged);
       }
 
-      // Merge and save shifts
+      // Merge and save shifts (merge into raw storage array to prevent flattening bugs)
       if (shifts.length > 0) {
-        const curShifts = this.getShifts();
+        const curShifts = this._getStorage(this.SHIFTS_KEY, []);
         const map = new Map();
         curShifts.forEach(s => map.set(s.id, s));
-        shifts.forEach(s => map.set(s.id, { ...(map.get(s.id) || {}), ...s }));
+        shifts.forEach(s => {
+          const shiftId = s.id || ('shift_' + (s.timestamp ? new Date(s.timestamp).getTime() : Date.now()));
+          const existing = map.get(shiftId) || {};
+          map.set(shiftId, { ...existing, ...s, id: shiftId, docType: 'shift' });
+        });
         const merged = Array.from(map.values());
         merged.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
         this._dualSave(this.SHIFTS_KEY, merged);
+      }
+
+      // Merge and save employees
+      if (employees.length > 0) {
+        const curEmp = this._getStorage(this.EMPLOYEES_KEY, []);
+        const empMap = new Map();
+        curEmp.forEach(e => empMap.set(e.name.toLowerCase(), e));
+        employees.forEach(e => {
+          if (e.name) {
+            empMap.set(e.name.toLowerCase(), { ...(empMap.get(e.name.toLowerCase()) || {}), ...e });
+          }
+        });
+        this._dualSave(this.EMPLOYEES_KEY, Array.from(empMap.values()));
       }
 
       // Merge and save expenses
@@ -417,8 +443,13 @@ const DB = {
         window.App.updateTopBarBadges();
         if (this._refreshDebounceTimer) clearTimeout(this._refreshDebounceTimer);
         this._refreshDebounceTimer = setTimeout(() => {
-          if (window.App && window.App.refreshPage) {
-            window.App.refreshPage(window.App.currentPage);
+          if (window.App) {
+            if (window.App.updateDashboardShiftStatusBanner) {
+              window.App.updateDashboardShiftStatusBanner();
+            }
+            if (window.App.refreshPage) {
+              window.App.refreshPage(window.App.currentPage);
+            }
           }
         }, 150);
       }
@@ -429,13 +460,22 @@ const DB = {
 
   async _syncToFirebase(collection, docId, data) {
     if (!window.FS) return false;
+    
+    // Safety guard: Project security rules only permit payment_tracker_updates & payment_tracker_shops
+    let targetCol = collection;
+    if (targetCol !== 'payment_tracker_shops') {
+      targetCol = 'payment_tracker_updates';
+    }
+
     try {
       this.setCloudSyncing(true);
-      await window.FS.collection(collection).doc(docId).set(data);
+      // Deep sanitize data to completely eliminate undefined values which cause Firestore set() to throw
+      const cleanData = JSON.parse(JSON.stringify(data));
+      await window.FS.collection(targetCol).doc(docId).set(cleanData, { merge: true });
       this.setCloudSyncing(false, true);
       return true;
     } catch (e) {
-      console.error("Firebase set error", collection, docId, e);
+      console.error("Firebase set error", targetCol, docId, e);
       this.setCloudSyncing(false, false, e.message);
       if (window.App && window.App.showToast) {
         const isSizeErr = e.message && e.message.includes('exceeds maximum allowed size');
@@ -457,7 +497,11 @@ const DB = {
 
   _deleteFromFirebase(collection, docId) {
     if (window.FS) {
-      window.FS.collection(collection).doc(docId).delete().catch(e => console.error("Firebase delete error", e));
+      let targetCol = collection;
+      if (targetCol !== 'payment_tracker_shops') {
+        targetCol = 'payment_tracker_updates';
+      }
+      window.FS.collection(targetCol).doc(docId).delete().catch(e => console.error("Firebase delete error", e));
     }
   },
 
@@ -1139,7 +1183,6 @@ const DB = {
     credits.unshift(item);
     this.saveCredits(credits);
     this._syncToFirebase('payment_tracker_updates', 'cred_' + item.id, item);
-    this._syncToFirebase('payment_tracker_credits', item.id, item).catch(() => {});
 
     // Deduct credit reload amount from the corresponding SIM in active balance (lastUpdate)
     if (item.shopId && item.amount > 0) {
@@ -1315,7 +1358,6 @@ const DB = {
     credits = credits.filter(c => c.id !== creditId);
     this.saveCredits(credits);
     this._deleteFromFirebase('payment_tracker_updates', 'cred_' + creditId);
-    this._deleteFromFirebase('payment_tracker_credits', creditId);
     return true;
   },
 
@@ -1522,7 +1564,7 @@ const DB = {
 
   // ---- Daily Evening Shift Summaries & POS Tally ----
   getShifts(shopId = null) {
-    let list = JSON.parse(localStorage.getItem(this.SHIFTS_KEY) || '[]');
+    let list = this._getStorage(this.SHIFTS_KEY, []);
     if (shopId) list = list.filter(s => s.shopId === shopId);
     if (!Array.isArray(list) || list.length === 0) return [];
 
@@ -1606,7 +1648,7 @@ const DB = {
 
   checkAndExpireYesterdayShifts() {
     const today = this.getTodayDate();
-    let shifts = this.getShifts(null);
+    let shifts = this._getStorage(this.SHIFTS_KEY, []);
     let modified = false;
     const expiredList = [];
 
@@ -1625,7 +1667,8 @@ const DB = {
     if (modified) {
       this.saveShifts(shifts);
       expiredList.forEach(s => {
-        this._syncToFirebase('payment_tracker_updates', 'shift_' + s.id, s);
+        const docId = s.id.startsWith('shift_') ? s.id : ('shift_' + s.id);
+        this._syncToFirebase('payment_tracker_updates', docId, s);
       });
     }
     return expiredList;
@@ -1633,7 +1676,7 @@ const DB = {
 
   _deduplicateLegacyShifts() {
     try {
-      const list = this.getShifts(null);
+      const list = this._getStorage(this.SHIFTS_KEY, []);
       if (!Array.isArray(list) || list.length === 0) return;
 
       const groups = new Map();
@@ -1680,17 +1723,17 @@ const DB = {
           const expenses = primary.drawerExpenses || primary.totalExpenses || 0;
           primary.expectedCash = (primary.openingFloat || 0) + posCash - expenses;
           primary.difference = (primary.countedCash || primary.actualCountedCash || 0) - primary.expectedCash;
-        if (primary.shiftType === 'morning' || primary.status === 'morning_active') {
-          primary.status = 'morning_active';
-        } else if ((primary.openingFloat || 0) === 0 && (primary.countedCash || 0) === 0 && (primary.posGrossSales || primary.posSales || 0) === 0) {
-          primary.status = 'unsettled';
-        } else if (primary.difference > 0.01) {
-          primary.status = 'excess';
-        } else if (primary.difference < -0.01) {
-          primary.status = 'shortage';
-        } else {
-          primary.status = 'balanced';
-        }
+          if (primary.shiftType === 'morning' || primary.status === 'morning_active') {
+            primary.status = 'morning_active';
+          } else if ((primary.openingFloat || 0) === 0 && (primary.countedCash || 0) === 0 && (primary.posGrossSales || primary.posSales || 0) === 0) {
+            primary.status = 'unsettled';
+          } else if (primary.difference > 0.01) {
+            primary.status = 'excess';
+          } else if (primary.difference < -0.01) {
+            primary.status = 'shortage';
+          } else {
+            primary.status = 'balanced';
+          }
 
           deduplicated.push(primary);
 
@@ -1706,8 +1749,8 @@ const DB = {
         this.saveShifts(deduplicated);
         console.log(`✅ Cleaned up ${idsToDeleteFromCloud.length} duplicate shift rows into unified daily records`);
         idsToDeleteFromCloud.forEach(dupId => {
-          this._deleteFromFirebase('payment_tracker_updates', 'shift_' + dupId);
-          this._deleteFromFirebase('payment_tracker_shifts', dupId);
+          const docId = dupId.startsWith('shift_') ? dupId : ('shift_' + dupId);
+          this._deleteFromFirebase('payment_tracker_updates', docId);
         });
       }
     } catch (e) {
@@ -1715,10 +1758,40 @@ const DB = {
     }
   },
 
+  async syncAllLocalShiftsToCloud() {
+    if (!window.FS) return { count: 0, success: false };
+    const local = this._getStorage(this.SHIFTS_KEY, []);
+    if (!local || local.length === 0) return { count: 0, success: true };
+
+    let uploaded = 0;
+    for (const shift of local) {
+      try {
+        const docId = shift.id.startsWith('shift_') ? shift.id : ('shift_' + shift.id);
+        const cleanShift = JSON.parse(JSON.stringify({
+          ...shift,
+          id: shift.id,
+          docType: 'shift'
+        }));
+        await window.FS.collection('payment_tracker_updates').doc(docId).set(cleanShift, { merge: true });
+        uploaded++;
+      } catch (e) {
+        console.warn('Failed to push shift to cloud:', shift.id, e);
+      }
+    }
+    return { count: uploaded, success: true };
+  },
+
   updateShift(id, shiftData) {
-    const list = this.getShifts(null);
-    const idx = list.findIndex(s => s.id === id);
-    if (idx === -1) return null;
+    const list = this._getStorage(this.SHIFTS_KEY, []);
+    let idx = list.findIndex(s => s.id === id);
+    if (idx === -1) {
+      const matchIdx = list.findIndex(s => s.shopId === shiftData.shopId && s.date === (shiftData.date || this.getTodayDate()));
+      if (matchIdx !== -1) {
+        idx = matchIdx;
+      } else {
+        return this.addShift({ ...shiftData, id });
+      }
+    }
 
     const existing = list[idx];
     const posCash = (shiftData.posCashSales !== undefined) ? (parseFloat(shiftData.posCashSales) || 0) : (existing.posCashSales || 0);
@@ -1746,11 +1819,11 @@ const DB = {
     const updated = {
       ...existing,
       ...shiftData,
-      id,
+      id: existing.id || id,
       shopId: shiftData.shopId || existing.shopId,
       shiftName: shiftData.shiftName || existing.shiftName || 'Daily Evening Closing',
       shiftType: shiftData.shiftType || existing.shiftType || 'evening',
-      date: existing.date, // Preserve date
+      date: existing.date || shiftData.date || this.getTodayDate(),
       timestamp: shiftData.timestamp || existing.timestamp,
       updatedAt: new Date().toISOString(),
       cashierName: (shiftData.cashierName || shiftData.cashier || existing.cashierName || existing.cashier || '').trim(),
@@ -1769,23 +1842,23 @@ const DB = {
       difference,
       netMargin,
       status,
-      denominations: (shiftData.denominations !== undefined) ? shiftData.denominations : existing.denominations,
-      specialNotes: (shiftData.specialNotes !== undefined) ? shiftData.specialNotes : (existing.specialNotes || existing.cashNote || ''),
-      cashNote: (shiftData.specialNotes !== undefined) ? shiftData.specialNotes : (existing.specialNotes || existing.cashNote || ''),
-      notes: (shiftData.notes !== undefined) ? shiftData.notes : (existing.notes || existing.note || ''),
-      note: (shiftData.notes !== undefined) ? shiftData.notes : (existing.notes || existing.note || ''),
+      denominations: (shiftData.denominations !== undefined) ? (shiftData.denominations || null) : (existing.denominations || null),
+      specialNotes: (shiftData.specialNotes !== undefined) ? (shiftData.specialNotes || '') : (existing.specialNotes || existing.cashNote || ''),
+      cashNote: (shiftData.specialNotes !== undefined) ? (shiftData.specialNotes || '') : (existing.specialNotes || existing.cashNote || ''),
+      notes: (shiftData.notes !== undefined) ? (shiftData.notes || '') : (existing.notes || existing.note || ''),
+      note: (shiftData.notes !== undefined) ? (shiftData.notes || '') : (existing.notes || existing.note || ''),
       docType: 'shift'
     };
 
     list[idx] = updated;
     this.saveShifts(list);
-    this._syncToFirebase('payment_tracker_updates', 'shift_' + id, updated);
-    this._syncToFirebase('payment_tracker_shifts', id, updated).catch(() => {});
+    const docId = (updated.id && updated.id.startsWith('shift_')) ? updated.id : ('shift_' + (updated.id || id));
+    this._syncToFirebase('payment_tracker_updates', docId, updated);
     return updated;
   },
 
   addShift(data) {
-    const list = this.getShifts(null);
+    const list = this._getStorage(this.SHIFTS_KEY, []);
     const now = new Date();
     const targetDate = data.date || this.getTodayDate();
     const targetShopId = data.shopId || this.getActiveShopId();
@@ -1818,8 +1891,9 @@ const DB = {
       status = 'shortage';
     }
 
+    const shiftId = (data.id && data.id.startsWith('shift_')) ? data.id : ('shift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5));
     const item = {
-      id: 'shift_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      id: shiftId,
       shopId: targetShopId,
       shiftName: data.shiftName || 'Daily Closing',
       shiftType: data.shiftType || 'evening',
@@ -1853,17 +1927,17 @@ const DB = {
     };
     list.unshift(item);
     this.saveShifts(list);
-    this._syncToFirebase('payment_tracker_updates', 'shift_' + item.id, item);
-    this._syncToFirebase('payment_tracker_shifts', item.id, item).catch(() => {});
+    const docId = shiftId.startsWith('shift_') ? shiftId : ('shift_' + shiftId);
+    this._syncToFirebase('payment_tracker_updates', docId, item);
     return item;
   },
 
   deleteShift(id) {
-    let list = this.getShifts(null);
+    let list = this._getStorage(this.SHIFTS_KEY, []);
     list = list.filter(s => s.id !== id);
     this.saveShifts(list);
-    this._deleteFromFirebase('payment_tracker_updates', 'shift_' + id);
-    this._deleteFromFirebase('payment_tracker_shifts', id);
+    const docId = id.startsWith('shift_') ? id : ('shift_' + id);
+    this._deleteFromFirebase('payment_tracker_updates', docId);
     return true;
   },
 
@@ -1913,7 +1987,6 @@ const DB = {
     list.unshift(item);
     this.saveExpenses(list);
     this._syncToFirebase('payment_tracker_updates', 'exp_' + item.id, item);
-    this._syncToFirebase('payment_tracker_expenses', item.id, item).catch(() => {});
 
     // If deductFromBalance is true and shopId given, deduct from shop active cash drawer
     if (data.deductFromBalance && data.shopId && item.paidFrom === 'cash') {
@@ -1945,7 +2018,6 @@ const DB = {
     list = list.filter(e => e.id !== id);
     this.saveExpenses(list);
     this._deleteFromFirebase('payment_tracker_updates', 'exp_' + id);
-    this._deleteFromFirebase('payment_tracker_expenses', id);
     return true;
   },
 
@@ -2908,7 +2980,10 @@ const DB = {
       list.push({ name: cleanName, role: cleanRole });
     }
     this._dualSave(this.EMPLOYEES_KEY, list);
-    this._syncToFirebase('payment_tracker_employees', cleanName.replace(/[^a-zA-Z0-9_-]/g, '_'), {
+    const empDocId = 'emp_' + cleanName.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    this._syncToFirebase('payment_tracker_updates', empDocId, {
+      id: empDocId,
+      docType: 'employee',
       name: cleanName,
       role: cleanRole,
       updatedAt: new Date().toISOString()

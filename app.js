@@ -79,9 +79,8 @@ const App = {
       this.refreshShopSelector();
       this.updateBackupStatus();
       this.updateTopBarBadges();
-      if (this.currentPage === 'dashboard') {
-        this.renderDashboard();
-      }
+      this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
     }).catch(err => {
       console.warn('DB.initialize background error:', err);
     });
@@ -4556,9 +4555,8 @@ Thank you! - ${shopName}`;
       this.updateTopBarBadges();
       this.showToast(I18N.currentLang === 'si' ? 'Credit deleted (මකා දැමුවා)' : 'Credit deleted', 'success');
       this.renderCreditsPage();
-      if (this.currentPage === 'dashboard') {
-        this.renderDashboard();
-      }
+      this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
     });
   },
 
@@ -4567,9 +4565,8 @@ Thank you! - ${shopName}`;
       DB.deleteRouterExpense(id);
       this.showToast(I18N.currentLang === 'si' ? 'Router expense deleted (මකා දැමුවා)' : 'Router expense deleted', 'success');
       this.renderCreditsPage();
-      if (this.currentPage === 'dashboard') {
-        this.renderDashboard();
-      }
+      this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
     });
   },
 
@@ -4578,9 +4575,8 @@ Thank you! - ${shopName}`;
       DB.deleteDistributorTopup(id);
       this.showToast(I18N.currentLang === 'si' ? 'Distributor top-up deleted (මකා දැමුවා)' : 'Distributor top-up deleted', 'success');
       this.renderCreditsPage();
-      if (this.currentPage === 'dashboard') {
-        this.renderDashboard();
-      }
+      this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
     });
   },
 
@@ -8957,7 +8953,11 @@ setShiftViewMode(mode) {
     this.showToast(I18N.currentLang === 'si' ? '☁️ Cloud වෙතින් සජීවී දත්ත ලබා ගනිමින්...' : '☁️ Syncing live data with Cloud...', 'info');
     this.updateCloudSyncingUI(true);
     try {
-      // 1. Fetch shops
+      // 1. Push any un-synced local shifts & device credits to cloud first
+      await DB.syncAllLocalShiftsToCloud().catch(() => {});
+      await DB.syncAllLocalDeviceCreditsToCloud().catch(() => {});
+
+      // 2. Fetch shops
       const shopsSnap = await window.FS.collection('payment_tracker_shops').get();
       const shops = [];
       shopsSnap.forEach(d => {
@@ -8970,13 +8970,14 @@ setShiftViewMode(mode) {
         this.refreshShopSelector();
       }
 
-      // 2. Fetch updates collection (includes shifts, device credits, etc.)
+      // 3. Fetch updates collection (includes shifts, device credits, etc.)
       const updatesSnap = await window.FS.collection('payment_tracker_updates').get();
       DB.processUpdatesSnapshot(updatesSnap);
 
       this.updateCloudSyncingUI(false, true);
       this.showToast('✅ ' + (I18N.currentLang === 'si' ? 'සියලු දත්ත Cloud සමඟ සමමුහුර්ත විය!' : 'All data live-synced with Cloud!'), 'success');
       this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
       this.updateTopBarBadges();
     } catch (e) {
       console.error('Manual sync from cloud error:', e);
@@ -10207,9 +10208,8 @@ setShiftViewMode(mode) {
       this.updateTopBarBadges();
       this.showToast(I18N.currentLang === 'si' ? 'ණය ගිවිසුම මකා දමන ලදී' : 'Device credit agreement deleted', 'success');
       this.renderDeviceCreditsPage();
-      if (this.currentPage === 'dashboard') {
-        this.renderDashboard();
-      }
+      this.refreshPage(this.currentPage);
+      this.updateDashboardShiftStatusBanner();
     });
   }
 };
