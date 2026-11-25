@@ -22,7 +22,7 @@
   <link rel="preconnect" href="https://cdn.jsdelivr.net">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Noto+Sans+Sinhala:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   
-  <link rel="stylesheet" href="style.css?v=53.0">
+  <link rel="stylesheet" href="style.css?v=59.0">
 </head>
 <body>
 
@@ -97,6 +97,7 @@
         <li><a href="#" data-page="dashboard" class="active" onclick="App.navigateTo('dashboard')"><span class="nav-icon">📊</span> <span data-i18n="nav_dashboard">Dashboard</span></a></li>
         <li><a href="#" data-page="update" onclick="App.navigateTo('update')"><span class="nav-icon">⚡</span> <span data-i18n="nav_update">Reload & Payments</span></a></li>
         <li><a href="#" data-page="device-credits" onclick="App.navigateTo('device-credits')"><span class="nav-icon">✍️</span> <span data-i18n="nav_dev_credits">Phone Loans & Agreements</span></a></li>
+        <li><a href="#" data-page="inventory" onclick="App.navigateTo('inventory')"><span class="nav-icon">📦</span> <span data-i18n="nav_inventory">Stock & Inventory</span></a></li>
         <li><a href="#" data-page="shifts" onclick="App.navigateTo('shifts')"><span class="nav-icon">🌙</span> <span data-i18n="nav_shifts">Shop Drawer & Shift Tally</span></a></li>
         <li><a href="#" data-page="credits" onclick="App.navigateTo('credits')"><span class="nav-icon">📒</span> <span data-i18n="nav_credits">Credits & Ledger</span></a></li>
         <li><a href="#" data-page="history" onclick="App.navigateTo('history')"><span class="nav-icon">📜</span> <span data-i18n="nav_history">Update History</span></a></li>
@@ -139,7 +140,12 @@
               🏪 <span id="quickActionsActiveShopName">Main Shop</span>
             </span>
           </div>
-          <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">1-Tap Operations</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div id="adminRoleSecurityPill" onclick="App.toggleAdminSession()" title="Click to toggle Admin / Staff Mode" style="border:1px solid var(--border-glass); background:rgba(14,24,52,0.7); color:var(--text-secondary); border-radius:20px; padding:3px 10px; font-size:0.75rem; font-weight:700; display:inline-flex; align-items:center; gap:4px; cursor:pointer;">
+              <span>🔒</span> <span>Staff Mode</span> <span style="font-size:0.68rem; opacity:0.75;">[Unlock]</span>
+            </div>
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">1-Tap Operations</span>
+          </div>
         </div>
 
         <div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
@@ -148,6 +154,9 @@
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showAddDeviceCreditModal()" style="font-weight:700; padding:8px 14px; background:linear-gradient(135deg, #0d9488, #059669); color:#fff; border:none; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
             <span>✍️</span> <span>+ Phone Agreement</span>
+          </button>
+          <button type="button" class="btn btn-sm" onclick="App.showAddStockItemModal()" style="font-weight:700; padding:8px 14px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:var(--accent-green); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
+            <span>📦</span> <span>+ Stock / IMEI</span>
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showQuickAddBankDepositModal()" style="font-weight:700; padding:8px 14px; background:rgba(139,92,246,0.15); border:1px solid rgba(139,92,246,0.4); color:var(--accent-purple); display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
             <span>🏦</span> <span>+ Bank Deposit / Handover</span>
@@ -163,7 +172,7 @@
             <span class="top-bar-badge" id="topBarCreditBadge" style="display:none; margin-left:4px;">0</span>
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showAddRepCreditModal()" style="font-weight:700; padding:8px 14px; background:rgba(234,88,12,0.15); border:1px solid rgba(234,88,12,0.4); color:#ea580c; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
-            <span>🤝</span> <span>+ Rep Reload Credit</span>
+            <span>🤝</span> <span>+ Rep Reload (Cash/Credit)</span>
             <span class="top-bar-badge" id="topBarRepCreditBadge" style="display:none; background:#ea580c; color:#fff; margin-left:4px;">0</span>
           </button>
           <button type="button" class="btn btn-sm" onclick="App.showAddExpenseModal()" style="font-weight:700; padding:8px 14px; background:rgba(244,63,94,0.12); border:1px solid rgba(244,63,94,0.35); color:#f43f5e; display:inline-flex; align-items:center; gap:6px; border-radius:8px;">
@@ -441,7 +450,7 @@
           <!-- SECTION 1: RELOAD / SIMS -->
           <div class="section-divider blue">
             <div class="divider-icon">🔄</div>
-            <div class="divider-text" data-i18n="upd_reload_sec_title">Section 1: Reload & SIMs Balance</div>
+            <div class="divider-text" data-i18n="upd_reload_sec_title">Section 1: Reload SIMs Balance (රීලෝඩ් සිම්පත් ශේෂයන්)</div>
             <div class="divider-line"></div>
           </div>
 
@@ -476,7 +485,7 @@
           <!-- Live Reload SIMs Total Badge -->
           <div class="auto-total" style="padding:12px 16px; border-radius:var(--radius-md); background:rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.2); margin-bottom:24px;">
             <div>
-              <span class="total-label" style="font-size:0.95rem; font-weight:700;" data-i18n="upd_sims_total_badge">🔄 Reload SIMs Total</span>
+              <span class="total-label" style="font-size:0.95rem; font-weight:700;" data-i18n="upd_sims_total_badge">🔄 Section 1: Reload SIMs Total</span>
               <div id="liveSimsDiffBadge" style="margin-top:4px;"></div>
             </div>
             <span class="total-value" id="liveReloadSimTotal" style="font-size:1.35rem; color:var(--accent-blue);">Rs.0.00</span>
@@ -495,6 +504,10 @@
           <!-- Prominent Reload Cash Drawer Card -->
           <div class="card cash-drawer-card" style="margin-bottom:24px; padding:20px; background:linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%); border:2px solid rgba(245,158,11,0.35); border-radius:var(--radius-md); box-shadow:0 4px 16px rgba(245,158,11,0.08);">
             
+            <div style="font-size:0.83rem; color:var(--text-secondary); margin-bottom:14px; background:rgba(245,158,11,0.06); padding:6px 12px; border-radius:var(--radius-sm); border-left:3px solid var(--accent-gold);">
+              ℹ️ <strong>රීලෝඩ් මුළු එකතුව (Total Reload):</strong> Section 1 හි සිම්පත් ශේෂයන් + Section 2 හි රීලෝඩ් මුදල් ලාච්චුව එක්ව ගණනය කෙරේ.
+            </div>
+
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 16px;">
               <!-- 1. Reload Drawer Cash -->
               <div style="background:var(--bg-glass-card); padding:16px; border-radius:var(--radius-sm); border:1px solid rgba(245,158,11,0.25);">
@@ -536,22 +549,22 @@
             <!-- Total Reload Cash Drawer Badge -->
             <div class="auto-total" style="padding:10px 14px; border-radius:var(--radius-sm); background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); margin-bottom:12px;">
               <div>
-                <span class="total-label" style="font-size:0.88rem; font-weight:700; color:var(--accent-gold);" data-i18n="upd_reload_drawer_total_badge">💵 Reload Cash in Drawer Total (Drawer + Hub)</span>
+                <span class="total-label" style="font-size:0.88rem; font-weight:700; color:var(--accent-gold);" data-i18n="upd_reload_drawer_total_badge">💵 Section 2: Reload Cash Drawer Total (Drawer + Hub)</span>
                 <div id="liveCashDrawerDiffBadge" style="margin-top:2px;"></div>
               </div>
               <span class="total-value" id="liveReloadDrawerTotal" style="font-size:1.25rem; font-weight:800; color:var(--accent-gold);">Rs.0.00</span>
             </div>
 
             <!-- COMBINED FULL RELOAD TOTAL BADGE (SIMs + Cash Drawer) -->
-            <div class="auto-total" style="padding:14px 18px; border-radius:var(--radius-md); background:linear-gradient(135deg, rgba(59,130,246,0.12), rgba(245,158,11,0.12)); border:2px solid rgba(59,130,246,0.35);">
+            <div class="auto-total" style="padding:14px 18px; border-radius:var(--radius-md); background:linear-gradient(135deg, rgba(59,130,246,0.12), rgba(245,158,11,0.12)); border:2px solid rgba(59,130,246,0.4);">
               <div>
-                <div class="total-label" style="font-size:1.05rem; font-weight:900; color:var(--text-primary);">🔄 Total Reload (SIMs Total + Cash Drawer)</div>
+                <div class="total-label" style="font-size:1.05rem; font-weight:900; color:var(--text-primary);">🔄 Total Reload [Section 1 + Section 2] (රීලෝඩ් මුළු එකතුව)</div>
                 <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
-                  SIMs: <strong style="color:var(--accent-blue);" id="liveSimsSubVal">Rs.0.00</strong> + Drawer Cash: <strong style="color:var(--accent-gold);" id="liveDrawerCashSubVal">Rs.0.00</strong>
+                  Section 1 (SIMs): <strong style="color:var(--accent-blue);" id="liveSimsSubVal">Rs.0.00</strong> + Section 2 (Drawer Cash): <strong style="color:var(--accent-gold);" id="liveDrawerCashSubVal">Rs.0.00</strong>
                 </div>
                 <div id="liveReloadFullDiffBadge" style="margin-top:4px;"></div>
               </div>
-              <span class="total-value" id="liveReloadFullTotal" style="font-size:1.6rem; font-weight:900; color:var(--accent-blue);">Rs.0.00</span>
+              <span class="total-value" id="liveReloadFullTotal" style="font-size:1.65rem; font-weight:900; color:var(--accent-blue);">Rs.0.00</span>
             </div>
 
           </div>
@@ -559,7 +572,7 @@
           <!-- SECTION 3: BANK & MOBILE PAYMENTS -->
           <div class="section-divider purple">
             <div class="divider-icon">🏦</div>
-            <div class="divider-text" data-i18n="upd_bank_sec_title">Section 3: Bank & Mobile Payments</div>
+            <div class="divider-text" data-i18n="upd_bank_sec_title">Section 3: Bank & Mobile Payments (බැංකු සහ ජංගම ගෙවීම්)</div>
             <div class="divider-line"></div>
           </div>
 
@@ -573,13 +586,13 @@
           <!-- Live Bank Total Badge -->
           <div class="auto-total" style="padding:14px 18px; border-radius:var(--radius-md); background:rgba(139,92,246,0.08); border:2px solid rgba(139,92,246,0.3); margin-bottom:24px;">
             <div>
-              <div class="total-label" style="font-size:1.05rem; font-weight:900; color:var(--accent-purple);" data-i18n="upd_bank_total_badge">🏦 Bank Total (Accounts + Bank Cash)</div>
+              <div class="total-label" style="font-size:1.05rem; font-weight:900; color:var(--accent-purple);" data-i18n="upd_bank_total_badge">🏦 Section 3: Bank Total (Accounts + Bank Cash)</div>
               <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:2px;">
                 Bank Accounts: <strong style="color:var(--accent-purple);" id="liveBankAcctSubVal">Rs.0.00</strong> + Bank Cash: <strong style="color:var(--accent-gold);" id="liveBankCashSubVal">Rs.0.00</strong>
               </div>
               <div id="liveBankDiffBadge" style="margin-top:4px;"></div>
             </div>
-            <span class="total-value" id="liveBankTotal" style="font-size:1.6rem; font-weight:900; color:var(--accent-purple);">Rs.0.00</span>
+            <span class="total-value" id="liveBankTotal" style="font-size:1.65rem; font-weight:900; color:var(--accent-purple);">Rs.0.00</span>
           </div>
 
           <!-- Quick Actions Note -->
@@ -595,33 +608,82 @@
           <!-- SECTION 4: GRAND TOTAL CAPITAL -->
           <div class="section-divider green">
             <div class="divider-icon">💰</div>
-            <div class="divider-text" data-i18n="upd_grand_sec_title">Section 4: Grand Total Capital</div>
+            <div class="divider-text" data-i18n="upd_grand_sec_title">Section 4: Grand Total Capital [Section (1+2) + Section 3]</div>
             <div class="divider-line"></div>
           </div>
 
           <!-- Live Capital Breakdown Grid & Grand Total -->
-          <div class="auto-total" style="flex-direction:column; align-items:stretch; padding:18px 20px; border-radius:var(--radius-md); background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.28); margin-bottom:20px;">
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:14px; padding-bottom:14px; border-bottom:1px dashed rgba(16,185,129,0.25);">
-              <div style="background:var(--bg-glass-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(59,130,246,0.2);">
-                <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:var(--accent-blue);" data-i18n="upd_sims_total_badge">🔄 Reload SIMs Total</div>
-                <div id="liveSimsBreakdownVal" style="font-size:1.15rem; font-weight:800; color:var(--accent-blue); margin-top:2px;">Rs.0.00</div>
+          <div class="card" style="padding:20px; border-radius:var(--radius-md); background:linear-gradient(135deg, rgba(16,185,129,0.07) 0%, rgba(59,130,246,0.04) 100%); border:2px solid rgba(16,185,129,0.35); box-shadow:0 6px 20px rgba(16,185,129,0.08); margin-bottom:22px;">
+            
+            <!-- The 2 Pillars Grid: Section 1+2 (Reload Total) AND Section 3 (Bank Total) -->
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-bottom:16px;">
+              
+              <!-- Pillar 1: Total Reload (Section 1 + Section 2) -->
+              <div style="background:var(--bg-glass-card); padding:16px; border-radius:var(--radius-sm); border:1.5px solid rgba(59,130,246,0.35); display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:0.88rem; font-weight:800; color:var(--accent-blue); text-transform:uppercase;">
+                      🔄 1. Total Reload (Section 1 + 2)
+                    </span>
+                    <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(59,130,246,0.12); color:var(--accent-blue);">රීලෝඩ් මුළු එකතුව</span>
+                  </div>
+                  <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px;">
+                    SIMs: <span id="grandReloadSimsSub" style="font-weight:700; color:var(--accent-blue);">Rs.0.00</span> + Drawer Cash: <span id="grandReloadCashSub" style="font-weight:700; color:var(--accent-gold);">Rs.0.00</span>
+                  </div>
+                </div>
+                <div id="liveReloadBreakdownVal" style="font-size:1.5rem; font-weight:900; color:var(--accent-blue);">Rs.0.00</div>
               </div>
-              <div style="background:var(--bg-glass-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(245,158,11,0.3);">
-                <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:var(--accent-gold);" data-i18n="upd_cash_total_badge">💵 Total Cash in Drawer</div>
-                <div id="liveCashBreakdownVal" style="font-size:1.15rem; font-weight:800; color:var(--accent-gold); margin-top:2px;">Rs.0.00</div>
+
+              <!-- Pillar 2: Bank Total (Section 3) -->
+              <div style="background:var(--bg-glass-card); padding:16px; border-radius:var(--radius-sm); border:1.5px solid rgba(139,92,246,0.35); display:flex; flex-direction:column; justify-content:space-between;">
+                <div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:0.88rem; font-weight:800; color:var(--accent-purple); text-transform:uppercase;">
+                      🏦 2. Bank & Payments (Section 3)
+                    </span>
+                    <span style="font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:12px; background:rgba(139,92,246,0.12); color:var(--accent-purple);">බැංකු එකතුව</span>
+                  </div>
+                  <div style="font-size:0.8rem; color:var(--text-secondary); margin-bottom:8px;">
+                    Accounts: <span id="grandBankAcctSub" style="font-weight:700; color:var(--accent-purple);">Rs.0.00</span> + Bank Cash: <span id="grandBankCashSub" style="font-weight:700; color:var(--accent-gold);">Rs.0.00</span>
+                  </div>
+                </div>
+                <div id="liveBankBreakdownVal" style="font-size:1.5rem; font-weight:900; color:var(--accent-purple);">Rs.0.00</div>
               </div>
-              <div style="background:var(--bg-glass-card); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(139,92,246,0.2);">
-                <div style="font-size:0.75rem; text-transform:uppercase; font-weight:700; color:var(--accent-purple);" data-i18n="upd_bank_total_badge">🏦 Bank Total</div>
-                <div id="liveBankBreakdownVal" style="font-size:1.15rem; font-weight:800; color:var(--accent-purple); margin-top:2px;">Rs.0.00</div>
-              </div>
+
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+
+            <!-- Grand Total Main Display with explicit formula -->
+            <div style="background:rgba(16,185,129,0.12); border:2px solid rgba(16,185,129,0.45); border-radius:var(--radius-sm); padding:16px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
               <div>
-                <span class="total-label" style="font-size:1.05rem; font-weight:800;" data-i18n="upd_grand_total">Grand Total Capital (SIMs + Bank + Cash Drawer)</span>
-                <div id="updateOverallDiffBadge" style="margin-top:4px;"></div>
+                <div style="font-size:1.15rem; font-weight:900; color:var(--text-primary); display:flex; align-items:center; gap:8px;">
+                  <span>💰 GRAND TOTAL CAPITAL</span>
+                  <span style="font-size:0.85rem; font-weight:700; color:var(--accent-green);">(සම්පූර්ණ මුළු ප්‍රාග්ධනය)</span>
+                </div>
+                <!-- Dynamic formula equation -->
+                <div id="grandFormulaEquation" style="font-size:0.88rem; font-weight:700; color:var(--text-secondary); margin-top:4px;">
+                  [🔄 Total Reload: <span id="formulaReloadVal" style="color:var(--accent-blue); font-weight:800;">Rs.0.00</span>] + [🏦 Bank Total: <span id="formulaBankVal" style="color:var(--accent-purple); font-weight:800;">Rs.0.00</span>]
+                </div>
+                <div id="updateOverallDiffBadge" style="margin-top:6px;"></div>
               </div>
-              <span class="total-value" id="updateTotalCapital" style="font-size:1.7rem; font-weight:900; color:var(--accent-green);">Rs.0.00</span>
+              <div style="text-align:right;">
+                <span class="total-value" id="updateTotalCapital" style="font-size:2.1rem; font-weight:900; color:var(--accent-green); text-shadow:0 0 25px rgba(16,185,129,0.25);">Rs.0.00</span>
+              </div>
             </div>
+
+            <!-- Auxiliary Drawer Cash Info Footer -->
+            <div style="margin-top:12px; padding:8px 12px; background:rgba(245,158,11,0.06); border:1px dashed rgba(245,158,11,0.3); border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; font-size:0.8rem; color:var(--text-secondary);">
+              <div>
+                💼 <strong>Physical Cash in Drawer (ලාච්චුවේ මුළු මුදල්):</strong>
+                Reload Cash (<span id="auxReloadCashSub" style="color:var(--accent-gold); font-weight:700;">Rs.0.00</span>) + Bank Cash (<span id="auxBankCashSub" style="color:var(--accent-gold); font-weight:700;">Rs.0.00</span>)
+              </div>
+              <div>
+                Total Physical Cash: <strong id="liveCashBreakdownVal" style="color:var(--accent-gold); font-size:0.95rem;">Rs.0.00</strong>
+              </div>
+            </div>
+
+            <!-- Hidden element for backwards compatibility -->
+            <div style="display:none;" id="liveSimsBreakdownVal">Rs.0.00</div>
+
           </div>
 
           <!-- OVERALL SUMMARY PREVIEW -->
@@ -745,7 +807,7 @@
           <div style="display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; align-items:center;">
             <div style="display:flex; gap:8px; flex-wrap:wrap;" id="ledgerTabButtons">
               <button class="btn btn-primary btn-sm ledger-tab-btn active" data-tab="credits" data-i18n="tab_credits">👤 Customer Credits</button>
-              <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="rep_credits" style="color:#ea580c; border:1px solid rgba(234,88,12,0.35);">🤝 Rep Reload Credits (රෙෆ් ණය)</button>
+              <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="rep_credits" style="color:#ea580c; border:1px solid rgba(234,88,12,0.35);">🤝 Rep Reloads (කැෂ් / ණය)</button>
               <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="routers" data-i18n="tab_routers">📶 Router Expenses</button>
               <button class="btn btn-ghost btn-sm ledger-tab-btn" data-tab="topups" data-i18n="tab_topups">📥 Distributor Top-ups</button>
             </div>
@@ -1030,6 +1092,115 @@
         <div id="devCreditListContainer"></div>
       </div>
 
+      <!-- ===== MULTI-BRANCH STOCK & BARCODE INVENTORY PAGE ===== -->
+      <div class="page" id="page-inventory">
+        <div class="page-header">
+          <div>
+            <h1><span class="header-icon">📦</span> <span data-i18n="inv_title">Branch Stock & Barcode Inventory</span></h1>
+            <p style="color:var(--text-secondary); font-size:0.85rem; margin-top:4px;" data-i18n="inv_subtitle">Track phones, IMEI numbers, routers & accessories across all branches</p>
+          </div>
+          <div class="header-actions" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button type="button" class="btn btn-primary" onclick="App.showAddStockItemModal()">
+              <span>📦</span> <span data-i18n="btn_add_stock">+ Add Stock Item</span>
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="App.openInventoryImeiScannerModal()" style="border:1px solid rgba(245,158,11,0.4); color:var(--accent-gold); font-weight:700;">
+              <span>📷</span> <span>Scan Barcode / IMEI</span>
+            </button>
+            <button type="button" class="btn btn-ghost" onclick="App.manualSyncFromCloud()" style="border:1px solid rgba(99,102,241,0.4); color:var(--accent-blue); font-weight:700;">
+              <span>☁️</span> <span>Sync Cloud</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Inventory KPI Cards -->
+        <div class="summary-grid" style="margin-bottom:24px;">
+          <div class="card accent-blue">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_total_in_stock">📦 Total In Stock</span>
+              <div class="card-icon">📦</div>
+            </div>
+            <div class="card-value" id="kpiInvTotalCount">0 Items</div>
+            <div class="card-diff neutral" id="kpiInvSmartphonesCount">0 Phones</div>
+          </div>
+
+          <div class="card accent-green">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_stock_cost_val">💰 Total Stock Cost</span>
+              <div class="card-icon">💰</div>
+            </div>
+            <div class="card-value" id="kpiInvCostValue">Rs.0.00</div>
+            <div class="card-diff profit" id="kpiInvPotentialProfit">Margin: Rs.0.00</div>
+          </div>
+
+          <div class="card accent-gold">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_stock_retail_val">🏷️ Retail / Selling Value</span>
+              <div class="card-icon">🏷️</div>
+            </div>
+            <div class="card-value" id="kpiInvSellingValue" style="color:var(--accent-gold);">Rs.0.00</div>
+            <div class="card-diff neutral" id="kpiInvRoutersCount">0 Routers / Accs</div>
+          </div>
+
+          <div class="card accent-purple">
+            <div class="card-header">
+              <span class="card-title" data-i18n="stat_credit_issued">🤝 Credit Issued</span>
+              <div class="card-icon">🤝</div>
+            </div>
+            <div class="card-value" id="kpiInvCreditIssuedCount" style="color:var(--accent-purple);">0</div>
+            <div class="card-diff neutral" id="kpiInvSoldCount">0 Cash Sold</div>
+          </div>
+        </div>
+
+        <!-- Filter & Search Bar -->
+        <div class="card" style="margin-bottom:24px; padding:16px 20px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px;">
+            <!-- Branch Filter + Category + Search Box -->
+            <div style="display:flex; gap:10px; align-items:center; flex:1; min-width:300px; flex-wrap:wrap;">
+              <div style="min-width:170px; max-width:220px; flex:0 0 auto;">
+                <select id="invShopFilter" class="form-select" onchange="App.setInventoryShopFilter(this.value)" style="font-weight:700; width:100%; padding:9px 12px; font-size:0.88rem; border-radius:var(--radius-sm); border:1px solid var(--border-glass); background:var(--bg-glass);">
+                  <option value="all">🏪 All Branches (සියලු ශාඛා)</option>
+                </select>
+              </div>
+
+              <div style="min-width:160px; max-width:200px; flex:0 0 auto;">
+                <select id="invCategoryFilter" class="form-select" onchange="App.setInventoryCategoryFilter(this.value)" style="font-weight:600; width:100%; padding:9px 12px; font-size:0.88rem; border-radius:var(--radius-sm); border:1px solid var(--border-glass); background:var(--bg-glass);">
+                  <option value="all">📁 All Categories (සියල්ල)</option>
+                  <option value="smartphone">📱 Smartphones</option>
+                  <option value="featurephone">📞 Feature Phones</option>
+                  <option value="router">📡 4G/5G Routers</option>
+                  <option value="accessory">🎧 Accessories / Chargers</option>
+                  <option value="sim">💳 SIM & Cards</option>
+                </select>
+              </div>
+
+              <div style="flex:1; min-width:220px; position:relative;">
+                <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:1.1rem; opacity:0.6;">🔍</span>
+                <input type="text" id="invSearchInput" class="form-input" placeholder="Search Brand, Model, IMEI, or Barcode..." oninput="App.renderInventoryPage()" style="padding-left:38px; width:100%; border-radius:var(--radius-sm);">
+              </div>
+            </div>
+
+            <!-- Status Tabs -->
+            <div class="tab-pills" id="invStatusFilterTabs" style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="tab-pill active" data-status="in_stock" onclick="App.setInventoryStatusFilter('in_stock')">
+                <span>🟢 In Stock</span> (<span id="countInvInStock">0</span>)
+              </button>
+              <button type="button" class="tab-pill" data-status="device_credit" onclick="App.setInventoryStatusFilter('device_credit')">
+                <span>🤝 Credit Issued</span> (<span id="countInvCredit">0</span>)
+              </button>
+              <button type="button" class="tab-pill" data-status="sold_cash" onclick="App.setInventoryStatusFilter('sold_cash')">
+                <span>✅ Cash Sold</span> (<span id="countInvSold">0</span>)
+              </button>
+              <button type="button" class="tab-pill" data-status="all" onclick="App.setInventoryStatusFilter('all')">
+                <span>📑 All Records</span> (<span id="countInvAll">0</span>)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inventory List Container -->
+        <div id="invListContainer"></div>
+      </div>
+
     </main>
   </div>
 
@@ -1084,17 +1255,27 @@
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="i18n.js?v=53.0"></script>
-  <script src="firebase-init.js?v=53.0"></script>
-  <script src="data.js?v=53.0"></script>
-  <script src="app.js?v=53.0"></script>
+  <script src="i18n.js?v=59.0"></script>
+  <script src="firebase-init.js?v=59.0"></script>
+  <script src="data.js?v=59.0"></script>
+  <script src="app.js?v=59.0"></script>
   
   <!-- Register Service Worker -->
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').then(reg => {
+        navigator.serviceWorker.register('sw.js?v=59.0').then(reg => {
           reg.update();
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  window.location.reload();
+                }
+              });
+            }
+          });
           console.log('ServiceWorker registration successful');
         }).catch(err => {
           console.log('ServiceWorker registration failed: ', err);

@@ -97,7 +97,9 @@ const DB = {
   BANK_TRANSACTIONS_KEY: 'spt_bank_transactions',
   DEVICE_CREDITS_KEY: 'spt_device_credits',
   REP_CREDITS_KEY: 'spt_rep_credits_v1',
+  SAVED_REPS_KEY: 'spt_saved_reps_v1',
   EMPLOYEES_KEY: 'spt_employees',
+  INVENTORY_KEY: 'spt_inventory',
   cloudStatus: navigator.onLine ? 'online' : 'offline',
   setCloudStatus(isOnline) {
     this.cloudStatus = isOnline ? 'online' : 'offline';
@@ -173,9 +175,11 @@ const DB = {
     await restoreKey(this.SHIFTS_KEY);
     await restoreKey(this.EXPENSES_KEY);
     await restoreKey(this.REP_CREDITS_KEY);
+    await restoreKey(this.SAVED_REPS_KEY);
     await restoreKey(this.BANK_TRANSACTIONS_KEY);
     await restoreKey(this.DEVICE_CREDITS_KEY);
     await restoreKey(this.EMPLOYEES_KEY);
+    await restoreKey(this.INVENTORY_KEY);
 
     try {
       let lsActive = localStorage.getItem(this.ACTIVE_SHOP_KEY);
@@ -192,6 +196,9 @@ const DB = {
     // Migrate any legacy updates to 3-pillar system
     this._migrateLegacyUpdates();
     this._deduplicateLegacyShifts();
+
+    // Create automated daily safety snapshot
+    this.createSafetySnapshot();
 
     // Setup page close warning
     this._setupBeforeUnload();
@@ -775,7 +782,7 @@ const DB = {
       if (totalBankAcct === 0 && totalBankCash === 0 && u.mobileRental.grandTotal !== undefined) {
         totalBankAcct = parseFloat(u.mobileRental.grandTotal) || 0;
       }
-      bankTotal = totalBankAcct;
+      bankTotal = totalBankAcct + totalBankCash;
     } else if (u.bankTotal !== undefined) {
       bankTotal = parseFloat(u.bankTotal) || 0;
       totalBankAcct = bankTotal;
@@ -784,8 +791,8 @@ const DB = {
     // 3. Physical Cash in Drawer
     const totalCash = reloadCash + reloadHubCash + totalBankCash;
 
-    // 4. Shop Total Capital = SIMs Float + Bank Accounts + Cash in Drawer
-    let totalCapital = simTotal + bankTotal + totalCash;
+    // 4. Shop Total Capital = [Section 1 + Section 2 (Reload Total)] + [Section 3 (Bank Total)]
+    let totalCapital = reloadTotal + bankTotal;
     if (u.totalCapital !== undefined) {
       const storedCap = parseFloat(u.totalCapital) || 0;
       if (storedCap > 0 && Math.abs(storedCap - totalCapital) < 5) {
@@ -803,10 +810,10 @@ const DB = {
       banks,
       totalBankAcct,
       totalBankCash,
-      bankTotal, // Pure Bank Accounts Total
+      bankTotal, // Bank Accounts + Bank Cash Total
       totalCash, // Pure Cash in Drawer Total
       cashInDrawer: totalCash,
-      totalCapital, // SIMs + Bank + Cash in Drawer
+      totalCapital, // Reload Total + Bank Total
       reloadDenominations: (u.reload && u.reload.denominations) ? u.reload.denominations : null,
       hubDenominations: (u.reload && u.reload.hubDenominations) ? u.reload.hubDenominations : null
     };
@@ -2246,10 +2253,10 @@ const DB = {
     const now = new Date();
     const today = this.getTodayDate();
 
-    // Auto-download backup once per day (first update of the day)
+    // Silent backup snapshot timestamp - do NOT auto-download files to user browser on every submit
     if (!lastBackup || !lastBackup.startsWith(today)) {
-      this._downloadBackup();
       localStorage.setItem(this.BACKUP_KEY, now.toISOString());
+      console.log('ℹ️ Daily snapshot recorded silently in database (no download popup)');
     }
   },
 
@@ -2274,6 +2281,28 @@ const DB = {
       console.log('✅ Auto-backup downloaded');
     } catch (e) {
       console.error('Auto-backup failed:', e);
+    }
+  },
+
+  createSafetySnapshot() {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      const today = this.getTodayDate ? this.getTodayDate() : new Date().toISOString().split('T')[0];
+      const lastSnapshotDate = localStorage.getItem('spt_last_snapshot_date');
+      if (lastSnapshotDate !== today) {
+        const payload = this.exportData();
+        localStorage.setItem(`spt_snapshot_${today}`, payload);
+        localStorage.setItem('spt_last_snapshot_date', today);
+        // Retain latest 3 daily safety snapshots to optimize storage
+        const snapshotKeys = Object.keys(localStorage).filter(k => k.startsWith('spt_snapshot_')).sort();
+        while (snapshotKeys.length > 3) {
+          const oldKey = snapshotKeys.shift();
+          localStorage.removeItem(oldKey);
+        }
+        console.log(`🛡️ Daily safety snapshot created for ${today}`);
+      }
+    } catch (e) {
+      console.warn('Safety snapshot warning:', e);
     }
   },
 
@@ -2716,7 +2745,99 @@ const DB = {
   },
 
   // ================================================================
-  // REP RELOAD CREDITS (STOCK ON CREDIT FROM DISTRIBUTOR REPS)
+  // REP DIRECTORY & CONTACTS (SAVED REPS FOR 1-TAP SELECTION)
+  // ================================================================
+  getSavedReps() {
+    try {
+      const explicit = this._getStorage(this.SAVED_REPS_KEY, []) || [];
+      const repMap = new Map();
+
+      // First add explicitly saved reps
+      explicit.forEach(r => {
+        if (r && r.name && r.name.trim()) {
+          const key = (r.name.trim() + '___' + (r.network || '')).toLowerCase();
+          repMap.set(key, {
+            name: r.name.trim(),
+            phone: (r.phone || '').trim(),
+            network: r.network || 'Dialog',
+            updatedAt: r.updatedAt || ''
+          });
+        }
+      });
+
+      // Also merge past reps from credit/purchase transaction history
+      const credits = this.getRepCredits(null, true);
+      credits.forEach(c => {
+        if (c && c.repName && c.repName.trim()) {
+          const key = (c.repName.trim() + '___' + (c.network || '')).toLowerCase();
+          if (!repMap.has(key)) {
+            repMap.set(key, {
+              name: c.repName.trim(),
+              phone: (c.repPhone || '').trim(),
+              network: c.network || 'Dialog',
+              updatedAt: c.timestamp || ''
+            });
+          } else {
+            const cur = repMap.get(key);
+            if (!cur.phone && c.repPhone) {
+              cur.phone = c.repPhone.trim();
+            }
+          }
+        }
+      });
+
+      const list = Array.from(repMap.values());
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      return list;
+    } catch (e) {
+      console.warn('Error reading saved reps:', e);
+      return [];
+    }
+  },
+
+  saveRepContact(rep) {
+    if (!rep || !rep.name || !rep.name.trim()) return;
+    try {
+      const currentList = this.getSavedReps();
+      const normName = rep.name.trim();
+      const normNet = rep.network || 'Dialog';
+      const key = (normName + '___' + normNet).toLowerCase();
+
+      const idx = currentList.findIndex(r => (r.name + '___' + (r.network || '')).toLowerCase() === key);
+      const entry = {
+        name: normName,
+        phone: (rep.phone || '').trim(),
+        network: normNet,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (idx >= 0) {
+        currentList[idx] = { ...currentList[idx], ...entry };
+      } else {
+        currentList.push(entry);
+      }
+
+      this._dualSave(this.SAVED_REPS_KEY, currentList);
+      this._syncToFirebase('saved_reps', normName.replace(/[^a-zA-Z0-9]/g, '_'), entry);
+    } catch (e) {
+      console.warn('Error saving rep contact:', e);
+    }
+  },
+
+  deleteSavedRep(name, network) {
+    try {
+      let list = this.getSavedReps();
+      const key = (name.trim() + '___' + (network || '')).toLowerCase();
+      list = list.filter(r => (r.name + '___' + (r.network || '')).toLowerCase() !== key);
+      this._dualSave(this.SAVED_REPS_KEY, list);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ================================================================
+  // REP RELOAD CREDITS & CASH PURCHASES
   // ================================================================
   getRepCredits(shopId = null, includeSettled = true) {
     try {
@@ -2736,12 +2857,16 @@ const DB = {
   addRepCredit(data) {
     const list = this.getRepCredits(null, true);
     const now = new Date();
-    const creditDays = parseInt(data.creditDays, 10) || 3;
+    const purchaseType = data.purchaseType || (data.status === 'settled' ? 'cash' : 'credit'); // 'cash' or 'credit'
+    const isCash = purchaseType === 'cash';
+    const creditDays = isCash ? 0 : (parseInt(data.creditDays, 10) || 3);
     const takenDate = data.takenDate || this.getTodayDate();
     
     // Auto calculate due date if missing
     let dueDate = data.dueDate;
-    if (!dueDate) {
+    if (isCash) {
+      dueDate = takenDate;
+    } else if (!dueDate) {
       const d = new Date(takenDate);
       d.setDate(d.getDate() + creditDays);
       const year = d.getFullYear();
@@ -2760,12 +2885,13 @@ const DB = {
       takenDate: takenDate,
       dueDate: dueDate,
       creditDays: creditDays,
-      status: 'pending', // 'pending' or 'settled'
-      paidAmount: 0,
-      paidDate: '',
-      paidFrom: '', // 'cash' or 'bank'
-      settledBy: '',
-      settledNotes: '',
+      purchaseType: purchaseType, // 'cash' or 'credit'
+      status: isCash ? 'settled' : (data.status || 'pending'), // 'pending' or 'settled'
+      paidAmount: isCash ? (parseFloat(data.amount) || 0) : (parseFloat(data.paidAmount) || 0),
+      paidDate: isCash ? takenDate : (data.paidDate || ''),
+      paidFrom: isCash ? (data.paidFrom || 'cash') : (data.paidFrom || ''),
+      settledBy: data.settledBy || '',
+      settledNotes: data.settledNotes || (isCash ? 'Direct Cash Purchase from Rep' : ''),
       notes: (data.notes || '').trim(),
       timestamp: data.timestamp || now.toISOString(),
       docType: 'rep_credit'
@@ -2774,6 +2900,32 @@ const DB = {
     list.unshift(item);
     this.saveRepCredits(list);
     this._syncToFirebase('payment_tracker_updates', item.id, item);
+
+    // Auto-save Rep into contact directory for future dropdown selection
+    this.saveRepContact({
+      name: item.repName,
+      phone: item.repPhone,
+      network: item.network
+    });
+
+    // If Cash purchase and requested to record as drawer expense deduction
+    if (isCash && data.recordDrawerExpense) {
+      try {
+        this.addExpense({
+          shopId: item.shopId,
+          amount: item.amount,
+          category: 'other',
+          description: `Rep Reload Purchase (${item.network} - ${item.repName}) [Cash Paid]`,
+          date: takenDate,
+          paymentMethod: 'cash',
+          deductFromDrawer: true,
+          deductFromBalance: true
+        });
+      } catch (err) {
+        console.warn('Could not auto-add drawer expense for rep cash purchase:', err);
+      }
+    }
+
     return item;
   },
 
@@ -2813,11 +2965,19 @@ const DB = {
     let overdueCount = 0;
     let totalSettled = 0;
     let settledCount = 0;
+    let totalCashPurchases = 0;
+    let cashCount = 0;
     const byNetwork = { Dialog: 0, Mobitel: 0, Airtel: 0, Hutch: 0, EzCash: 0, Other: 0 };
 
     list.forEach(r => {
+      const amt = parseFloat(r.amount) || 0;
+      const isCash = r.purchaseType === 'cash' || (r.status === 'settled' && r.paidFrom === 'cash' && !r.dueDate);
+      if (isCash) {
+        totalCashPurchases += amt;
+        cashCount++;
+      }
+
       if (r.status === 'pending') {
-        const amt = parseFloat(r.amount) || 0;
         totalPending += amt;
         pendingCount++;
         const net = r.network || 'Other';
@@ -2829,12 +2989,12 @@ const DB = {
           else if (r.dueDate < today) overdueCount++;
         }
       } else if (r.status === 'settled') {
-        totalSettled += (parseFloat(r.paidAmount || r.amount) || 0);
+        totalSettled += (parseFloat(r.paidAmount || amt) || 0);
         settledCount++;
       }
     });
 
-    return { totalPending, pendingCount, dueTodayCount, overdueCount, totalSettled, settledCount, byNetwork };
+    return { totalPending, pendingCount, dueTodayCount, overdueCount, totalSettled, settledCount, totalCashPurchases, cashCount, byNetwork };
   },
 
     // Export all data
@@ -2848,10 +3008,13 @@ const DB = {
       shifts: this.getShifts(null),
       expenses: this.getExpenses(null),
       repCredits: this.getRepCredits(null, true),
+      savedReps: this.getSavedReps(),
       deviceCredits: this.getDeviceCredits(null),
+      employees: this.getEmployees(),
+      inventory: this.getInventory(null),
       activeShopId: this.getActiveShopId(),
       exportedAt: new Date().toISOString(),
-      version: '4.0'
+      version: '58.0'
     }, null, 2);
   },
 
@@ -2867,7 +3030,16 @@ const DB = {
       if (data.shifts) this.saveShifts(data.shifts);
       if (data.expenses) this.saveExpenses(data.expenses);
       if (data.repCredits) this.saveRepCredits(data.repCredits);
+      if (data.savedReps && Array.isArray(data.savedReps)) {
+        this._dualSave(this.SAVED_REPS_KEY, data.savedReps);
+      }
       if (data.deviceCredits) this.saveDeviceCredits(data.deviceCredits);
+      if (data.employees && Array.isArray(data.employees)) {
+        this._dualSave(this.EMPLOYEES_KEY, data.employees);
+      }
+      if (data.inventory && Array.isArray(data.inventory)) {
+        this.saveInventory(data.inventory);
+      }
       if (data.activeShopId) this.setActiveShop(data.activeShopId);
       return true;
     } catch (e) {
@@ -2989,5 +3161,191 @@ const DB = {
       updatedAt: new Date().toISOString()
     }).catch(() => {});
   },
+
+  // ---- Master / Admin PIN Security (Default: 1234) ----
+  getAdminPin() {
+    try {
+      const stored = localStorage.getItem('spt_admin_pin_v1');
+      return stored && stored.trim() ? stored.trim() : '1234';
+    } catch (e) {
+      return '1234';
+    }
+  },
+
+  setAdminPin(newPin) {
+    if (!newPin || typeof newPin !== 'string') return false;
+    const clean = newPin.trim();
+    if (clean.length < 4) return false;
+    try {
+      localStorage.setItem('spt_admin_pin_v1', clean);
+      this._dualSave('spt_admin_pin_v1', clean);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  // ==========================================
+  // PHASE 4: MULTI-BRANCH STOCK & INVENTORY
+  // ==========================================
+  getInventory(shopId = null, filterStatus = null) {
+    let list = this._getStorage(this.INVENTORY_KEY, []);
+    if (shopId && shopId !== 'all') {
+      const activeShops = this.getShops(true);
+      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
+      list = list.filter(item => item.shopId === shopId || (isFirstShop && (!item.shopId || item.shopId === 'main')));
+    }
+    if (filterStatus && filterStatus !== 'all') {
+      list = list.filter(item => item.status === filterStatus);
+    }
+    return list.sort((a, b) => new Date(b.dateAdded || b.createdAt || 0) - new Date(a.dateAdded || a.createdAt || 0));
+  },
+
+  getInventoryItem(id) {
+    return this.getInventory(null).find(item => item.id === id) || null;
+  },
+
+  findInventoryItemByImei(imei) {
+    if (!imei) return null;
+    const cleanImei = String(imei).trim().toLowerCase();
+    return this.getInventory(null).find(item => 
+      (item.imei && String(item.imei).trim().toLowerCase() === cleanImei) || 
+      (item.imei2 && String(item.imei2).trim().toLowerCase() === cleanImei) ||
+      (item.barcode && String(item.barcode).trim().toLowerCase() === cleanImei)
+    ) || null;
+  },
+
+  saveInventory(list) {
+    this._dualSave(this.INVENTORY_KEY, list);
+  },
+
+  saveInventoryItem(itemData) {
+    const list = this.getInventory(null);
+    const isEdit = !!itemData.id;
+    let item;
+
+    if (isEdit) {
+      const idx = list.findIndex(i => i.id === itemData.id);
+      if (idx !== -1) {
+        item = {
+          ...list[idx],
+          ...itemData,
+          costPrice: parseFloat(itemData.costPrice) || 0,
+          sellingPrice: parseFloat(itemData.sellingPrice) || 0,
+          quantity: parseInt(itemData.quantity) || 1,
+          updatedAt: new Date().toISOString()
+        };
+        list[idx] = item;
+      } else {
+        item = {
+          ...itemData,
+          id: itemData.id || 'inv_' + Date.now(),
+          costPrice: parseFloat(itemData.costPrice) || 0,
+          sellingPrice: parseFloat(itemData.sellingPrice) || 0,
+          quantity: parseInt(itemData.quantity) || 1,
+          dateAdded: itemData.dateAdded || this.getTodayDate(),
+          createdAt: new Date().toISOString()
+        };
+        list.unshift(item);
+      }
+    } else {
+      item = {
+        ...itemData,
+        id: 'inv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+        costPrice: parseFloat(itemData.costPrice) || 0,
+        sellingPrice: parseFloat(itemData.sellingPrice) || 0,
+        quantity: parseInt(itemData.quantity) || 1,
+        dateAdded: itemData.dateAdded || this.getTodayDate(),
+        status: itemData.status || 'in_stock',
+        transferHistory: itemData.transferHistory || [],
+        createdAt: new Date().toISOString()
+      };
+      list.unshift(item);
+    }
+
+    this.saveInventory(list);
+    this._syncToFirebase('payment_tracker_updates', 'inv_' + item.id, { ...item, docType: 'inventory_item' });
+    return item;
+  },
+
+  deleteInventoryItem(id) {
+    const list = this.getInventory(null);
+    const filtered = list.filter(i => i.id !== id);
+    this.saveInventory(filtered);
+    this._deleteFromFirebase('payment_tracker_updates', 'inv_' + id);
+    return true;
+  },
+
+  transferInventoryItem(id, toShopId, transferredBy = '', note = '') {
+    const list = this.getInventory(null);
+    const item = list.find(i => i.id === id);
+    if (!item) return null;
+
+    const fromShopId = item.shopId;
+    if (fromShopId === toShopId) return item;
+
+    if (!Array.isArray(item.transferHistory)) item.transferHistory = [];
+    item.transferHistory.push({
+      fromShopId,
+      toShopId,
+      date: this.getTodayDate(),
+      timestamp: new Date().toISOString(),
+      transferredBy,
+      note
+    });
+
+    item.shopId = toShopId;
+    item.updatedAt = new Date().toISOString();
+
+    this.saveInventory(list);
+    this._syncToFirebase('payment_tracker_updates', 'inv_' + item.id, { ...item, docType: 'inventory_item' });
+    return item;
+  },
+
+  updateInventoryItemStatus(id, newStatus, extra = {}) {
+    const list = this.getInventory(null);
+    const item = list.find(i => i.id === id);
+    if (!item) return null;
+
+    item.status = newStatus;
+    Object.assign(item, extra);
+    item.updatedAt = new Date().toISOString();
+
+    this.saveInventory(list);
+    this._syncToFirebase('payment_tracker_updates', 'inv_' + item.id, { ...item, docType: 'inventory_item' });
+    return item;
+  },
+
+  getInventoryStats(shopId = null) {
+    const items = this.getInventory(shopId);
+    const inStock = items.filter(i => i.status === 'in_stock' || !i.status);
+    const sold = items.filter(i => i.status === 'sold_cash' || i.status === 'sold');
+    const deviceCredit = items.filter(i => i.status === 'device_credit');
+    const transferred = items.filter(i => i.status === 'transferred');
+
+    const totalInStock = inStock.reduce((sum, i) => sum + (parseInt(i.quantity) || 1), 0);
+    const totalCostValue = inStock.reduce((sum, i) => sum + ((parseFloat(i.costPrice) || 0) * (parseInt(i.quantity) || 1)), 0);
+    const totalSellingValue = inStock.reduce((sum, i) => sum + ((parseFloat(i.sellingPrice) || 0) * (parseInt(i.quantity) || 1)), 0);
+
+    const smartphonesCount = inStock.filter(i => i.category === 'smartphone').length;
+    const featurePhonesCount = inStock.filter(i => i.category === 'featurephone').length;
+    const routersCount = inStock.filter(i => i.category === 'router').length;
+    const accessoriesCount = inStock.filter(i => i.category === 'accessory' || i.category === 'sim').length;
+
+    return {
+      totalItems: items.length,
+      totalInStock,
+      totalCostValue,
+      totalSellingValue,
+      potentialProfit: Math.max(0, totalSellingValue - totalCostValue),
+      smartphonesCount,
+      featurePhonesCount,
+      routersCount,
+      accessoriesCount,
+      soldCount: sold.length,
+      deviceCreditCount: deviceCredit.length,
+      transferredCount: transferred.length
+    };
+  }
 
 };

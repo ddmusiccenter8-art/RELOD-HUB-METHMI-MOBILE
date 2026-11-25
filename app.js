@@ -51,6 +51,7 @@ const App = {
     this.setupMobileMenu();
     this.setupEmployeeAutocomplete();
     this.setupCloudListeners();
+    this.updateAdminSecurityUI();
 
     // Quick Add Shop
     const quickAddBtn = document.getElementById('quickAddShopBtn');
@@ -68,8 +69,11 @@ const App = {
       });
     }
 
-    // Render dashboard immediately with cached local data
-    this.navigateTo('dashboard');
+    // Render start page from URL hash if provided (#update, #device-credits, etc.), otherwise dashboard
+    const initialHash = (window.location.hash || '').replace('#', '').split('?')[0].trim();
+    const validPages = ['dashboard', 'update', 'device-credits', 'credits', 'shifts', 'history', 'shops', 'reports', 'inventory'];
+    const startPage = validPages.includes(initialHash) ? initialHash : 'dashboard';
+    this.navigateTo(startPage);
     this.updateTodayDate();
     this.updateBackupStatus();
     this.updateTopBarBadges();
@@ -96,9 +100,9 @@ const App = {
     // Check if backup is overdue (> 2 days)
     this.checkBackupReminder();
 
-    // Check direct Mobile Signing Link (#sign?id=... or ?id=...)
-    const checkMobileSignLink = () => {
-      const hash = window.location.hash || '';
+    // Check direct Mobile Signing Link (#sign?id=... or ?id=...) or Page Route
+    const checkHashRoute = () => {
+      const hash = (window.location.hash || '').replace('#', '').trim();
       const search = window.location.search || '';
       if (hash.includes('sign') || search.includes('sign')) {
         const targetStr = hash.includes('sign') ? hash : search;
@@ -109,10 +113,15 @@ const App = {
             this.openCreditAgreementModal(idMatch[1], langMatch ? langMatch[1] : 'si');
           }, 350);
         }
+        return;
+      }
+      const pageKey = hash.split('?')[0];
+      if (validPages.includes(pageKey) && pageKey !== this.currentPage) {
+        this.navigateTo(pageKey);
       }
     };
-    checkMobileSignLink();
-    window.addEventListener('hashchange', checkMobileSignLink);
+    checkHashRoute();
+    window.addEventListener('hashchange', checkHashRoute);
   },
 
   // ---- Backup Status ----
@@ -182,7 +191,10 @@ const App = {
     `;
     document.getElementById('modalBody').innerHTML = bodyHTML;
     const actionsEl = document.getElementById('modalActions');
-    actionsEl.innerHTML = '';
+    if (actionsEl) {
+      actionsEl.style.display = (actions && (typeof actions === 'string' || (Array.isArray(actions) && actions.length > 0))) ? 'flex' : 'none';
+      actionsEl.innerHTML = '';
+    }
     if (typeof actions === 'string') {
       actionsEl.innerHTML = actions;
     } else if (Array.isArray(actions)) {
@@ -204,6 +216,8 @@ const App = {
 
   closeModal() {
     document.getElementById('modalOverlay').classList.remove('active');
+    const actionsEl = document.getElementById('modalActions');
+    if (actionsEl) actionsEl.style.display = 'flex';
   },
 
   // ---- Sub Modal (for Denominations, Image Lightbox, Stacked Dialogs) ----
@@ -297,6 +311,12 @@ const App = {
 
   navigateTo(page) {
     this.currentPage = page;
+    const currentHash = (window.location.hash || '').replace('#', '').split('?')[0];
+    if (currentHash !== page && !window.location.hash.includes('sign')) {
+      try {
+        window.history.replaceState(null, '', '#' + page);
+      } catch (e) {}
+    }
     // Update nav
     document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
     const activeLink = document.querySelector(`.nav-links a[data-page="${page}"]`);
@@ -314,6 +334,7 @@ const App = {
       shifts: I18N.t('nav_shifts') || 'Shift Tally',
       credits: I18N.t('nav_credits') || 'Ledger',
       'device-credits': I18N.t('nav_dev_credits') || 'Device Credits',
+      inventory: I18N.t('nav_inventory') || 'Stock & Inventory',
       history: I18N.t('nav_history') || 'Update History',
       shops: I18N.t('nav_shops') || 'Manage Shops',
       reports: I18N.t('nav_reports') || 'Reports'
@@ -345,6 +366,7 @@ const App = {
       case 'shifts': this.renderShiftsPage(); break;
       case 'credits': this.renderCreditsPage(); break;
       case 'device-credits': this.renderDeviceCreditsPage(); break;
+      case 'inventory': this.renderInventoryPage(); break;
       case 'history': this.renderHistory(); break;
       case 'shops': this.renderShops(); break;
       case 'reports': break;
@@ -1423,7 +1445,7 @@ const App = {
                 </div>
               </div>
               <div style="display:flex; gap:6px;">
-                <button type="button" class="btn btn-xs" onclick="App.showAddRepCreditModal()" style="font-weight:700; background:#ea580c; color:#fff; border:none; padding:4px 10px;">+ Add Rep Credit</button>
+                <button type="button" class="btn btn-xs" onclick="App.showAddRepCreditModal()" style="font-weight:700; background:#ea580c; color:#fff; border:none; padding:4px 10px;">+ Buy / Add Rep Reload</button>
                 <button type="button" class="btn btn-xs btn-ghost" onclick="App.navigateTo('credits'); App.switchLedgerTab('rep_credits');" style="font-weight:700; border:1px solid rgba(234,88,12,0.4); color:#ea580c; padding:4px 10px;">View Ledger</button>
               </div>
             </div>
@@ -1753,16 +1775,48 @@ const App = {
     const liveBankCashSubVal = document.getElementById('liveBankCashSubVal');
     if (liveBankCashSubVal) liveBankCashSubVal.textContent = DB.formatCurrency(totalBankCash);
 
-    // Live Breakdown values in Section 4
+    // Section 4 Live 2 Pillars (Reload Total + Bank Total) & Grand Total
     const totalCashInDrawer = reloadDrawerTotal + totalBankCash;
-    const liveSimsBreakdownVal = document.getElementById('liveSimsBreakdownVal');
-    if (liveSimsBreakdownVal) liveSimsBreakdownVal.textContent = DB.formatCurrency(reloadSimTotal);
+
+    // Pillar 1: Reload Total (Section 1 + Section 2)
+    const liveReloadBreakdownVal = document.getElementById('liveReloadBreakdownVal');
+    if (liveReloadBreakdownVal) liveReloadBreakdownVal.textContent = DB.formatCurrency(reloadFullTotal);
+
+    const grandReloadSimsSub = document.getElementById('grandReloadSimsSub');
+    if (grandReloadSimsSub) grandReloadSimsSub.textContent = DB.formatCurrency(reloadSimTotal);
+
+    const grandReloadCashSub = document.getElementById('grandReloadCashSub');
+    if (grandReloadCashSub) grandReloadCashSub.textContent = DB.formatCurrency(reloadDrawerTotal);
+
+    // Pillar 2: Bank Total (Section 3)
+    const liveBankBreakdownVal = document.getElementById('liveBankBreakdownVal');
+    if (liveBankBreakdownVal) liveBankBreakdownVal.textContent = DB.formatCurrency(bankGrandTotal);
+
+    const grandBankAcctSub = document.getElementById('grandBankAcctSub');
+    if (grandBankAcctSub) grandBankAcctSub.textContent = DB.formatCurrency(totalBankAcct);
+
+    const grandBankCashSub = document.getElementById('grandBankCashSub');
+    if (grandBankCashSub) grandBankCashSub.textContent = DB.formatCurrency(totalBankCash);
+
+    // Dynamic equation in Grand Total
+    const formulaReloadVal = document.getElementById('formulaReloadVal');
+    if (formulaReloadVal) formulaReloadVal.textContent = DB.formatCurrency(reloadFullTotal);
+
+    const formulaBankVal = document.getElementById('formulaBankVal');
+    if (formulaBankVal) formulaBankVal.textContent = DB.formatCurrency(bankGrandTotal);
+
+    // Auxiliary Cash breakdown elements
+    const auxReloadCashSub = document.getElementById('auxReloadCashSub');
+    if (auxReloadCashSub) auxReloadCashSub.textContent = DB.formatCurrency(reloadDrawerTotal);
+
+    const auxBankCashSub = document.getElementById('auxBankCashSub');
+    if (auxBankCashSub) auxBankCashSub.textContent = DB.formatCurrency(totalBankCash);
 
     const liveCashBreakdownVal = document.getElementById('liveCashBreakdownVal');
     if (liveCashBreakdownVal) liveCashBreakdownVal.textContent = DB.formatCurrency(totalCashInDrawer);
 
-    const liveBankBreakdownVal = document.getElementById('liveBankBreakdownVal');
-    if (liveBankBreakdownVal) liveBankBreakdownVal.textContent = DB.formatCurrency(totalBankAcct);
+    const liveSimsBreakdownVal = document.getElementById('liveSimsBreakdownVal');
+    if (liveSimsBreakdownVal) liveSimsBreakdownVal.textContent = DB.formatCurrency(reloadSimTotal);
 
     // Section 2.5: Shift Adjustments
     let creditsTotal = 0;
@@ -2193,42 +2247,46 @@ const App = {
     }
     msg += `=================================\n\n`;
 
-    // 1. Reload SIMs Track
-    msg += `🔄 *1. RELOAD SIMS BALANCE:*\n`;
-    msg += `• Dialog SIM: ${DB.formatCurrency(vals.dialog)}\n`;
-    msg += `• Mobitel SIM: ${DB.formatCurrency(vals.mobitel)}\n`;
-    msg += `• Airtel SIM: ${DB.formatCurrency(vals.airtel)}\n`;
-    msg += `• Hutch SIM: ${DB.formatCurrency(vals.hutch)}\n`;
+    // 1. Reload Business (Section 1 + Section 2)
+    msg += `🔄 *1. RELOAD BUSINESS (SECTION 1 & 2):*\n`;
+    msg += `  [Section 1: SIMs Balance]\n`;
+    msg += `  • Dialog SIM: ${DB.formatCurrency(vals.dialog)}\n`;
+    msg += `  • Mobitel SIM: ${DB.formatCurrency(vals.mobitel)}\n`;
+    msg += `  • Airtel SIM: ${DB.formatCurrency(vals.airtel)}\n`;
+    msg += `  • Hutch SIM: ${DB.formatCurrency(vals.hutch)}\n`;
     if (vals.ezcash > 0) {
-      msg += `• eZ Cash: ${DB.formatCurrency(vals.ezcash)}\n`;
+      msg += `  • eZ Cash: ${DB.formatCurrency(vals.ezcash)}\n`;
     }
-    msg += `👉 *Total SIMs Balance:* *${DB.formatCurrency(vals.simTotal)}*\n\n`;
+    msg += `  👉 Subtotal SIMs: ${DB.formatCurrency(vals.simTotal)}\n\n`;
 
-    // 2. Reload Cash Drawer
-    msg += `💵 *2. RELOAD CASH DRAWER:*\n`;
-    msg += `• Reload Physical Cash: ${DB.formatCurrency(vals.reloadCash)}\n`;
+    msg += `  [Section 2: Reload Cash Drawer]\n`;
+    msg += `  • Physical Drawer Cash: ${DB.formatCurrency(vals.reloadCash)}\n`;
     if (vals.hubCash > 0) {
-      msg += `• Hub / Floating Cash: ${DB.formatCurrency(vals.hubCash)}\n`;
+      msg += `  • Hub / Floating Cash: ${DB.formatCurrency(vals.hubCash)}\n`;
     }
-    msg += `👉 *Reload Drawer Total:* *${DB.formatCurrency(vals.reloadDrawerTotal)}*\n`;
-    msg += `👉 *Combined Reload Track (SIMs + Drawer Cash):* *${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
+    msg += `  👉 Subtotal Reload Cash: ${DB.formatCurrency(vals.reloadDrawerTotal)}\n`;
+    msg += `⭐️ *TOTAL RELOAD (Sec 1 + Sec 2):* *${DB.formatCurrency(vals.reloadTotal)}*\n\n`;
 
-    // 3. Bank Track
-    msg += `🏦 *3. BANK PAYMENTS & ACCOUNTS:*\n`;
+    // 2. Bank Track (Section 3)
+    msg += `🏦 *2. BANK & PAYMENTS (SECTION 3):*\n`;
     if (vals.banks && vals.banks.length > 0) {
       vals.banks.forEach(b => {
-        msg += `• ${b.bank}: Acct${DB.formatCurrency(b.accountAmount)} | Cash${DB.formatCurrency(b.cashInDrawer)}\n`;
+        msg += `  • ${b.bank}: Acct ${DB.formatCurrency(b.accountAmount)}${b.cashInDrawer > 0 ? ' | Cash ' + DB.formatCurrency(b.cashInDrawer) : ''}\n`;
       });
     }
-    msg += `• Total Bank Accounts: ${DB.formatCurrency(vals.totalBankAcct)}\n`;
-    msg += `• Total Bank Cash in Drawer: ${DB.formatCurrency(vals.totalBankCash)}\n`;
-    msg += `👉 *Total Bank Track:* *${DB.formatCurrency(vals.bankTotal)}*\n\n`;
+    msg += `  • Bank Accounts: ${DB.formatCurrency(vals.totalBankAcct)}\n`;
+    if (vals.totalBankCash > 0) {
+      msg += `  • Bank Cash in Drawer: ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    }
+    msg += `⭐️ *TOTAL BANK & PAYMENTS (Sec 3):* *${DB.formatCurrency(vals.bankTotal)}*\n\n`;
 
-    // 4. Combined Physical Cash in Drawer
-    msg += `💼 *4. TOTAL PHYSICAL CASH IN DRAWER:*\n`;
+    // 3. Combined Physical Cash in Drawer
+    msg += `💼 *DRAWER PHYSICAL CASH SUMMARY:*\n`;
     msg += `• Reload Drawer Cash: ${DB.formatCurrency(vals.reloadDrawerTotal)}\n`;
-    msg += `• Bank Drawer Cash: ${DB.formatCurrency(vals.totalBankCash)}\n`;
-    msg += `👉 *Total Cash in Drawer:* *${DB.formatCurrency(vals.totalCash)}*\n`;
+    if (vals.totalBankCash > 0) {
+      msg += `• Bank Drawer Cash: ${DB.formatCurrency(vals.totalBankCash)}\n`;
+    }
+    msg += `👉 *Total Physical Cash in Drawer:* *${DB.formatCurrency(vals.totalCash)}*\n`;
 
     // Note denomination breakdown if present
     const denoms = u.reload?.denominations;
@@ -2249,10 +2307,10 @@ const App = {
     }
     msg += `\n`;
 
-    // 5. Grand Total Capital
+    // 4. Grand Total Capital
     msg += `=================================\n`;
     msg += `💰 *GRAND TOTAL CAPITAL:* *${DB.formatCurrency(vals.totalCapital)}*\n`;
-    msg += `(SIMs: ${DB.formatCurrency(vals.simTotal)} + Total Cash: ${DB.formatCurrency(vals.totalCash)} + Banks: ${DB.formatCurrency(vals.totalBankAcct)})\n`;
+    msg += `🧮 [Reload Total (Sec 1 + 2): ${DB.formatCurrency(vals.reloadTotal)}] + [Bank Total (Sec 3): ${DB.formatCurrency(vals.bankTotal)}] = *${DB.formatCurrency(vals.totalCapital)}*\n`;
     msg += `=================================\n\n`;
 
     // 6. Independent Margins & Operating Results vs Previous Update
@@ -2782,9 +2840,14 @@ const App = {
         ` : ''}
       </div>
 
-      <div style="font-weight:800;font-size:1.15rem;padding-top:12px;border-top:1px solid var(--border-glass);display:flex;justify-content:space-between;">
-        <span>💰 Grand Total Capital:</span>
-        <span style="color:var(--accent-green); font-size:1.25rem;">${DB.formatCurrency(vals.totalCapital)}</span>
+      <div style="font-weight:800;font-size:1.15rem;padding-top:12px;border-top:1px solid var(--border-glass);display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <span>💰 Grand Total Capital:</span>
+          <div style="font-size:0.8rem; font-weight:600; color:var(--text-secondary); margin-top:2px;">
+            [Reload Track: ${DB.formatCurrency(vals.reloadTotal)}] + [Bank Track: ${DB.formatCurrency(vals.bankTotal)}]
+          </div>
+        </div>
+        <span style="color:var(--accent-green); font-size:1.35rem;">${DB.formatCurrency(vals.totalCapital)}</span>
       </div>
 
       ${u.notes ? `
@@ -3632,8 +3695,21 @@ const App = {
       html += `</tbody></table>`;
       container.innerHTML = html;
     } else if (this.currentLedgerTab === 'rep_credits') {
-      let list = DB.getRepCredits ? DB.getRepCredits(shopId, true) : [];
+      let rawList = DB.getRepCredits ? DB.getRepCredits(shopId, true) : [];
       const today = DB.getTodayDate();
+      const currentSubFilter = this.repCreditSubFilter || 'all';
+
+      const totalCount = rawList.length;
+      const pendingCount = rawList.filter(r => r.status === 'pending').length;
+      const settledCount = rawList.filter(r => r.status === 'settled' || r.purchaseType === 'cash').length;
+
+      // Filter by sub-filter
+      let list = rawList;
+      if (currentSubFilter === 'pending') {
+        list = rawList.filter(r => r.status === 'pending');
+      } else if (currentSubFilter === 'cash_settled') {
+        list = rawList.filter(r => r.status === 'settled' || r.purchaseType === 'cash');
+      }
 
       if (term) {
         list = list.filter(r =>
@@ -3644,26 +3720,47 @@ const App = {
         );
       }
 
+      let subFilterBarHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; padding:10px 14px; background:var(--bg-card); border:1px solid var(--border-glass); border-radius:var(--radius-sm);">
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-xs ${currentSubFilter === 'all' ? 'btn-primary' : 'btn-ghost'}" onclick="App.setRepCreditSubFilter('all')">
+              📋 ${isSi ? 'සියලුම ගනුදෙනු' : 'All'} (${totalCount})
+            </button>
+            <button type="button" class="btn btn-xs ${currentSubFilter === 'pending' ? 'btn-primary' : 'btn-ghost'}" onclick="App.setRepCreditSubFilter('pending')" style="${currentSubFilter === 'pending' ? 'background:#ea580c; border-color:#ea580c;' : 'color:#ea580c; border-color:rgba(234,88,12,0.35);'}">
+              ⏳ ${isSi ? 'ගෙවීමට ඇති ණය' : 'Pending Credits'} (${pendingCount})
+            </button>
+            <button type="button" class="btn btn-xs ${currentSubFilter === 'cash_settled' ? 'btn-primary' : 'btn-ghost'}" onclick="App.setRepCreditSubFilter('cash_settled')" style="${currentSubFilter === 'cash_settled' ? 'background:#10b981; border-color:#10b981;' : 'color:#10b981; border-color:rgba(16,185,129,0.35);'}">
+              💵 ${isSi ? 'කැෂ් සහ පියවූ' : 'Cash & Settled'} (${settledCount})
+            </button>
+          </div>
+          <button type="button" class="btn btn-xs" onclick="App.showAddRepCreditModal()" style="font-weight:700; background:linear-gradient(135deg, #10b981, #059669); color:#fff; border:none; padding:6px 14px; border-radius:6px; box-shadow:0 0 10px rgba(16,185,129,0.3);">
+            + ${isSi ? 'රෙෆ් රීලෝඩ් ගැනීම (කැෂ්/ණය)' : 'Buy Rep Reload (Cash/Credit)'}
+          </button>
+        </div>
+      `;
+
       if (list.length === 0) {
         container.innerHTML = `
+          ${subFilterBarHtml}
           <div class="empty-state" style="padding:30px;">
             <div class="empty-icon">🤝</div>
-            <div class="empty-text">${isSi ? 'රෙෆ්ලගෙන් ණයට ගත් රීලෝඩ් තොග වාර්තා නැත' : 'No rep reload credit records found'}</div>
-            <div class="empty-sub">${isSi ? 'අලුත් රෙෆ් ණයක් සටහන් කිරීමට "+ Rep Reload Credit" ඔබන්න.' : 'Click "+ Rep Reload Credit" to record reload taken on credit from company reps.'}</div>
+            <div class="empty-text">${isSi ? 'තෝරාගත් වර්ගය යටතේ රෙෆ් රීලෝඩ් වාර්තා නැත' : 'No rep reload records found'}</div>
+            <div class="empty-sub">${isSi ? 'අලුත් රෙෆ් මිලදී ගැනීමක් සටහන් කිරීමට "+ Buy Rep Reload" ඔබන්න.' : 'Click "+ Buy Rep Reload" to record a cash purchase or credit taken from reps.'}</div>
           </div>
         `;
         return;
       }
 
-      let html = `
+      let html = subFilterBarHtml + `
         <table class="ledger-table">
           <thead>
             <tr>
-              <th>${isSi ? 'ගත්ත දිනය' : 'Date Taken'}</th>
+              <th>${isSi ? 'ගත් දිනය' : 'Date Taken'}</th>
               <th>${isSi ? 'නෙට්වර්ක්' : 'Network'}</th>
               <th>${isSi ? 'රෙෆ් නම / දුරකථන' : 'Rep Name & Phone'}</th>
+              <th style="text-align:center;">${isSi ? 'ක්‍රමය' : 'Type'}</th>
               <th style="text-align:right;">${isSi ? 'මුදල (Rs.)' : 'Amount'}</th>
-              <th style="text-align:center;">${isSi ? 'ගෙවිය යුතු දිනය' : 'Due Date'}</th>
+              <th style="text-align:center;">${isSi ? 'ගෙවූ / ගෙවිය යුතු දිනය' : 'Payment Details'}</th>
               <th style="text-align:center;">${isSi ? 'තත්ත්වය' : 'Status'}</th>
               <th style="text-align:center;">${isSi ? 'ක්‍රියාමාර්ග' : 'Action'}</th>
             </tr>
@@ -3672,9 +3769,13 @@ const App = {
       `;
 
       list.forEach(r => {
+        const isCash = r.purchaseType === 'cash' || (r.status === 'settled' && r.paidFrom === 'cash' && !r.dueDate);
         const isSettled = r.status === 'settled';
         let dueBadge = '';
-        if (isSettled) {
+
+        if (isCash) {
+          dueBadge = `<span style="font-size:0.75rem; color:#10b981; font-weight:700;">💵 ${isSi ? 'එවලේම ගෙවන ලදී' : 'Cash on spot'}</span>`;
+        } else if (isSettled) {
           dueBadge = `<span style="font-size:0.75rem; color:var(--accent-green); font-weight:700;">✅ Paid: ${r.paidDate || ''} (${r.paidFrom || 'cash'})${r.settledBy ? ' - ' + r.settledBy : ''}</span>`;
         } else if (r.dueDate) {
           if (r.dueDate < today) {
@@ -3688,6 +3789,22 @@ const App = {
 
         const netColor = r.network === 'Dialog' ? '#e11d48' : (r.network === 'Mobitel' ? '#059669' : (r.network === 'Airtel' ? '#dc2626' : (r.network === 'Hutch' ? '#ea580c' : 'var(--accent-blue)')));
 
+        let typeBadge = '';
+        if (isCash) {
+          typeBadge = `<span class="status-badge" style="background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.35); font-weight:800; padding:2px 8px; border-radius:12px;">💵 Cash</span>`;
+        } else {
+          typeBadge = `<span class="status-badge" style="background:rgba(234,88,12,0.15); color:#ea580c; border:1px solid rgba(234,88,12,0.35); font-weight:800; padding:2px 8px; border-radius:12px;">⏳ Credit</span>`;
+        }
+
+        let statusBadge = '';
+        if (isCash) {
+          statusBadge = '<span class="status-badge paid" style="font-weight:800; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.35);">✅ Paid (කැෂ්)</span>';
+        } else if (isSettled) {
+          statusBadge = '<span class="status-badge paid" style="font-weight:800;">✅ Settled</span>';
+        } else {
+          statusBadge = '<span class="status-badge pending" style="background:rgba(234,88,12,0.15); color:#ea580c; border:1px solid rgba(234,88,12,0.35); font-weight:800;">⏳ Pending</span>';
+        }
+
         html += `
           <tr>
             <td style="white-space:nowrap; font-size:0.8rem; color:var(--text-muted);">${r.takenDate || ''}</td>
@@ -3697,16 +3814,12 @@ const App = {
               ${r.repPhone ? `<div style="font-size:0.75rem; color:var(--text-muted);"><a href="tel:${r.repPhone}" style="color:var(--text-secondary); text-decoration:none;">📞 ${r.repPhone}</a></div>` : ''}
               ${r.notes ? `<div style="font-size:0.75rem; color:var(--text-secondary); font-style:italic;">📝 ${r.notes}</div>` : ''}
             </td>
+            <td style="text-align:center;">${typeBadge}</td>
             <td style="text-align:right; font-weight:900; color:var(--accent-gold); font-size:1.05rem;">${DB.formatCurrency(r.amount)}</td>
             <td style="text-align:center;">${dueBadge}</td>
-            <td style="text-align:center;">
-              ${isSettled ?
-                '<span class="status-badge paid">✅ Settled</span>' :
-                '<span class="status-badge pending" style="background:rgba(234,88,12,0.15); color:#ea580c; border:1px solid rgba(234,88,12,0.35);">⏳ Pending</span>'
-              }
-            </td>
+            <td style="text-align:center;">${statusBadge}</td>
             <td style="text-align:center; white-space:nowrap;">
-              ${!isSettled ? `
+              ${(!isSettled && !isCash) ? `
                 <button class="btn btn-xs btn-success" onclick="App.showSettleRepCreditModal('${r.id}')" style="font-size:0.75rem; font-weight:700; padding:4px 8px; background:#16a34a; border:none; margin-right:4px;">
                   💰 Settle
                 </button>
@@ -3722,6 +3835,11 @@ const App = {
     }
   },
 
+  setRepCreditSubFilter(filter) {
+    this.repCreditSubFilter = filter;
+    this.renderCreditsTable();
+  },
+
 
   switchLedgerTab(tab) {
     this.currentLedgerTab = tab;
@@ -3734,7 +3852,7 @@ const App = {
     this.renderCreditsTable();
   },
 
-  showAddRepCreditModal() {
+  showAddRepCreditModal(initialType = 'cash') {
     const shops = DB.getShops();
     const isSi = I18N.currentLang === 'si';
     if (shops.length === 0) {
@@ -3743,6 +3861,7 @@ const App = {
     }
     const activeShopId = DB.getActiveShopId() || shops[0].id;
     const today = DB.getTodayDate();
+    const savedReps = DB.getSavedReps ? DB.getSavedReps() : [];
 
     // Default 3 days later
     const d3 = new Date(today);
@@ -3762,6 +3881,51 @@ const App = {
       <form id="addRepCreditForm" style="display:flex; flex-direction:column; gap:12px;">
         ${shopSelectHtml}
 
+        <!-- 1. Payment Type Selector: Cash vs Credit -->
+        <div class="form-group" style="margin-bottom:4px;">
+          <label class="form-label" style="font-weight:700;">${isSi ? 'ගෙවීම් ආකාරය (Payment Type) *' : 'Payment Type *'}</label>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <label id="repPayTypeCashLabel" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:12px; border-radius:8px; border:2px solid #10b981; cursor:pointer; background:rgba(16,185,129,0.15); font-weight:800; font-size:0.95rem; color:#10b981; transition:var(--transition); box-shadow:0 0 12px rgba(16,185,129,0.25);">
+              <input type="radio" name="repPurchaseType" value="cash" checked style="display:none;" onchange="App.onToggleRepPurchaseType('cash')">
+              <span style="font-size:1.35rem;">💵</span>
+              <span>${isSi ? 'කැෂ් ගෙවීම (Cash)' : 'Cash Payment'}</span>
+              <span style="font-size:0.72rem; opacity:0.85; font-weight:500;">${isSi ? 'එවලේම මුදල් ගෙවන ලදී' : 'Paid on the spot'}</span>
+            </label>
+            <label id="repPayTypeCreditLabel" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:12px; border-radius:8px; border:1px solid rgba(234,88,12,0.4); cursor:pointer; background:rgba(234,88,12,0.06); font-weight:800; font-size:0.95rem; color:#ea580c; opacity:0.65; transition:var(--transition);">
+              <input type="radio" name="repPurchaseType" value="credit" style="display:none;" onchange="App.onToggleRepPurchaseType('credit')">
+              <span style="font-size:1.35rem;">⏳</span>
+              <span>${isSi ? 'ණයට / ක්‍රෙඩිට් (Credit)' : 'Credit (Pay Later)'}</span>
+              <span style="font-size:0.72rem; opacity:0.85; font-weight:500;">${isSi ? 'පසුව දිනකින් ගෙවීමට' : 'Pay after due date'}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 2. Rep Selection Dropdown & Inputs -->
+        <div class="form-group" style="margin-bottom:0;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label class="form-label" style="font-weight:700; margin-bottom:0;">${isSi ? 'රෙෆ් තෝරන්න (Select Saved Rep)' : 'Select Saved Rep'}</label>
+            <span style="font-size:0.72rem; color:var(--accent-cyan); font-weight:600;">⚡ ${isSi ? 'නැවත ටයිප් කිරීම අවශ්‍ය නැත' : 'Auto-fill name & phone'}</span>
+          </div>
+          <select id="repSelectSaved" class="form-select" onchange="App.onSelectSavedRep(this.value)" style="border-color:var(--border-glass-hover);">
+            <option value="">➕ ${isSi ? 'අලුත් රෙෆ් කෙනෙක් ඇතුළත් කරන්න (+ Enter New Rep)' : '+ Enter New Rep'}</option>
+            ${savedReps.map((r, idx) => `
+              <option value="${idx}">👤 ${r.name} - 📞 ${r.phone || (isSi ? 'අංකයක් නැත' : 'No phone')} (${r.network})</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'රෙෆ්ගේ නම (Rep Name) *' : 'Rep Name *'}</label>
+            <input type="text" class="form-input" id="repCreditRepName" placeholder="${isSi ? 'උදා: Safan (Dialog Rep)' : 'e.g. Safan'}" required>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'දුරකථන අංකය (Phone)' : 'Rep Phone'}</label>
+            <input type="tel" class="form-input" id="repCreditRepPhone" placeholder="0771234567">
+          </div>
+        </div>
+
+        <!-- 3. Network Selection -->
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label" style="font-weight:700;">${isSi ? 'නෙට්වර්ක් එක (Network) *' : 'Network *'}</label>
           <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
@@ -3784,91 +3948,198 @@ const App = {
           </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">${isSi ? 'රෙෆ්ගේ නම (Rep Name) *' : 'Rep Name *'}</label>
-            <input type="text" class="form-input" id="repCreditRepName" placeholder="e.g. Kamal (Dialog Rep)" required>
-          </div>
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">${isSi ? 'දුරකථන අංකය (Phone)' : 'Rep Phone'}</label>
-            <input type="tel" class="form-input" id="repCreditRepPhone" placeholder="0771234567">
-          </div>
-        </div>
-
+        <!-- 4. Reload Amount Input -->
         <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label" style="font-weight:800; color:var(--accent-gold);">${isSi ? 'ණයට ගත් රීලෝඩ් මුදල (Amount Rs.) *' : 'Reload Amount (Rs.) *'}</label>
+          <label class="form-label" style="font-weight:800; color:var(--accent-gold);">${isSi ? 'ගන්නා රීලෝඩ් තොග මුදල (Amount Rs.) *' : 'Reload Amount (Rs.) *'}</label>
           <input type="number" step="0.01" min="1" class="form-input" id="repCreditAmount" placeholder="25000.00" style="font-size:1.3rem; font-weight:900; color:var(--accent-gold);" required>
         </div>
 
+        <!-- 5. Taken Date & Dynamic Due Date / Cash Info -->
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
           <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">${isSi ? 'ගත්ත දිනය (Taken Date)' : 'Date Taken'}</label>
+            <label class="form-label">${isSi ? 'ගත් දිනය (Taken Date)' : 'Date Taken'}</label>
             <input type="date" class="form-input" id="repCreditTakenDate" value="${today}">
           </div>
-          <div class="form-group" style="margin-bottom:0;">
+          <div class="form-group" id="repDueDateWrapper" style="margin-bottom:0; display:none;">
             <label class="form-label" style="font-weight:700; color:#ea580c;">${isSi ? 'ගෙවිය යුතු දිනය (Due Date) *' : 'Payment Due Date *'}</label>
             <input type="date" class="form-input" id="repCreditDueDate" value="${d3Str}">
           </div>
         </div>
 
-        <!-- Quick Due Date Presets -->
-        <div style="display:flex; gap:6px; align-items:center;">
+        <!-- Quick Presets for Credit (Only visible when credit is active) -->
+        <div id="repQuickPresetsRow" style="display:none; gap:6px; align-items:center;">
           <span style="font-size:0.75rem; color:var(--text-muted); font-weight:700;">Quick Presets:</span>
           <button type="button" class="btn btn-xs btn-ghost" onclick="App.setRepDueDateDays(3)" style="border:1px solid var(--border-glass); padding:2px 8px; font-size:0.75rem;">+3 Days (දින 3)</button>
           <button type="button" class="btn btn-xs btn-ghost" onclick="App.setRepDueDateDays(7)" style="border:1px solid var(--border-glass); padding:2px 8px; font-size:0.75rem;">+1 Week (සතියක්)</button>
           <button type="button" class="btn btn-xs btn-ghost" onclick="App.setRepDueDateDays(14)" style="border:1px solid var(--border-glass); padding:2px 8px; font-size:0.75rem;">+2 Weeks (සති 2)</button>
         </div>
 
+        <!-- Cash Details & Drawer Option (Only visible when cash is active) -->
+        <div id="repCashDetailsRow" style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:var(--radius-sm); padding:10px 12px;">
+          <div style="display:flex; align-items:center; gap:8px; color:#10b981; font-weight:700; font-size:0.85rem;">
+            <span>💵</span> <span>${isSi ? 'එවලේම මුදල් ගෙවන ලද සෘජු මිලදී ගැනීමකි' : 'Paid in cash immediately on purchase'}</span>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.82rem; color:var(--text-primary); margin-top:8px;">
+            <input type="checkbox" id="repRecordDrawerExpense" checked style="accent-color:#10b981; width:16px; height:16px;">
+            <span>${isSi ? 'ලාච්චුවේ මුදලින් ගෙවූ බව ලාච්චු වාර්තාවට / දෛනික වියදම් වලට සටහන් කරන්න' : 'Record as cash drawer payout / daily expense'}</span>
+          </label>
+        </div>
+
+        <!-- 6. Notes / Invoice No -->
         <div class="form-group" style="margin-bottom:0;">
           <label class="form-label">${isSi ? 'සටහන් / බිල් අංකය (Notes / Invoice)' : 'Notes / Invoice No'}</label>
-          <input type="text" class="form-input" id="repCreditNotes" placeholder="e.g. Invoice #9823 / Will collect cash next Tuesday">
+          <input type="text" class="form-input" id="repCreditNotes" placeholder="${isSi ? 'උදා: Bill #542 / Dialog Safan' : 'e.g. Invoice #9823'}">
         </div>
       </form>
     `;
 
     this.showModal(
-      isSi ? '🤝 රෙෆ්ගෙන් ණයට රීලෝඩ් ගැනීම (Add Rep Reload Credit)' : '🤝 Add Rep Reload Credit',
+      isSi ? '🤝 රෙෆ්ගෙන් රීලෝඩ් ගැනීම (Buy Reload from Rep)' : '🤝 Buy Reload from Rep',
       bodyHtml,
       [
         { text: isSi ? 'අවලංගුයි' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        { text: isSi ? '💾 ණය සටහන් කරන්න (Save)' : '💾 Save Rep Credit', class: 'btn-primary', style: 'background:#ea580c; border-color:#ea580c; font-weight:800;', onClick: () => {
-          const shopId = document.getElementById('repCreditShop')?.value;
-          const network = document.querySelector('input[name="repNetwork"]:checked')?.value || 'Dialog';
-          const repName = document.getElementById('repCreditRepName')?.value?.trim();
-          const repPhone = document.getElementById('repCreditRepPhone')?.value?.trim();
-          const amount = parseFloat(document.getElementById('repCreditAmount')?.value) || 0;
-          const takenDate = document.getElementById('repCreditTakenDate')?.value || today;
-          const dueDate = document.getElementById('repCreditDueDate')?.value || d3Str;
-          const notes = document.getElementById('repCreditNotes')?.value?.trim() || '';
+        { 
+          text: isSi ? '💾 කැෂ් රීලෝඩ් සුරකින්න (Save)' : '💾 Save Cash Reload', 
+          class: 'btn-primary', 
+          id: 'repModalSaveBtn',
+          style: 'background:#10b981; border-color:#10b981; font-weight:800; box-shadow:0 0 12px rgba(16,185,129,0.3);',
+          onClick: () => {
+            const shopId = document.getElementById('repCreditShop')?.value;
+            const purchaseType = document.querySelector('input[name="repPurchaseType"]:checked')?.value || 'cash';
+            const network = document.querySelector('input[name="repNetwork"]:checked')?.value || 'Dialog';
+            const repName = document.getElementById('repCreditRepName')?.value?.trim();
+            const repPhone = document.getElementById('repCreditRepPhone')?.value?.trim();
+            const amount = parseFloat(document.getElementById('repCreditAmount')?.value) || 0;
+            const takenDate = document.getElementById('repCreditTakenDate')?.value || today;
+            const dueDate = document.getElementById('repCreditDueDate')?.value || d3Str;
+            const recordDrawerExpense = document.getElementById('repRecordDrawerExpense')?.checked || false;
+            const notes = document.getElementById('repCreditNotes')?.value?.trim() || '';
 
-          if (!shopId) { this.showToast('Please select a shop', 'error'); return; }
-          if (!repName) { this.showToast('Please enter Rep Name', 'error'); return; }
-          if (amount <= 0) { this.showToast('Please enter a valid amount', 'error'); return; }
+            if (!shopId) { this.showToast('Please select a shop', 'error'); return; }
+            if (!repName) { this.showToast('Please enter Rep Name', 'error'); return; }
+            if (amount <= 0) { this.showToast('Please enter a valid amount', 'error'); return; }
 
-          DB.addRepCredit({
-            shopId,
-            network,
-            repName,
-            repPhone,
-            amount,
-            takenDate,
-            dueDate,
-            notes
-          });
+            DB.addRepCredit({
+              shopId,
+              purchaseType,
+              network,
+              repName,
+              repPhone,
+              amount,
+              takenDate,
+              dueDate: purchaseType === 'credit' ? dueDate : takenDate,
+              recordDrawerExpense: purchaseType === 'cash' ? recordDrawerExpense : false,
+              notes
+            });
 
-          this.closeModal();
-          this.showToast(isSi ? `✅ රෙෆ් ණය (${DB.formatCurrency(amount)}) සාර්ථකව සුරැකිණි!` : 'Rep credit saved successfully ✅', 'success');
-          this.updateTopBarBadges();
-          if (this.currentPage === 'credits') {
-            this.switchLedgerTab('rep_credits');
-          } else if (this.currentPage === 'update') {
-            this.renderUpdateForm();
-          } else {
-            this.renderDashboard();
+            this.closeModal();
+            const successMsg = purchaseType === 'cash' ?
+              (isSi ? `✅ රෙෆ්ගෙන් කැෂ් රීලෝඩ් මිලදී ගැනීම (${DB.formatCurrency(amount)}) සටහන් විය!` : 'Cash reload purchase saved successfully ✅') :
+              (isSi ? `✅ රෙෆ් ණය (${DB.formatCurrency(amount)}) සාර්ථකව සුරැකිණි!` : 'Rep credit saved successfully ✅');
+
+            this.showToast(successMsg, 'success');
+            this.updateTopBarBadges();
+            if (this.currentPage === 'credits') {
+              this.switchLedgerTab('rep_credits');
+            } else if (this.currentPage === 'update') {
+              this.renderUpdateForm();
+            } else {
+              this.renderDashboard();
+            }
           }
-        }}
+        }
       ]
     );
+
+    if (initialType === 'credit') {
+      setTimeout(() => this.onToggleRepPurchaseType('credit'), 50);
+    }
+  },
+
+  onToggleRepPurchaseType(type) {
+    const isSi = I18N.currentLang === 'si';
+    const cashLabel = document.getElementById('repPayTypeCashLabel');
+    const creditLabel = document.getElementById('repPayTypeCreditLabel');
+    const dueWrapper = document.getElementById('repDueDateWrapper');
+    const quickPresets = document.getElementById('repQuickPresetsRow');
+    const cashDetails = document.getElementById('repCashDetailsRow');
+    const saveBtn = document.getElementById('repModalSaveBtn');
+
+    if (type === 'cash') {
+      if (cashLabel) {
+        cashLabel.style.border = '2px solid #10b981';
+        cashLabel.style.background = 'rgba(16,185,129,0.15)';
+        cashLabel.style.opacity = '1';
+        cashLabel.style.boxShadow = '0 0 12px rgba(16,185,129,0.25)';
+      }
+      if (creditLabel) {
+        creditLabel.style.border = '1px solid rgba(234,88,12,0.4)';
+        creditLabel.style.background = 'rgba(234,88,12,0.06)';
+        creditLabel.style.opacity = '0.65';
+        creditLabel.style.boxShadow = 'none';
+      }
+      if (dueWrapper) dueWrapper.style.display = 'none';
+      if (quickPresets) quickPresets.style.display = 'none';
+      if (cashDetails) cashDetails.style.display = 'block';
+      if (saveBtn) {
+        saveBtn.textContent = isSi ? '💾 කැෂ් රීලෝඩ් සුරකින්න (Save)' : '💾 Save Cash Reload';
+        saveBtn.style.background = '#10b981';
+        saveBtn.style.borderColor = '#10b981';
+        saveBtn.style.boxShadow = '0 0 12px rgba(16,185,129,0.3)';
+      }
+    } else {
+      if (creditLabel) {
+        creditLabel.style.border = '2px solid #ea580c';
+        creditLabel.style.background = 'rgba(234,88,12,0.15)';
+        creditLabel.style.opacity = '1';
+        creditLabel.style.boxShadow = '0 0 12px rgba(234,88,12,0.25)';
+      }
+      if (cashLabel) {
+        cashLabel.style.border = '1px solid rgba(16,185,129,0.4)';
+        cashLabel.style.background = 'rgba(16,185,129,0.06)';
+        cashLabel.style.opacity = '0.65';
+        cashLabel.style.boxShadow = 'none';
+      }
+      if (dueWrapper) dueWrapper.style.display = 'block';
+      if (quickPresets) quickPresets.style.display = 'flex';
+      if (cashDetails) cashDetails.style.display = 'none';
+      if (saveBtn) {
+        saveBtn.textContent = isSi ? '💾 රෙෆ් ණය සටහන් කරන්න (Save)' : '💾 Save Rep Credit';
+        saveBtn.style.background = '#ea580c';
+        saveBtn.style.borderColor = '#ea580c';
+        saveBtn.style.boxShadow = '0 0 12px rgba(234,88,12,0.3)';
+      }
+    }
+  },
+
+  onSelectSavedRep(idx) {
+    const nameInp = document.getElementById('repCreditRepName');
+    const phoneInp = document.getElementById('repCreditRepPhone');
+    if (!nameInp) return;
+
+    if (idx === '' || idx === null || idx === undefined) {
+      nameInp.value = '';
+      if (phoneInp) phoneInp.value = '';
+      nameInp.focus();
+      return;
+    }
+
+    const savedReps = DB.getSavedReps ? DB.getSavedReps() : [];
+    const rep = savedReps[parseInt(idx, 10)];
+    if (!rep) return;
+
+    nameInp.value = rep.name || '';
+    if (phoneInp) phoneInp.value = rep.phone || '';
+
+    // Automatically select the network
+    if (rep.network) {
+      const radio = document.querySelector(`input[name="repNetwork"][value="${rep.network}"]`);
+      if (radio) {
+        radio.checked = true;
+        radio.parentElement.parentElement.querySelectorAll('label').forEach(l => l.style.opacity = '0.5');
+        radio.parentElement.style.opacity = '1';
+      }
+    }
   },
 
   setRepDueDateDays(days) {
@@ -4580,34 +4851,191 @@ Thank you! - ${shopName}`;
     });
   },
 
-  showAdminPasswordModal(onSuccess) {
+  // ================================================================
+  // STAFF & ADMIN PIN SECURITY (MASTER PIN: 1234)
+  // ================================================================
+  isAdminSessionActive() {
+    return !!(this.adminSessionExpires && Date.now() < this.adminSessionExpires);
+  },
+
+  toggleAdminSession() {
     const isSi = I18N.currentLang === 'si';
-    this.showModal(
-      '🔐 Enter Admin Password',
-      `
-      <div style="font-size:0.85rem; color:var(--text-muted); margin-bottom:8px;">${isSi ? 'මෙම දත්තය මකා දැමීමට Admin Password ලබා දෙන්න:' : 'Enter Admin Password to delete this record:'}</div>
-      <div class="form-group">
-        <input type="password" id="adminActionPwdInput" class="form-input" placeholder="Password (1234)" autofocus>
+    if (this.isAdminSessionActive()) {
+      this.adminSessionExpires = 0;
+      this.updateAdminSecurityUI();
+      this.showToast(isSi ? '🔒 Staff Mode එකට මාරු විය (Admin Lock)' : '🔒 Locked to Staff Mode', 'info');
+    } else {
+      this.showAdminPasswordModal(() => {
+        this.updateAdminSecurityUI();
+        this.showToast(isSi ? '👑 Admin Mode සාර්ථකව විවෘත විය (Unlocked 30 mins)!' : '👑 Admin Mode Unlocked (30 mins)!', 'success');
+      }, isSi ? '👑 Admin Mode එක Unlock කරන්න' : '👑 Unlock Admin Mode');
+    }
+  },
+
+  updateAdminSecurityUI() {
+    const pill = document.getElementById('adminRoleSecurityPill');
+    if (!pill) return;
+    const isSi = I18N.currentLang === 'si';
+    const active = this.isAdminSessionActive();
+    if (active) {
+      pill.innerHTML = `
+        <span style="font-size:0.9rem;">👑</span>
+        <span>${isSi ? 'Admin Unlocked' : 'Admin Mode'}</span>
+        <span style="font-size:0.7rem; opacity:0.8; margin-left:4px;">[Lock]</span>
+      `;
+      pill.style.background = 'rgba(234, 179, 8, 0.18)';
+      pill.style.color = '#fbbf24';
+      pill.style.borderColor = 'rgba(234, 179, 8, 0.45)';
+      pill.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.3)';
+    } else {
+      pill.innerHTML = `
+        <span style="font-size:0.9rem;">🔒</span>
+        <span>${isSi ? 'Staff Mode' : 'Staff Mode'}</span>
+        <span style="font-size:0.7rem; opacity:0.75; margin-left:4px;">[Unlock]</span>
+      `;
+      pill.style.background = 'rgba(14, 24, 52, 0.7)';
+      pill.style.color = 'var(--text-secondary)';
+      pill.style.borderColor = 'var(--border-glass)';
+      pill.style.boxShadow = 'none';
+    }
+  },
+
+  showAdminPasswordModal(onSuccess, title = null) {
+    const isSi = I18N.currentLang === 'si';
+    const adminPin = DB.getAdminPin ? DB.getAdminPin() : '1234';
+
+    if (this.isAdminSessionActive()) {
+      if (typeof onSuccess === 'function') onSuccess();
+      return;
+    }
+
+    const modalTitle = title || (isSi ? '🔐 Admin PIN අංකය ඇතුළත් කරන්න' : '🔐 Enter Admin PIN');
+
+    const pinPadHtml = `
+      <div style="text-align:center; padding:6px 0;">
+        <div style="font-size:0.88rem; color:var(--text-secondary); margin-bottom:14px;">
+          ${isSi ? 'පැරණි දත්ත ආරක්ෂා කර ඇති බැවින් මෙම ක්‍රියාව සඳහා Admin PIN අංකය (1234) ඇතුළත් කරන්න:' : 'Enter 4-Digit Admin PIN (1234) to confirm this protected action:'}
+        </div>
+
+        <!-- PIN Dots Display -->
+        <div style="display:flex; justify-content:center; gap:14px; margin-bottom:14px;">
+          <input type="password" id="adminPinHiddenInput" maxlength="4" style="position:absolute; opacity:0; pointer-events:none;" autofocus>
+          <div class="pin-dot" id="pindot_1" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--accent-cyan); background:transparent; transition:all 0.2s;"></div>
+          <div class="pin-dot" id="pindot_2" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--accent-cyan); background:transparent; transition:all 0.2s;"></div>
+          <div class="pin-dot" id="pindot_3" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--accent-cyan); background:transparent; transition:all 0.2s;"></div>
+          <div class="pin-dot" id="pindot_4" style="width:18px; height:18px; border-radius:50%; border:2px solid var(--accent-cyan); background:transparent; transition:all 0.2s;"></div>
+        </div>
+
+        <div id="pinErrorMsg" style="color:var(--accent-red); font-size:0.82rem; font-weight:700; height:18px; margin-bottom:12px;"></div>
+
+        <!-- Touch / Click PIN Keypad -->
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; max-width:240px; margin:0 auto 10px auto;">
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('1')">1</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('2')">2</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('3')">3</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('4')">4</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('5')">5</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('6')">6</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('7')">7</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('8')">8</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('9')">9</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadClear()" style="font-size:0.85rem; color:var(--text-muted);">C</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadKey('0')">0</button>
+          <button type="button" class="btn btn-ghost pin-pad-key" onclick="App.onPinPadBackspace()">⌫</button>
+        </div>
       </div>
-      `,
+    `;
+
+    this._currentPinCallback = onSuccess;
+    this._currentPinEntered = '';
+
+    this.showModal(
+      modalTitle,
+      pinPadHtml,
       [
-        { text: isSi ? 'Cancel (අවලංගු)' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        {
-          text: isSi ? 'Confirm (තහවුරු කරන්න)' : 'Confirm',
-          class: 'btn-danger',
-          onClick: () => {
-            const pwd = document.getElementById('adminActionPwdInput').value;
-            const cleaned = pwd ? pwd.trim() : '';
-            if (cleaned === '1234') {
-              this.closeModal();
-              onSuccess();
-            } else {
-              this.showToast('❌ Incorrect Admin Password!', 'error');
-            }
-          }
-        }
+        { text: isSi ? 'අවලංගුයි' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() }
       ]
     );
+
+    setTimeout(() => {
+      const inp = document.getElementById('adminPinHiddenInput');
+      if (inp) {
+        inp.focus();
+        inp.oninput = () => {
+          this._currentPinEntered = (inp.value || '').replace(/\D/g, '').slice(0, 4);
+          this.updatePinDotsUI();
+          if (this._currentPinEntered.length === 4) {
+            this.verifyEnteredPin();
+          }
+        };
+      }
+    }, 100);
+  },
+
+  onPinPadKey(num) {
+    if (!this._currentPinEntered) this._currentPinEntered = '';
+    if (this._currentPinEntered.length < 4) {
+      this._currentPinEntered += num;
+      this.updatePinDotsUI();
+      if (this._currentPinEntered.length === 4) {
+        this.verifyEnteredPin();
+      }
+    }
+  },
+
+  onPinPadBackspace() {
+    if (this._currentPinEntered && this._currentPinEntered.length > 0) {
+      this._currentPinEntered = this._currentPinEntered.slice(0, -1);
+      this.updatePinDotsUI();
+    }
+  },
+
+  onPinPadClear() {
+    this._currentPinEntered = '';
+    this.updatePinDotsUI();
+    const err = document.getElementById('pinErrorMsg');
+    if (err) err.textContent = '';
+  },
+
+  updatePinDotsUI() {
+    const len = (this._currentPinEntered || '').length;
+    for (let i = 1; i <= 4; i++) {
+      const dot = document.getElementById(`pindot_${i}`);
+      if (dot) {
+        if (i <= len) {
+          dot.classList.add('filled');
+          dot.style.background = '#00f2fe';
+          dot.style.boxShadow = '0 0 10px #00f2fe';
+        } else {
+          dot.classList.remove('filled');
+          dot.style.background = 'transparent';
+          dot.style.boxShadow = 'none';
+        }
+      }
+    }
+  },
+
+  verifyEnteredPin() {
+    const isSi = I18N.currentLang === 'si';
+    const adminPin = DB.getAdminPin ? DB.getAdminPin() : '1234';
+    if (this._currentPinEntered === adminPin) {
+      // 30-minute unlocked admin session
+      this.adminSessionExpires = Date.now() + 30 * 60 * 1000;
+      this.closeModal();
+      this.updateAdminSecurityUI();
+      this.showToast(isSi ? '✅ Admin PIN තහවුරු විය!' : '✅ Admin PIN Verified!', 'success');
+      if (typeof this._currentPinCallback === 'function') {
+        this._currentPinCallback();
+      }
+    } else {
+      const err = document.getElementById('pinErrorMsg');
+      if (err) {
+        err.textContent = isSi ? '❌ වැරදි PIN අංකයකි! නැවත උත්සාහ කරන්න.' : '❌ Incorrect PIN! Try again.';
+      }
+      setTimeout(() => {
+        this.onPinPadClear();
+      }, 500);
+    }
   },
 
   // ================================================================
@@ -4927,10 +5355,19 @@ Thank you! - ${shopName}`;
 
     if (window.reportChartInstance) {
       window.reportChartInstance.destroy();
+      window.reportChartInstance = null;
     }
     const chartCanvas = document.getElementById('reportChart');
     if (chartCanvas && window.Chart) {
       const ctx = chartCanvas.getContext('2d');
+      const profitGrad = ctx.createLinearGradient(0, 0, 0, 300);
+      profitGrad.addColorStop(0, 'rgba(0, 242, 254, 0.85)');
+      profitGrad.addColorStop(1, 'rgba(16, 185, 129, 0.35)');
+
+      const lossGrad = ctx.createLinearGradient(0, 0, 0, 300);
+      lossGrad.addColorStop(0, 'rgba(244, 63, 94, 0.85)');
+      lossGrad.addColorStop(1, 'rgba(255, 51, 102, 0.35)');
+
       window.reportChartInstance = new window.Chart(ctx, {
         type: 'bar',
         data: {
@@ -4939,24 +5376,65 @@ Thank you! - ${shopName}`;
             {
               label: I18N.currentLang === 'si' ? 'Profit (ලාභ)' : 'Profit',
               data: chartDataProfit,
-              backgroundColor: 'rgba(22, 163, 74, 0.7)',
-              borderColor: 'rgba(22, 163, 74, 1)',
-              borderWidth: 1
+              backgroundColor: profitGrad,
+              borderColor: '#00f2fe',
+              borderWidth: 1.5,
+              borderRadius: 6
             },
             {
               label: I18N.currentLang === 'si' ? 'Loss (අලාභ)' : 'Loss',
               data: chartDataLoss,
-              backgroundColor: 'rgba(228, 0, 43, 0.7)',
-              borderColor: 'rgba(228, 0, 43, 1)',
-              borderWidth: 1
+              backgroundColor: lossGrad,
+              borderColor: '#f43f5e',
+              borderWidth: 1.5,
+              borderRadius: 6
             }
           ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: {
+                color: '#94a3b8',
+                font: { family: "'Inter', sans-serif", size: 12, weight: '600' },
+                usePointStyle: true,
+                pointStyle: 'circle'
+              }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(11, 20, 44, 0.95)',
+              titleColor: '#00f2fe',
+              bodyColor: '#f8fafc',
+              borderColor: 'rgba(0, 242, 254, 0.4)',
+              borderWidth: 1,
+              padding: 10,
+              cornerRadius: 8,
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.dataset.label}: Rs. ${Number(context.raw || 0).toLocaleString()}`;
+                }
+              }
+            }
+          },
           scales: {
-            y: { beginAtZero: true }
+            x: {
+              grid: { color: 'rgba(56, 189, 248, 0.06)', drawBorder: false },
+              ticks: { color: '#64748b', font: { size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(56, 189, 248, 0.08)', drawBorder: false },
+              ticks: {
+                color: '#64748b',
+                font: { size: 11 },
+                callback: function(val) {
+                  if (val >= 1000) return 'Rs.' + (val / 1000).toFixed(0) + 'k';
+                  return 'Rs.' + val;
+                }
+              }
+            }
           }
         }
       });
@@ -6979,14 +7457,15 @@ setShiftViewMode(mode) {
 
   promptDeleteBankTransaction(id) {
     const isSi = I18N.currentLang === 'si';
-    if (!confirm(isSi ? 'මෙම බැංකු තැන්පතු හෝ මුදල් භාරදීම් සටහන ඉවත් කිරීමට ඔබට විශ්වාසද?' : 'Are you sure you want to delete this bank/handover transaction?')) return;
-    DB.deleteBankTransaction(id);
-    this.showToast(isSi ? 'සටහන ඉවත් කරන ලදී' : 'Record deleted', 'info');
-    if (this.currentPage === 'shifts') {
-      this.renderShiftsPage();
-    } else {
-      this.refreshPage(this.currentPage);
-    }
+    this.showAdminPasswordModal(() => {
+      DB.deleteBankTransaction(id);
+      this.showToast(isSi ? 'සටහන ඉවත් කරන ලදී' : 'Record deleted', 'info');
+      if (this.currentPage === 'shifts') {
+        this.renderShiftsPage();
+      } else {
+        this.refreshPage(this.currentPage);
+      }
+    });
   },
 
   // ================================================================
@@ -7203,10 +7682,12 @@ setShiftViewMode(mode) {
   // EXPENSE MODAL
   // ================================================================
   promptDeleteExpense(id) {
-    if (!confirm(I18N.currentLang === 'si' ? 'මෙම වියදම මකා දැමීමට අවශ්‍යද?' : 'Are you sure you want to delete this expense?')) return;
-    DB.deleteExpense(id);
-    this.renderShiftsPage();
-    this.showToast(I18N.currentLang === 'si' ? 'වියදම මකා දමන ලදී' : 'Expense deleted', 'success');
+    const isSi = I18N.currentLang === 'si';
+    this.showAdminPasswordModal(() => {
+      DB.deleteExpense(id);
+      this.renderShiftsPage();
+      this.showToast(isSi ? 'වියදම මකා දමන ලදී' : 'Expense deleted', 'success');
+    });
   },
 
   showAddExpenseModal(returnToShiftModal = false) {
@@ -7259,7 +7740,7 @@ setShiftViewMode(mode) {
   },
 
   // ================================================================
-  // DASHBOARD CHART TIMEFRAME
+  // DASHBOARD CHART TIMEFRAME & ANALYTICS
   // ================================================================
   setDashChartTimeframe(timeframe) {
     this.dashChartTimeframe = timeframe;
@@ -7268,8 +7749,239 @@ setShiftViewMode(mode) {
       b.classList.toggle('btn-primary', b.dataset.timeframe === timeframe);
       b.classList.toggle('btn-ghost', b.dataset.timeframe !== timeframe);
     });
-    const shopId = DB.getActiveShopId();
-    if (shopId) this.renderDashboardChart(shopId, timeframe);
+    this.renderDashboardAnalyticsChart();
+  },
+
+  renderDashboardChart(shopId, timeframe) {
+    if (timeframe) this.dashChartTimeframe = timeframe;
+    this.renderDashboardAnalyticsChart();
+  },
+
+  renderDashboardAnalyticsChart() {
+    const canvas = document.getElementById('dashAnalyticsChart');
+    if (!canvas || !window.Chart) return;
+
+    if (window.dashAnalyticsChartInstance) {
+      try {
+        window.dashAnalyticsChartInstance.destroy();
+      } catch (e) {
+        console.warn('Error destroying chart instance:', e);
+      }
+      window.dashAnalyticsChartInstance = null;
+    }
+
+    const timeframe = this.dashChartTimeframe || 'week';
+    const activeShopId = DB.getActiveShopId ? DB.getActiveShopId() : null;
+    const allShifts = (DB.getShifts ? DB.getShifts() : []) || [];
+    const allExpenses = (DB.getExpenses ? DB.getExpenses() : []) || [];
+
+    // Filter by active shop if selected
+    const shifts = activeShopId ? allShifts.filter(s => s && s.shopId === activeShopId) : allShifts;
+    const expenses = activeShopId ? allExpenses.filter(e => e && e.shopId === activeShopId) : allExpenses;
+
+    const labels = [];
+    const inflowData = [];
+    const outflowData = [];
+
+    const now = new Date();
+
+    if (timeframe === 'week') {
+      // Last 7 days ending today
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${day}`;
+        const dayLabel = d.toLocaleDateString(I18N.currentLang === 'si' ? 'si-LK' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        labels.push(dayLabel);
+
+        const dayShifts = shifts.filter(s => s && s.date === dateStr);
+        const dayInflow = dayShifts.reduce((sum, s) => {
+          const pos = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
+          return sum + (parseFloat(pos) || 0);
+        }, 0);
+
+        let dayOutflow = dayShifts.reduce((sum, s) => {
+          const exp = s.drawerExpenses || s.totalExpenses || s.expenses || 0;
+          return sum + (parseFloat(exp) || 0);
+        }, 0);
+
+        const dayExp = expenses.filter(e => e && e.date === dateStr);
+        dayOutflow += dayExp.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+        inflowData.push(dayInflow);
+        outflowData.push(dayOutflow);
+      }
+    } else if (timeframe === 'month') {
+      // Last 12 months
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const monthKey = `${y}-${m}`;
+        const monthLabel = d.toLocaleDateString(I18N.currentLang === 'si' ? 'si-LK' : 'en-US', { month: 'short', year: '2-digit' });
+        labels.push(monthLabel);
+
+        const mShifts = shifts.filter(s => s && s.date && s.date.startsWith(monthKey));
+        const mInflow = mShifts.reduce((sum, s) => {
+          const pos = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
+          return sum + (parseFloat(pos) || 0);
+        }, 0);
+
+        let mOutflow = mShifts.reduce((sum, s) => {
+          const exp = s.drawerExpenses || s.totalExpenses || s.expenses || 0;
+          return sum + (parseFloat(exp) || 0);
+        }, 0);
+
+        const mExp = expenses.filter(e => e && e.date && e.date.startsWith(monthKey));
+        mOutflow += mExp.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+        inflowData.push(mInflow);
+        outflowData.push(mOutflow);
+      }
+    } else {
+      // Yearly trend (last 4 years)
+      const currentYear = now.getFullYear();
+      for (let y = currentYear - 3; y <= currentYear; y++) {
+        const yearKey = `${y}`;
+        labels.push(yearKey);
+
+        const yShifts = shifts.filter(s => s && s.date && s.date.startsWith(yearKey));
+        const yInflow = yShifts.reduce((sum, s) => {
+          const pos = s.posGrossSales || s.posSales || ((s.posCashSales || 0) + (s.posCardSales || 0) + (s.posChequeSales || 0));
+          return sum + (parseFloat(pos) || 0);
+        }, 0);
+
+        let yOutflow = yShifts.reduce((sum, s) => {
+          const exp = s.drawerExpenses || s.totalExpenses || s.expenses || 0;
+          return sum + (parseFloat(exp) || 0);
+        }, 0);
+
+        const yExp = expenses.filter(e => e && e.date && e.date.startsWith(yearKey));
+        yOutflow += yExp.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+        inflowData.push(yInflow);
+        outflowData.push(yOutflow);
+      }
+    }
+
+    const ctx = canvas.getContext('2d');
+
+    // Create Cyber Gradients
+    const cyanGrad = ctx.createLinearGradient(0, 0, 0, 240);
+    cyanGrad.addColorStop(0, 'rgba(0, 242, 254, 0.4)');
+    cyanGrad.addColorStop(0.5, 'rgba(0, 242, 254, 0.12)');
+    cyanGrad.addColorStop(1, 'rgba(0, 242, 254, 0.0)');
+
+    const roseGrad = ctx.createLinearGradient(0, 0, 0, 240);
+    roseGrad.addColorStop(0, 'rgba(244, 63, 94, 0.35)');
+    roseGrad.addColorStop(0.5, 'rgba(244, 63, 94, 0.1)');
+    roseGrad.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+
+    window.dashAnalyticsChartInstance = new window.Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: I18N.currentLang === 'si' ? 'විකුණුම් / ලැබීම් (Inflow)' : 'POS Sales & Inflow',
+            data: inflowData,
+            borderColor: '#00f2fe',
+            borderWidth: 2.5,
+            backgroundColor: cyanGrad,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#00f2fe',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointHoverBackgroundColor: '#00f2fe',
+            pointHoverBorderColor: '#ffffff'
+          },
+          {
+            label: I18N.currentLang === 'si' ? 'වියදම් / ගෙවීම් (Outflow)' : 'Expenses & Outflow',
+            data: outflowData,
+            borderColor: '#f43f5e',
+            borderWidth: 2,
+            backgroundColor: roseGrad,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#f43f5e',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 7,
+            pointHoverBackgroundColor: '#f43f5e',
+            pointHoverBorderColor: '#ffffff'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            position: 'top',
+            labels: {
+              color: '#94a3b8',
+              font: { family: "'Inter', sans-serif", size: 12, weight: '600' },
+              usePointStyle: true,
+              pointStyle: 'circle',
+              padding: 15
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(11, 20, 44, 0.95)',
+            titleColor: '#00f2fe',
+            bodyColor: '#f8fafc',
+            borderColor: 'rgba(0, 242, 254, 0.4)',
+            borderWidth: 1,
+            padding: 10,
+            cornerRadius: 8,
+            boxPadding: 4,
+            callbacks: {
+              label: function(context) {
+                return ` ${context.dataset.label}: Rs. ${Number(context.raw || 0).toLocaleString()}`;
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              color: 'rgba(56, 189, 248, 0.06)',
+              drawBorder: false
+            },
+            ticks: {
+              color: '#64748b',
+              font: { size: 11, weight: '500' }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(56, 189, 248, 0.08)',
+              drawBorder: false
+            },
+            ticks: {
+              color: '#64748b',
+              font: { size: 11 },
+              callback: function(val) {
+                if (val >= 1000) return 'Rs.' + (val / 1000).toFixed(0) + 'k';
+                return 'Rs.' + val;
+              }
+            }
+          }
+        }
+      }
+    });
   },
 
   // ================================================================
@@ -7840,10 +8552,16 @@ setShiftViewMode(mode) {
       } else if (isOverdue) {
         cardClass += ' overdue';
         const daysLate = Math.round((new Date(today) - new Date(c.dueDate)) / (1000 * 60 * 60 * 24));
-        statusBadgeHtml = `<span class="tally-badge shortage">❌ ${I18N.t('status_overdue') || 'Overdue'} (${daysLate} ${I18N.currentLang === 'si' ? 'දිනක් පමායි' : 'days late'})</span>`;
+        if (daysLate >= 15) {
+          statusBadgeHtml = `<span class="tally-badge shortage" style="background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.6); color:#f87171; font-weight:800;">🚨 ${I18N.currentLang === 'si' ? 'දින ' + daysLate + ' ක් පමායි • ලොක් අවදානමක්' : daysLate + 'd Overdue • Lock Risk'}</span>`;
+        } else if (daysLate >= 8) {
+          statusBadgeHtml = `<span class="tally-badge shortage" style="background:rgba(249,115,22,0.18); border:1px solid rgba(249,115,22,0.5); color:#fb923c; font-weight:800;">⚠️ ${I18N.currentLang === 'si' ? 'දින ' + daysLate + ' ක් පමායි • රු. 1,200 දඩය' : daysLate + 'd Overdue • Late Penalty'}</span>`;
+        } else {
+          statusBadgeHtml = `<span class="tally-badge shortage">⚠️ ${I18N.t('status_overdue') || 'Overdue'} (${daysLate} ${I18N.currentLang === 'si' ? 'දිනක් පමායි' : 'days late'})</span>`;
+        }
       } else if (isDueToday) {
         cardClass += ' due-today';
-        statusBadgeHtml = `<span class="tally-badge excess" style="background:rgba(245,158,11,0.15); color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4);">⚠️ ${I18N.t('status_due_today') || 'Due Today'}</span>`;
+        statusBadgeHtml = `<span class="tally-badge excess" style="background:rgba(245,158,11,0.15); color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4); font-weight:800;">🔔 ${I18N.t('status_due_today') || 'Due Today'}</span>`;
       } else {
         cardClass += ' active';
         statusBadgeHtml = `<span class="tally-badge" style="background:rgba(59,130,246,0.12); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">⏳ ${c.dueDate ? (I18N.currentLang === 'si' ? `පියවිය යුතු: ${c.dueDate}` : `Due: ${c.dueDate}`) : (I18N.t('status_active') || 'Active')}</span>`;
@@ -7942,6 +8660,9 @@ setShiftViewMode(mode) {
                 <span style="font-size:0.85rem; font-weight:700; color:var(--accent-green); display:flex; align-items:center; gap:4px;">
                   <span>🎉</span> <span>${I18N.currentLang === 'si' ? 'සම්පූර්ණ මුදල පියවා ඇත' : 'Fully Settled Agreement'}</span>
                 </span>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="App.sendDevicePaymentReceipt('${c.id}')" style="border:1px solid rgba(16,185,129,0.4); color:var(--accent-green); font-weight:700; padding:6px 12px;">
+                  <span>🧾</span> <span>${I18N.currentLang === 'si' ? 'රිසිට්පත (Receipt)' : 'Receipt'}</span>
+                </button>
               `}
               <button type="button" class="btn btn-sm ${c.signature ? 'btn-ghost' : 'btn-warning'}" onclick="App.openCreditAgreementModal('${c.id}', '${c.agreementLanguage || 'si'}')" style="font-weight:700; padding:6px 12px; ${!c.signature ? 'background:var(--accent-gold); color:#000; border:none; box-shadow:0 2px 6px rgba(245,158,11,0.3);' : 'border:1px solid rgba(34,197,94,0.4); color:var(--accent-green);'}">
                 <span>${c.signature ? '✅' : '✍️'}</span> <span>${c.signature ? (I18N.currentLang === 'si' ? 'අත්සන බලන්න' : 'View Sign') : (I18N.currentLang === 'si' ? 'එවෙලෙම අත්සන් කරන්න' : 'Sign Agreement')}</span>
@@ -8135,7 +8856,11 @@ setShiftViewMode(mode) {
           <div class="divider-icon">📱</div>
           <div class="divider-text">${I18N.t('dev_info_sec') || 'Device & IMEI Details'}</div>
           <div class="divider-line"></div>
+          <button type="button" class="btn btn-xs btn-ghost" onclick="App.openSelectPhoneFromStockModal()" style="border:1px solid rgba(16,185,129,0.4); color:var(--accent-green); font-weight:700; padding:2px 8px; margin-left:auto;">
+            <span>📦</span> <span>${I18N.currentLang === 'si' ? 'තොගයෙන් තෝරන්න' : 'Pick from Stock'}</span>
+          </button>
         </div>
+        <input type="hidden" id="devCreditInventoryItemId" value="">
 
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px;">
           <div class="form-group" style="margin-bottom:0;">
@@ -8741,6 +9466,23 @@ setShiftViewMode(mode) {
       savedRecord = DB.addDeviceCredit(payload);
     }
 
+    // Update linked inventory item status to 'device_credit'
+    const invItemId = document.getElementById('devCreditInventoryItemId')?.value;
+    if (invItemId) {
+      DB.updateInventoryItemStatus(invItemId, 'device_credit', {
+        deviceCreditId: savedRecord ? savedRecord.id : null,
+        soldDate: agreementDate
+      });
+    } else if (imei1) {
+      const matchInv = DB.findInventoryItemByImei(imei1);
+      if (matchInv && (matchInv.status === 'in_stock' || !matchInv.status)) {
+        DB.updateInventoryItemStatus(matchInv.id, 'device_credit', {
+          deviceCreditId: savedRecord ? savedRecord.id : null,
+          soldDate: agreementDate
+        });
+      }
+    }
+
     const stepEl = document.getElementById('devCreditUploadStep');
     if (stepEl) {
       stepEl.textContent = I18N.currentLang === 'si' ? '☁️ Cloud Server වෙත සජීවීව ලියාපදිංචි කෙරේ...' : '☁️ Registering live on cloud server...';
@@ -8847,6 +9589,16 @@ setShiftViewMode(mode) {
           <label class="form-label">Payment Note / Receipt (Optional)</label>
           <input type="text" class="form-input" id="devPayNote" placeholder="e.g. 1st Installment / Cash in shop">
         </div>
+
+        <!-- Direct In-Form Action Buttons (Always Visible) -->
+        <div style="display:flex; gap:10px; margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.12);">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal()" style="flex:1; padding:12px; font-weight:700;">
+            ${I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel'}
+          </button>
+          <button type="button" class="btn btn-success" id="btnSubmitDevPaymentForm" onclick="App.saveDevicePayment('${creditId}')" style="flex:2; padding:12px; font-weight:800; font-size:1.02rem; background:linear-gradient(135deg, #10b981 0%, #059669 100%); color:#fff; border:none; border-radius:var(--radius-sm); box-shadow:0 4px 15px rgba(16,185,129,0.4); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+            <span>💾</span> <span>${I18N.currentLang === 'si' ? 'ගෙවීම සම්පූර්ණ කරන්න (Complete Payment)' : 'Complete & Save Payment'}</span>
+          </button>
+        </div>
       </form>
     `;
 
@@ -8937,9 +9689,14 @@ setShiftViewMode(mode) {
             </div>
           </div>
 
-          <button type="button" class="btn btn-primary" onclick="App.closeModal(); App.renderDeviceCreditsPage();" style="font-weight:800; padding:10px 32px; font-size:0.95rem;">
-            🚀 ${I18N.currentLang === 'si' ? 'සම්පූර්ණයි (Done)' : 'Done'}
-          </button>
+          <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-success" onclick="App.sendDevicePaymentReceipt('${creditId}', '${updated.payments && updated.payments.length ? updated.payments[updated.payments.length-1].id : ''}')" style="background:#16a34a; font-weight:800; padding:10px 22px; font-size:0.95rem; border:none; box-shadow:0 4px 14px rgba(22,163,74,0.4); display:flex; align-items:center; gap:8px; cursor:pointer;">
+              <span>📲</span> <span>${I18N.currentLang === 'si' ? 'WhatsApp රිසිට්පත යවන්න' : 'Send WhatsApp Receipt'}</span>
+            </button>
+            <button type="button" class="btn btn-primary" onclick="App.closeModal(); App.renderDeviceCreditsPage();" style="font-weight:800; padding:10px 24px; font-size:0.95rem;">
+              🚀 ${I18N.currentLang === 'si' ? 'සම්පූර්ණයි (Done)' : 'Done'}
+            </button>
+          </div>
         </div>
       `;
     }
@@ -9692,9 +10449,14 @@ setShiftViewMode(mode) {
             <td style="padding:6px 8px; font-weight:800; color:var(--accent-green);">${DB.formatCurrency(p.amount)}</td>
             <td style="padding:6px 8px; color:var(--text-secondary);">${p.note || '-'}</td>
             <td style="padding:6px 8px; color:var(--text-muted);">${p.cashier || '-'}</td>
+            <td style="padding:6px 8px; text-align:right;">
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.sendDevicePaymentReceipt('${credit.id}', '${p.id}')" title="Send WhatsApp Receipt" style="border:1px solid rgba(16,185,129,0.35); color:var(--accent-green); padding:2px 8px; font-weight:700;">
+                📲 Receipt
+              </button>
+            </td>
           </tr>
         `).join('')
-      : `<tr><td colspan="5" style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.8rem;">No installment payments recorded yet.</td></tr>`;
+      : `<tr><td colspan="6" style="text-align:center; padding:12px; color:var(--text-muted); font-size:0.8rem;">No installment payments recorded yet.</td></tr>`;
 
     const renderDocThumbnail = (src, label) => {
       if (!src) {
@@ -9829,6 +10591,7 @@ setShiftViewMode(mode) {
                   <th style="padding:6px 8px;">Amount</th>
                   <th style="padding:6px 8px;">Note</th>
                   <th style="padding:6px 8px;">Staff</th>
+                  <th style="padding:6px 8px; text-align:right;">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -9852,7 +10615,7 @@ setShiftViewMode(mode) {
       [
         { text: 'Close', class: 'btn-ghost', onClick: () => this.closeModal() },
         { text: '✍️ 📝 Agreement & Sign', class: 'btn-warning', onClick: () => this.openCreditAgreementModal(credit.id, credit.agreementLanguage || 'si') },
-        !isSettled ? { text: '💬 WhatsApp Reminder', class: 'btn-success', onClick: () => this.sendWhatsAppReminder(credit.id) } : null,
+        !isSettled ? { text: '💬 WhatsApp Reminder', class: 'btn-success', onClick: () => this.sendWhatsAppReminder(credit.id) } : { text: '🧾 WhatsApp Receipt', class: 'btn-success', onClick: () => this.sendDevicePaymentReceipt(credit.id) },
         !isSettled ? { text: '💵 + Add Payment', class: 'btn-primary', onClick: () => { this.closeModal(); this.showAddDevicePaymentModal(credit.id); } } : null
       ].filter(Boolean)
     );
@@ -9873,29 +10636,489 @@ setShiftViewMode(mode) {
     this.showSubModal(title, bodyHtml, [{ text: 'Close', class: 'btn-primary', onClick: () => this.closeSubModal() }]);
   },
 
+  // ==========================================
+  // PHASE 3: DEVICE CREDIT WHATSAPP REMINDER & RECEIPT ENGINE
+  // ==========================================
+
   sendWhatsAppReminder(creditId) {
+    this.openDeviceCreditWhatsAppModal(creditId);
+  },
+
+  openDeviceCreditWhatsAppModal(creditId, selectedTemplate = null, selectedLang = null) {
     const credit = DB.getDeviceCredits().find(c => c.id === creditId);
     if (!credit) return;
 
-    let phone = credit.primaryPhone.replace(/\D/g, '');
+    const today = DB.getTodayDate();
+    const daysLate = credit.dueDate ? Math.round((new Date(today) - new Date(credit.dueDate)) / (1000 * 60 * 60 * 24)) : 0;
+
+    // Auto-select smart template if not specified
+    let templateType = selectedTemplate;
+    if (!templateType) {
+      if (daysLate >= 15) {
+        templateType = 'lock';
+      } else if (daysLate >= 1) {
+        templateType = 'warning';
+      } else {
+        templateType = 'friendly';
+      }
+    }
+
+    const currentLang = selectedLang || credit.agreementLanguage || I18N.currentLang || 'si';
+
+    // Format phone
+    let rawPhone = credit.primaryPhone || '';
+    let phone = rawPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) {
       phone = '94' + phone.substring(1);
-    } else if (!phone.startsWith('94')) {
+    } else if (phone && !phone.startsWith('94')) {
       phone = '94' + phone;
     }
 
     const shop = DB.getShop(credit.shopId);
-    const shopName = shop ? shop.name : 'Shop Payment Tracker';
+    const shopName = shop ? shop.name : 'Methmi Mobile';
 
-    let msg = '';
-    if (I18N.currentLang === 'si') {
-      msg = `ආයුබෝවන් ${credit.customerName},\n\nඔබ අප ${shopName} ආයතනයෙන් ලබාගත් ${credit.phoneModel} (IMEI: ${credit.imeiNumber || 'N/A'}) සඳහා ගෙවීමට ඇති ණය ශේෂය රු. ${credit.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })} වේ.\n\nනියමිත දිනය: ${credit.dueDate || 'අද දින'}.\nකරුණාකර නියමිත පරිදි මුදල් ගෙවා අවසන් කිරීමට කාරුණික වන්න.\n\nස්තූතියි!\n${shopName}`;
-    } else {
-      msg = `Hello ${credit.customerName},\n\nThis is a friendly reminder from ${shopName} regarding your device credit agreement for ${credit.phoneModel} (IMEI: ${credit.imeiNumber || 'N/A'}).\n\nOutstanding Balance: Rs. ${credit.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}\nDue Date: ${credit.dueDate || 'Today'}\n\nPlease arrange payment at your earliest convenience.\n\nThank you,\n${shopName}`;
+    const generatedMsg = this.generateDeviceCreditReminderText(credit, templateType, currentLang, shopName, daysLate);
+
+    const isSi = I18N.currentLang === 'si';
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Customer & Risk Overview Header -->
+        <div style="background:var(--bg-glass-card); padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+            <div>
+              <div style="font-weight:800; font-size:1.05rem; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                <span>👤 ${credit.customerName}</span>
+                <span class="branch-pill-badge" style="font-size:0.75rem;">🏪 ${shopName}</span>
+              </div>
+              <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px;">
+                📱 ${credit.phoneModel} | IMEI: <code>${credit.imeiNumber || 'N/A'}</code>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Balance Due</div>
+              <div style="font-size:1.25rem; font-weight:900; color:var(--accent-red);">${DB.formatCurrency(credit.balanceDue)}</div>
+              <div style="font-size:0.78rem; font-weight:700; color:${daysLate > 0 ? 'var(--accent-red)' : 'var(--accent-gold)'};">
+                ${credit.dueDate ? (daysLate > 0 ? (isSi ? `⚠️ දින ${daysLate} ක් ප්‍රමාදයි` : `⚠️ ${daysLate}d Overdue`) : (isSi ? `නියමිත දිනය: ${credit.dueDate}` : `Due: ${credit.dueDate}`)) : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Template Selector -->
+        <div>
+          <label class="form-label" style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; display:block;">
+            ${isSi ? '1. පණිවිඩ ආකෘතිය තෝරන්න (Message Template):' : '1. Select Message Template:'}
+          </label>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:6px;">
+            <button type="button" class="btn btn-sm ${templateType === 'friendly' ? 'btn-primary' : 'btn-ghost'}" 
+              onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', 'friendly', '${currentLang}')"
+              style="padding:8px 6px; font-size:0.78rem; font-weight:700; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px;">
+              <span>🌿 Friendly</span>
+              <span style="font-size:0.7rem; opacity:0.8;">${isSi ? 'සාමාන්‍ය මතක් කිරීම' : 'Due Reminder'}</span>
+            </button>
+            <button type="button" class="btn btn-sm ${templateType === 'warning' ? 'btn-warning' : 'btn-ghost'}" 
+              onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', 'warning', '${currentLang}')"
+              style="padding:8px 6px; font-size:0.78rem; font-weight:700; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px; ${templateType === 'warning' ? 'background:var(--accent-gold); color:#000;' : ''}">
+              <span>⚠️ Overdue</span>
+              <span style="font-size:0.7rem; opacity:0.8;">${isSi ? 'රු. 1,200 දඩ අවදානම' : 'Late Penalty'}</span>
+            </button>
+            <button type="button" class="btn btn-sm ${templateType === 'lock' ? 'btn-danger' : 'btn-ghost'}" 
+              onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', 'lock', '${currentLang}')"
+              style="padding:8px 6px; font-size:0.78rem; font-weight:700; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px; ${templateType === 'lock' ? 'background:var(--accent-red); color:#fff;' : ''}">
+              <span>🚨 Lock / Legal</span>
+              <span style="font-size:0.7rem; opacity:0.8;">${isSi ? 'අවසාන නිවේදනය' : 'Remote Lock'}</span>
+            </button>
+            <button type="button" class="btn btn-sm ${templateType === 'bank' ? 'btn-success' : 'btn-ghost'}" 
+              onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', 'bank', '${currentLang}')"
+              style="padding:8px 6px; font-size:0.78rem; font-weight:700; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px; ${templateType === 'bank' ? 'background:#16a34a; color:#fff;' : ''}">
+              <span>🏦 Bank Info</span>
+              <span style="font-size:0.7rem; opacity:0.8;">${isSi ? 'බැංකු ගිණුම් විස්තර' : 'Direct Transfer'}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Language Switcher & Recipient Phone -->
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">${isSi ? 'භාෂාව:' : 'Language:'}</span>
+            <div class="tab-pills" style="gap:4px;">
+              <button type="button" class="tab-pill ${currentLang === 'si' ? 'active' : ''}" style="padding:4px 10px; font-size:0.75rem;" onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', '${templateType}', 'si')">සිංහල</button>
+              <button type="button" class="tab-pill ${currentLang === 'ta' ? 'active' : ''}" style="padding:4px 10px; font-size:0.75rem;" onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', '${templateType}', 'ta')">தமிழ்</button>
+              <button type="button" class="tab-pill ${currentLang === 'en' ? 'active' : ''}" style="padding:4px 10px; font-size:0.75rem;" onclick="App.updateDeviceCreditWhatsAppPreview('${credit.id}', '${templateType}', 'en')">English</button>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">WhatsApp:</span>
+            <input type="text" id="waRecipientPhone" class="form-input" value="${phone}" style="width:140px; padding:4px 8px; font-size:0.85rem; font-family:monospace; font-weight:700; text-align:center;">
+          </div>
+        </div>
+
+        <!-- Editable Message Preview Area -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <label class="form-label" style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:0;">
+              ${isSi ? '2. පණිවිඩය පෙරදසුන (අවශ්‍ය නම් වෙනස් කරන්න):' : '2. Message Preview (Editable):'}
+            </label>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.copyDeviceCreditWhatsAppText()" style="font-size:0.72rem; padding:2px 8px;">
+              📋 ${isSi ? 'පිටපත් කරගන්න (Copy)' : 'Copy Text'}
+            </button>
+          </div>
+          <textarea id="waMessageTextPreview" class="form-input" rows="8" style="width:100%; font-family:monospace; font-size:0.83rem; line-height:1.45; background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-sm); resize:vertical;">${generatedMsg}</textarea>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display:flex; gap:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal()" style="flex:1; padding:12px; font-weight:700;">
+            ${isSi ? 'වසන්න (Close)' : 'Close'}
+          </button>
+          <button type="button" class="btn btn-success" onclick="App.dispatchDeviceCreditWhatsApp()" style="flex:2; padding:12px; font-weight:800; font-size:1.02rem; background:linear-gradient(135deg, #16a34a 0%, #15803d 100%); color:#fff; border:none; border-radius:var(--radius-sm); box-shadow:0 4px 15px rgba(22,163,74,0.4); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+            <span>💬</span> <span>${isSi ? 'WhatsApp විවෘත කරන්න (Send via WhatsApp)' : 'Open in WhatsApp & Send'}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    this.showModal(
+      `📲 WhatsApp Reminder Center - ${credit.customerName}`,
+      bodyHtml,
+      [
+        { text: isSi ? 'වසන්න' : 'Close', class: 'btn-ghost', onClick: () => this.closeModal() }
+      ]
+    );
+  },
+
+  updateDeviceCreditWhatsAppPreview(creditId, templateType, lang) {
+    this.openDeviceCreditWhatsAppModal(creditId, templateType, lang);
+  },
+
+  copyDeviceCreditWhatsAppText() {
+    const textarea = document.getElementById('waMessageTextPreview');
+    if (!textarea) return;
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      this.showToast(I18N.currentLang === 'si' ? '✅ පණිවිඩය පිටපත් විය!' : '✅ Message copied to clipboard!', 'info');
+    }).catch(() => {
+      textarea.select();
+      document.execCommand('copy');
+      this.showToast(I18N.currentLang === 'si' ? '✅ පණිවිඩය පිටපත් විය!' : '✅ Message copied!', 'info');
+    });
+  },
+
+  dispatchDeviceCreditWhatsApp() {
+    const phoneInput = document.getElementById('waRecipientPhone');
+    const msgText = document.getElementById('waMessageTextPreview')?.value || '';
+
+    let rawPhone = phoneInput ? phoneInput.value.trim() : '';
+    let phone = rawPhone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '94' + phone.substring(1);
+    } else if (phone && !phone.startsWith('94')) {
+      phone = '94' + phone;
     }
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    if (!phone) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර වලංගු WhatsApp අංකයක් ඇතුළත් කරන්න' : 'Please enter a valid WhatsApp number', 'error');
+      return;
+    }
+
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msgText)}`;
+    window.open(waUrl, '_blank');
+    this.closeModal();
+  },
+
+  generateDeviceCreditReminderText(credit, templateType, lang, shopName, daysLate) {
+    const balDue = DB.formatCurrency(credit.balanceDue);
+    const dueDate = credit.dueDate || (lang === 'ta' ? 'இன்றைய திகதி' : (lang === 'si' ? 'අද දින' : 'Today'));
+    const model = credit.phoneModel || 'Mobile Device';
+    const imei = credit.imeiNumber || 'N/A';
+
+    const bankDetailsSi = `\n\n🏦 *බැංකු ගිණුම් විස්තර (Direct Bank Transfer):*\n` +
+      `• බැංකුව: Commercial Bank / BOC\n` +
+      `• ගිණුම් නම: METHMI MOBILE (PVT) LTD\n` +
+      `• ශාඛාව: Mutur Branch\n` +
+      `👉 කරුණාකර මුදල් තැන්පත් කිරීමෙන් පසු බැංකු රිසිට්පත (Bank Slip / Screenshot) මෙම WhatsApp අංකයට යොමු කරන්න.`;
+
+    const bankDetailsTa = `\n\n🏦 *வங்கி விபரங்கள் (Direct Bank Transfer):*\n` +
+      `• வங்கி: Commercial Bank / BOC\n` +
+      `• கணக்கு பெயர்: METHMI MOBILE (PVT) LTD\n` +
+      `• கிளை: Mutur Branch\n` +
+      `👉 பணத்தை வைப்பிலிட்ட பின்னர் ரசீதை (Slip) இந்த WhatsApp இலக்கத்திற்கு அனுப்பி வைக்கவும்.`;
+
+    const bankDetailsEn = `\n\n🏦 *Bank Account Details for Direct Transfer:*\n` +
+      `• Bank: Commercial Bank / BOC\n` +
+      `• Account Name: METHMI MOBILE (PVT) LTD\n` +
+      `• Branch: Mutur Branch\n` +
+      `👉 Please share the deposit slip/screenshot to this WhatsApp number once transferred.`;
+
+    let msg = '';
+
+    if (lang === 'ta') {
+      if (templateType === 'warning') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `⚠️ *அவசர நிலுவை நினைவூட்டல் - தாமத அபராத எச்சரிக்கை*\n` +
+          `---------------------------------\n` +
+          `வணக்கம் ${credit.customerName},\n\n` +
+          `எமது ${shopName} கிளையிலிருந்து நீங்கள் பெற்றுக்கொண்ட ${model} (IMEI: ${imei}) தொலைபேசிக்கான நிலுவைத் தொகை *${balDue}* செலுத்துவதற்கான இறுதித் திகதி (${dueDate}) கடந்துவிட்டது (தற்போது ${daysLate} நாட்கள் தாமதமாகியுள்ளது).\n\n` +
+          `⚖️ நீங்கள் ஒப்புக்கொண்ட சட்ட ஒப்பந்தத்தின்படி:\n` +
+          `14/15 நாட்களுக்குப் பின் ரூ. 1,200/- ஆரம்ப அபராதம் (Late Penalty) சேர்க்கப்படும்.\n\n` +
+          `எனவே மேலதிக அபராதங்களைத் தவிர்க்க இன்றோ நாளையோ இத்தொகையைச் செலுத்தி முடிக்குமாறு கேட்டுக்கொள்கிறோம்.\n\n` +
+          `📞 தொடர்புகளுக்கு: 0752 335 533 / 0753 028 100\n` +
+          `${shopName}`;
+      } else if (templateType === 'lock') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `🚨 *இறுதி சட்ட அறிவித்தல் - REMOTE LOCK & சட்ட நடவடிக்கை*\n` +
+          `=================================\n` +
+          `வாடிக்கையாளர் ${credit.customerName} அவர்களுக்கு,\n\n` +
+          `எமது ${shopName} கிளையிலிருந்து நீங்கள் பெற்றுக்கொண்ட ${model} (IMEI: ${imei}) தொலைபேசிக்கான நிலுவைத் தொகை *${balDue}* ஐத் தீர்க்காது ${daysLate} நாட்கள் கடந்துவிட்டன.\n\n` +
+          `⚖️ சட்ட ஒப்பந்தப்படி இறுதி அறிவித்தல்:\n` +
+          `1. 14 நாட்களுக்கு மேற்பட்டதால் ரூ. 1,200/- தாமத அபராதம் விதிக்கப்பட்டுள்ளது.\n` +
+          `2. உடனடியாக நிலுவையைச் செலுத்தத் தவறினால் தொலைபேசி தூரத்திலிருந்து முடக்கப்படும் (Remote Locked).\n` +
+          `3. தொலைபேசியை மீளக் கைப்பற்றவும் சட்டபூர்வ நடவடிக்கை எடுக்கவும் நிறுவனம் தயாராகவுள்ளது.\n\n` +
+          `உடனடியாகத் தொடர்புகொண்டு பணத்தைச் செலுத்துங்கள்:\n` +
+          `📞 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+          `${shopName}`;
+      } else if (templateType === 'bank') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `---------------------------------\n` +
+          `வணக்கம் ${credit.customerName},\n\n` +
+          `எமது ${shopName} கிளையிலிருந்து பெற்றுக்கொண்ட ${model} (IMEI: ${imei}) தொலைபேசிக்கான நிலුவைத் தொகை: *${balDue}* (இறுதித் திகதி: ${dueDate}).` +
+          bankDetailsTa + `\n\n` +
+          `📞 0752 335 533 / 0753 028 100\n` +
+          `${shopName}`;
+      } else {
+        // friendly
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `(Mutur • Serunuwara • Periyapalam)\n` +
+          `---------------------------------\n` +
+          `வணக்கம் ${credit.customerName},\n\n` +
+          `எமது ${shopName} கிளையிலிருந்து நீங்கள் பெற்றுக்கொண்ட ${model} (IMEI: ${imei}) தொலைபேசிக்கான ஆரம்பக் கொடுப்பனவு நிலுவைத் தொகை *${balDue}* ஆகும்.\n\n` +
+          `📅 *செலுத்த வேண்டிய இறுதித் திகதி:* ${dueDate}\n\n` +
+          `தயவுசெய்து குறித்த திகதிக்கு முன்னர் இத்தொகையைச் செலுத்தி முடிக்குமாறு அன்புடன் கேட்டுக்கொள்கிறோம்.\n\n` +
+          `📞 தொடர்புகளுக்கு: 0752 335 533 / 0753 028 100\n` +
+          `நன்றி! - ${shopName}`;
+      }
+    } else if (lang === 'en') {
+      if (templateType === 'warning') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `⚠️ *URGENT OVERDUE NOTICE - LATE PENALTY ALERT*\n` +
+          `---------------------------------\n` +
+          `Dear ${credit.customerName},\n\n` +
+          `This is an urgent notice regarding your outstanding balance of *${balDue}* for ${model} (IMEI: ${imei}) from ${shopName}.\n\n` +
+          `Your payment was due on ${dueDate} and is now *${daysLate} days overdue*.\n\n` +
+          `⚖️ Legal Agreement Notice:\n` +
+          `As per signed terms, failure to settle within 14-15 days attracts an initial Late Penalty of *Rs. 1,200/-*.\n\n` +
+          `Please settle this balance today to avoid penalties and account escalation.\n\n` +
+          `📞 Hotline: 0752 335 533 / 0753 028 100\n` +
+          `${shopName}`;
+      } else if (templateType === 'lock') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `🚨 *FINAL LEGAL NOTICE - REMOTE LOCK WARNING*\n` +
+          `=================================\n` +
+          `Attention: ${credit.customerName},\n\n` +
+          `Your device loan of *${balDue}* for ${model} (IMEI: ${imei}) is now severely overdue (*${daysLate} days late*).\n\n` +
+          `⚖️ Action Notice:\n` +
+          `1. The Rs. 1,200 late fee and monthly surcharge are in effect.\n` +
+          `2. If payment is not completed within 24 hours, the device will be remotely locked and blacklisted.\n` +
+          `3. Repossession and legal recovery proceedings will commence.\n\n` +
+          `Contact us immediately to settle:\n` +
+          `📞 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+          `${shopName}`;
+      } else if (templateType === 'bank') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `---------------------------------\n` +
+          `Dear ${credit.customerName},\n\n` +
+          `Outstanding Balance for ${model} (IMEI: ${imei}): *${balDue}* (Due: ${dueDate}).` +
+          bankDetailsEn + `\n\n` +
+          `📞 0752 335 533 / 0753 028 100\n` +
+          `${shopName}`;
+      } else {
+        // friendly
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `(Mutur • Serunuwara • Periyapalam)\n` +
+          `---------------------------------\n` +
+          `Dear ${credit.customerName},\n\n` +
+          `This is a friendly reminder regarding your outstanding balance for ${model} (IMEI: ${imei}) from ${shopName}.\n\n` +
+          `👉 *Balance Due:* *${balDue}*\n` +
+          `📅 *Due Date:* ${dueDate}\n\n` +
+          `Please arrange payment on or before the due date at our branch or via bank transfer.\n\n` +
+          `📞 Hotline: 0752 335 533 / 0753 028 100\n` +
+          `Thank you! - ${shopName}`;
+      }
+    } else {
+      // Sinhala (default)
+      if (templateType === 'warning') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `⚠️ *අත්‍යවශ්‍ය ගෙවීම් දැනුම්දීමයි - ප්‍රමාද දඩ අනතුරු ඇඟවීම*\n` +
+          `---------------------------------\n` +
+          `${credit.customerName} මහතා/මිය වෙත,\n\n` +
+          `ඔබ අප ${shopName} ආයතනයෙන් ලබාගත් ${model} (IMEI: ${imei}) දුරකථනය සඳහා ගෙවිය යුතු *${balDue}* ක හිඟ ශේෂය ගෙවීමේ අවසන් දිනය (${dueDate}) පසු වී ඇති අතර, මේ වන විට *දින ${daysLate} ක් ප්‍රමාද වී ඇත*.\n\n` +
+          `⚖️ ඔබ එකඟ වූ නෛතික ගිවිසුම ප්‍රකාරව:\n` +
+          `දින 14/15 ඉක්මවූ පසු *රු. 1,200/- ක මූලික දඩ මුදලක් (Late Penalty)* එකතු වන බව කරුණාවෙන් සලකන්න.\n\n` +
+          `එබැවින් දඩ මුදල් එකතු වීමට පෙර අද හෝ හෙට දින තුළ මෙම මුදල ගෙවා ඔබගේ ගිණුම නිදහස් කරගන්නා මෙන් කාරුණිකව දන්වා සිටිමු.\n\n` +
+          `📞 හදිසි ඇමතුම්: 0752 335 533 / 0753 028 100\n` +
+          `${shopName}`;
+      } else if (templateType === 'lock') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `🚨 *අවසාන නෛතික නිවේදනයයි - REMOTE LOCK & LEGAL ACTION NOTICE*\n` +
+          `=================================\n` +
+          `${credit.customerName} වෙත,\n\n` +
+          `ඔබ අප ${shopName} ආයතනයෙන් ලබාගත් ${model} (IMEI: ${imei}) සඳහා නියමිත *${balDue}* ක හිඟ මුදල ගෙවීම දිගින් දිගටම පැහැර හැර ඇති අතර, දැනට *දින ${daysLate} ක කාලයක් ප්‍රමාද වී ඇත*.\n\n` +
+          `⚖️ ගිවිසුම් කොන්දේසි ප්‍රකාරව අවසන් දැනුම්දීම:\n` +
+          `1. දින 14 ඉක්මවීම නිසා රු. 1,200/- ක දඩය සහ මාසික අධිභාර එක්වෙමින් පවතී.\n` +
+          `2. පැය 24 ක් ඇතුළත මෙම මුදල නොගෙවුවහොත්, අප පද්ධතිය මඟින් දුරකථනය දුරස්ථව ලොක් කර (Remote Lock) ක්‍රියා විරහිත කරනු ලැබේ.\n` +
+          `3. දුරකථනය ලොක් වූ පසු යළි අන්ලොක් කිරීමට දින 15ක් ගතවන අතර, ආයතනය සන්තකයට ගැනීම හෝ පොලිස්/නීතිමය ක්‍රියාමාර්ග ගනු ලැබේ.\n\n` +
+          `වහාම අප හා සම්බන්ධ වී මුදල් ගෙවා අවසන් කරන්න:\n` +
+          `📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+          `${shopName}`;
+      } else if (templateType === 'bank') {
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `(Mutur • Serunuwara • Periyapalam)\n` +
+          `---------------------------------\n` +
+          `ආයුබෝවන් ${credit.customerName},\n\n` +
+          `ඔබගේ ${model} (IMEI: ${imei}) දුරකථනය සඳහා ගෙවීමට ඇති ණය ශේෂය: *${balDue}* (නියමිත දිනය: ${dueDate}).` +
+          bankDetailsSi + `\n\n` +
+          `📞 විමසීම්: 0752 335 533 / 0753 028 100\n` +
+          `${shopName}`;
+      } else {
+        // friendly
+        msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+          `(Mutur • Serunuwara • Periyapalam)\n` +
+          `---------------------------------\n` +
+          `ආයුබෝවන් ${credit.customerName} මහතා/මිය,\n\n` +
+          `ඔබ අප ${shopName} ආයතනයෙන් ලබාගත් ${model} (IMEI: ${imei}) දුරකථනය සඳහා ගෙවීමට ඇති මූලික ගෙවීම් හිඟ ශේෂය *${balDue}* වේ.\n\n` +
+          `📅 *නියමිත දිනය:* ${dueDate}\n\n` +
+          `කරුණාකර නියමිත දිනට පෙර මෙම මුදල අප ආයතනය වෙත පැමිණ හෝ බැංකු තැන්පතුවක් මඟින් ගෙවා අවසන් කිරීමට කාරුණික වන්න.\n\n` +
+          `📞 විමසීම්: 0752 335 533 / 0753 028 100\n` +
+          `ස්තූතියි! - ${shopName}`;
+      }
+    }
+
+    return msg;
+  },
+
+  sendDevicePaymentReceipt(creditId, paymentId = null, lang = null) {
+    const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+    if (!credit) return;
+
+    let targetPayment = null;
+    if (paymentId && credit.payments && credit.payments.length > 0) {
+      targetPayment = credit.payments.find(p => p.id === paymentId);
+    }
+    if (!targetPayment && credit.payments && credit.payments.length > 0) {
+      targetPayment = credit.payments[credit.payments.length - 1];
+    }
+
+    const payAmt = targetPayment ? targetPayment.amount : (credit.downPayment || 0);
+    const payDate = targetPayment ? targetPayment.date : (credit.agreementDate || DB.getTodayDate());
+    const payNote = targetPayment ? (targetPayment.note || 'Cash in Shop') : 'Initial Down Payment';
+    const cashier = targetPayment ? (targetPayment.cashier || 'Staff') : 'Cashier';
+    const receiptNum = targetPayment ? targetPayment.id.replace('pay_', 'REC-') : 'REC-' + credit.id.slice(-6).toUpperCase();
+
+    const currentLang = lang || credit.agreementLanguage || I18N.currentLang || 'si';
+
+    const shop = DB.getShop(credit.shopId);
+    const shopName = shop ? shop.name : 'Methmi Mobile';
+
+    const totalPaid = (credit.downPayment || 0) + (credit.payments ? credit.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : 0);
+    const isSettled = credit.balanceDue <= 0.01 || credit.status === 'settled';
+
+    let msg = '';
+    if (currentLang === 'ta') {
+      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `🧾 *அதிகாரபூர்வ கட்டண ரசீது (PAYMENT RECEIPT)*\n` +
+        `=================================\n` +
+        `📄 ரசீது இல: #${receiptNum}\n` +
+        `📅 திகதி: ${payDate}\n` +
+        `🏪 கிளை: ${shopName}\n` +
+        `👤 பணியாளர்: ${cashier}\n` +
+        `---------------------------------\n` +
+        `👤 *வாடிக்கையாளர்:* ${credit.customerName}\n` +
+        `📱 *தொலைபேசி:* ${credit.phoneModel}\n` +
+        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
+        `📞 *தொலைபேசி:* ${credit.primaryPhone}\n` +
+        `---------------------------------\n` +
+        `💵 *கட்டண விபரம்:*\n` +
+        `• மொத்த சாதன விலை: ${DB.formatCurrency(credit.totalPrice)}\n` +
+        `• இப்போது செலுத்திய தொகை: *${DB.formatCurrency(payAmt)}*\n` +
+        `• விபரம்: ${payNote}\n` +
+        `=================================\n` +
+        `📊 *கணக்கு நிலை:*\n` +
+        `• இதுவரை செலுத்திய மொத்தத் தொகை: ${DB.formatCurrency(totalPaid)}\n` +
+        `👉 *மீதி நிலுவைத் தொகை: ${DB.formatCurrency(credit.balanceDue)}*\n` +
+        `நிலை: ${isSettled ? '✅ முழுமையாக தீர்க்கப்பட்டது (FULLY SETTLED)' : '⏳ மீதி நிலுவை உள்ளது (ACTIVE LOAN)'}\n` +
+        `=================================\n` +
+        `நன்றி! Thank you for choosing Methmi Mobile.\n` +
+        `📞 0752 335 533 / 0753 028 100\n` +
+        `Mutur • Serunuwara • Periyapalam`;
+    } else if (currentLang === 'en') {
+      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `🧾 *OFFICIAL PAYMENT RECEIPT*\n` +
+        `=================================\n` +
+        `📄 Receipt No: #${receiptNum}\n` +
+        `📅 Date: ${payDate}\n` +
+        `🏪 Branch: ${shopName}\n` +
+        `👤 Staff: ${cashier}\n` +
+        `---------------------------------\n` +
+        `👤 *Customer:* ${credit.customerName}\n` +
+        `📱 *Device:* ${credit.phoneModel}\n` +
+        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
+        `📞 *Phone:* ${credit.primaryPhone}\n` +
+        `---------------------------------\n` +
+        `💵 *PAYMENT SUMMARY:*\n` +
+        `• Total Agreed Price: ${DB.formatCurrency(credit.totalPrice)}\n` +
+        `• Payment Received: *${DB.formatCurrency(payAmt)}*\n` +
+        `• Payment Note: ${payNote}\n` +
+        `=================================\n` +
+        `📊 *ACCOUNT BALANCE:*\n` +
+        `• Total Paid to Date: ${DB.formatCurrency(totalPaid)}\n` +
+        `👉 *Remaining Balance: ${DB.formatCurrency(credit.balanceDue)}*\n` +
+        `STATUS: ${isSettled ? '✅ FULLY SETTLED & CLEARED' : '⏳ ACTIVE INSTALLMENT BALANCE'}\n` +
+        `=================================\n` +
+        `Thank you for your payment!\n` +
+        `📞 Hotline: 0752 335 533 / 0753 028 100\n` +
+        `Mutur • Serunuwara • Periyapalam`;
+    } else {
+      // Sinhala
+      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `🧾 *නිල ගෙවීම් රිසිට්පත (OFFICIAL PAYMENT RECEIPT)*\n` +
+        `=================================\n` +
+        `📄 රිසිට්පත් අංකය: #${receiptNum}\n` +
+        `📅 දිනය: ${payDate}\n` +
+        `🏪 ශාඛාව: ${shopName}\n` +
+        `👤 සේවක: ${cashier}\n` +
+        `---------------------------------\n` +
+        `👤 *පාරිභෝගිකයා:* ${credit.customerName}\n` +
+        `📱 *දුරකථනය:* ${credit.phoneModel}\n` +
+        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
+        `📞 *දුරකථන අංකය:* ${credit.primaryPhone}\n` +
+        `---------------------------------\n` +
+        `💵 *ගෙවීම් විස්තර:*\n` +
+        `• සම්පූර්ණ එකඟ වූ මිල: ${DB.formatCurrency(credit.totalPrice)}\n` +
+        `• දැන් ගෙවූ මුදල: *${DB.formatCurrency(payAmt)}*\n` +
+        `• ගෙවීම් සටහන: ${payNote}\n` +
+        `=================================\n` +
+        `📊 *ගිණුම් තත්ත්වය:*\n` +
+        `• මෙතෙක් ගෙවූ මුළු මුදල: ${DB.formatCurrency(totalPaid)}\n` +
+        `👉 *ඉතිරි හිඟ ශේෂය (Balance Due): ${DB.formatCurrency(credit.balanceDue)}*\n` +
+        `තත්ත්වය: ${isSettled ? '✅ ණය මුදල සම්පූර්ණයෙන් පියවා අවසන් (FULLY SETTLED)' : '⏳ සක්‍රිය ණය ශේෂයක් පවතී (ACTIVE LOAN)'}\n` +
+        `=================================\n` +
+        `ස්තූතියි! ඔබගේ ගෙවීම සාර්ථකව සටහන් විය.\n` +
+        `📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+        `Mutur • Serunuwara • Periyapalam`;
+    }
+
+    let phone = (credit.primaryPhone || '').replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '94' + phone.substring(1);
+    } else if (phone && !phone.startsWith('94')) {
+      phone = '94' + phone;
+    }
+
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
   },
 
   isTorchOn: false,
@@ -10204,15 +11427,677 @@ setShiftViewMode(mode) {
 
   promptDeleteDeviceCredit(creditId) {
     this.showAdminPasswordModal(() => {
+      // Restore linked inventory item back to in_stock
+      const allInv = DB.getInventory(null);
+      const linkedInv = allInv.find(i => i.deviceCreditId === creditId);
+      if (linkedInv) {
+        DB.updateInventoryItemStatus(linkedInv.id, 'in_stock', { deviceCreditId: null, soldDate: null });
+      }
+
       DB.deleteDeviceCredit(creditId);
       this.updateTopBarBadges();
-      this.showToast(I18N.currentLang === 'si' ? 'ණය ගිවිසුම මකා දමන ලදී' : 'Device credit agreement deleted', 'success');
+      this.showToast(I18N.currentLang === 'si' ? 'ණය ගිවිසුම මකා දමන ලදී (තොගය යළි සක්‍රිය විය)' : 'Device credit agreement deleted & stock restored', 'success');
       this.renderDeviceCreditsPage();
       this.refreshPage(this.currentPage);
       this.updateDashboardShiftStatusBanner();
     });
+  },
+
+  // ==========================================
+  // PHASE 4: MULTI-BRANCH STOCK & INVENTORY CONTROLLER
+  // ==========================================
+  invShopFilter: 'all',
+  invCategoryFilter: 'all',
+  invStatusFilter: 'in_stock',
+
+  setInventoryShopFilter(val) {
+    this.invShopFilter = val;
+    this.renderInventoryPage();
+  },
+
+  setInventoryCategoryFilter(val) {
+    this.invCategoryFilter = val;
+    this.renderInventoryPage();
+  },
+
+  setInventoryStatusFilter(val) {
+    this.invStatusFilter = val;
+    document.querySelectorAll('#invStatusFilterTabs .tab-pill').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-status') === val);
+    });
+    this.renderInventoryPage();
+  },
+
+  renderInventoryPage() {
+    const shopFilterEl = document.getElementById('invShopFilter');
+    const shops = DB.getShops(false);
+    const allShopsList = DB.getShops(true);
+    const selectedShopFilter = this.invShopFilter || 'all';
+
+    if (shopFilterEl && shopFilterEl.options.length <= 1) {
+      shopFilterEl.innerHTML = `<option value="all" ${selectedShopFilter === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
+      shops.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = '🏪 ' + s.name;
+        if (s.id === selectedShopFilter) opt.selected = true;
+        shopFilterEl.appendChild(opt);
+      });
+    }
+
+    const targetShopId = selectedShopFilter === 'all' ? null : selectedShopFilter;
+    const stats = DB.getInventoryStats(targetShopId);
+
+    // Update KPI cards
+    const totalCountEl = document.getElementById('kpiInvTotalCount');
+    if (totalCountEl) totalCountEl.textContent = `${stats.totalInStock} ${I18N.currentLang === 'si' ? 'භාණ්ඩ' : 'Items'}`;
+
+    const smartphonesCountEl = document.getElementById('kpiInvSmartphonesCount');
+    if (smartphonesCountEl) smartphonesCountEl.textContent = `${stats.smartphonesCount} ${I18N.currentLang === 'si' ? 'ස්මාර්ට්ෆෝන්' : 'Phones'}`;
+
+    const costValEl = document.getElementById('kpiInvCostValue');
+    if (costValEl) costValEl.textContent = DB.formatCurrency(stats.totalCostValue);
+
+    const marginEl = document.getElementById('kpiInvPotentialProfit');
+    if (marginEl) marginEl.textContent = `${I18N.currentLang === 'si' ? 'අපේක්ෂිත ලාභය' : 'Est Margin'}: ${DB.formatCurrency(stats.potentialProfit)}`;
+
+    const sellingValEl = document.getElementById('kpiInvSellingValue');
+    if (sellingValEl) sellingValEl.textContent = DB.formatCurrency(stats.totalSellingValue);
+
+    const routersCountEl = document.getElementById('kpiInvRoutersCount');
+    if (routersCountEl) routersCountEl.textContent = `${stats.routersCount} ${I18N.currentLang === 'si' ? 'රවුටර්' : 'Routers'} / ${stats.accessoriesCount} ${I18N.currentLang === 'si' ? 'අමතර' : 'Accs'}`;
+
+    const creditIssuedEl = document.getElementById('kpiInvCreditIssuedCount');
+    if (creditIssuedEl) creditIssuedEl.textContent = `${stats.deviceCreditCount} ${I18N.currentLang === 'si' ? 'ණයට දුන්' : 'Credit'}`;
+
+    const soldCountEl = document.getElementById('kpiInvSoldCount');
+    if (soldCountEl) soldCountEl.textContent = `${stats.soldCount} ${I18N.currentLang === 'si' ? 'මුදලට විකුණූ' : 'Cash Sold'}`;
+
+    // Update Tab count badges
+    const countInStock = document.getElementById('countInvInStock');
+    if (countInStock) countInStock.textContent = stats.totalInStock;
+
+    const countCredit = document.getElementById('countInvCredit');
+    if (countCredit) countCredit.textContent = stats.deviceCreditCount;
+
+    const countSold = document.getElementById('countInvSold');
+    if (countSold) countSold.textContent = stats.soldCount;
+
+    const countAll = document.getElementById('countInvAll');
+    if (countAll) countAll.textContent = stats.totalItems;
+
+    // Filter Items
+    let items = DB.getInventory(targetShopId);
+
+    // 1. Status Filter
+    if (this.invStatusFilter === 'in_stock') {
+      items = items.filter(i => i.status === 'in_stock' || !i.status);
+    } else if (this.invStatusFilter === 'device_credit') {
+      items = items.filter(i => i.status === 'device_credit');
+    } else if (this.invStatusFilter === 'sold_cash') {
+      items = items.filter(i => i.status === 'sold_cash' || i.status === 'sold');
+    }
+
+    // 2. Category Filter
+    if (this.invCategoryFilter && this.invCategoryFilter !== 'all') {
+      items = items.filter(i => i.category === this.invCategoryFilter);
+    }
+
+    // 3. Search query
+    const searchVal = document.getElementById('invSearchInput')?.value?.trim().toLowerCase();
+    if (searchVal) {
+      items = items.filter(i => {
+        const iShop = allShopsList.find(s => s.id === i.shopId);
+        const sName = (iShop ? iShop.name : '').toLowerCase();
+        return (i.brand && i.brand.toLowerCase().includes(searchVal)) ||
+               (i.model && i.model.toLowerCase().includes(searchVal)) ||
+               (i.imei && i.imei.toLowerCase().includes(searchVal)) ||
+               (i.imei2 && i.imei2.toLowerCase().includes(searchVal)) ||
+               (i.barcode && i.barcode.toLowerCase().includes(searchVal)) ||
+               sName.includes(searchVal);
+      });
+    }
+
+    const container = document.getElementById('invListContainer');
+    if (!container) return;
+
+    if (items.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state card" style="padding:40px 20px; text-align:center;">
+          <div style="font-size:3rem; margin-bottom:12px;">📦</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">
+            ${searchVal ? (I18N.currentLang === 'si' ? 'ගැලපෙන තොග වාර්තා හමුනොවීය' : 'No matching inventory items found') : (I18N.currentLang === 'si' ? 'තවම තොග සටහන් කර නොමැත' : 'No inventory items recorded yet')}
+          </div>
+          <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:18px;">
+            ${I18N.currentLang === 'si' ? 'දුරකථන, රවුටර් හෝ උපාංග තොගයට එක් කිරීමට පහත බොත්තම ඔබන්න' : 'Click the button below to add a phone or accessory to inventory'}
+          </div>
+          <button type="button" class="btn btn-primary" onclick="App.showAddStockItemModal()">
+            <span>📦</span> <span>${I18N.t('btn_add_stock') || '+ Add Stock Item'}</span>
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    let cardsHtml = '';
+    const categoryIcons = {
+      smartphone: '📱',
+      featurephone: '📞',
+      router: '📡',
+      accessory: '🎧',
+      sim: '💳'
+    };
+
+    items.forEach(item => {
+      const foundShop = allShopsList.find(s => s.id === item.shopId);
+      const branchName = foundShop ? foundShop.name : (allShopsList.length > 0 ? allShopsList[0].name : 'Main Shop');
+      const catIcon = categoryIcons[item.category] || '📦';
+      const isPhoneOrRouter = item.category === 'smartphone' || item.category === 'featurephone' || item.category === 'router';
+      const isDeviceCredit = item.status === 'device_credit';
+      const isSold = item.status === 'sold_cash' || item.status === 'sold';
+      const isInStock = item.status === 'in_stock' || !item.status;
+
+      let statusBadgeHtml = '';
+      if (isInStock) {
+        statusBadgeHtml = `<span class="tally-badge balanced">🟢 In Stock (තිබේ)</span>`;
+      } else if (isDeviceCredit) {
+        statusBadgeHtml = `<span class="tally-badge excess" style="background:rgba(139,92,246,0.15); color:var(--accent-purple); border:1px solid rgba(139,92,246,0.4);">🤝 Credit Issued</span>`;
+      } else if (isSold) {
+        statusBadgeHtml = `<span class="tally-badge" style="background:rgba(34,197,94,0.15); color:var(--accent-green); border:1px solid rgba(34,197,94,0.3);">✅ Cash Sold</span>`;
+      } else {
+        statusBadgeHtml = `<span class="tally-badge shortage">${item.status}</span>`;
+      }
+
+      const costPrice = parseFloat(item.costPrice) || 0;
+      const sellingPrice = parseFloat(item.sellingPrice) || 0;
+      const margin = sellingPrice - costPrice;
+      const marginPct = costPrice > 0 ? Math.round((margin / costPrice) * 100) : 0;
+
+      cardsHtml += `
+        <div class="card" style="margin-bottom:12px; padding:16px; border:1px solid var(--border-glass); transition:all 0.2s ease;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:48px; height:48px; border-radius:12px; background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); display:flex; align-items:center; justify-content:center; font-size:1.6rem;">
+                ${catIcon}
+              </div>
+              <div>
+                <div style="font-size:1.05rem; font-weight:800; color:var(--text-primary); display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  <span>${item.brand ? `${item.brand} ` : ''}${item.model || 'Device / Accessory'}</span>
+                  <span class="branch-pill-badge">
+                    <span>🏪</span> <span>${branchName}</span>
+                  </span>
+                  ${item.quantity > 1 ? `<span style="font-size:0.75rem; font-weight:800; padding:1px 8px; border-radius:10px; background:rgba(59,130,246,0.15); color:var(--accent-blue); border:1px solid rgba(59,130,246,0.3);">Qty: ${item.quantity}</span>` : ''}
+                </div>
+                <div style="font-size:0.82rem; color:var(--text-secondary); margin-top:3px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                  ${item.imei ? `
+                    <span style="font-family:monospace; color:var(--accent-gold); display:inline-flex; align-items:center; gap:4px;">
+                      IMEI: <strong>${item.imei}</strong>
+                      <button type="button" class="btn btn-xs btn-ghost" onclick="navigator.clipboard.writeText('${item.imei}'); App.showToast('IMEI Copied', 'info');" title="Copy IMEI" style="padding:1px 5px; font-size:0.68rem;">📋</button>
+                    </span>
+                  ` : ''}
+                  ${item.imei2 ? `<span style="font-family:monospace; color:var(--text-muted);">IMEI 2: ${item.imei2}</span>` : ''}
+                  ${item.barcode ? `<span style="font-family:monospace; color:var(--text-secondary);">Barcode: <strong>${item.barcode}</strong></span>` : ''}
+                  <span style="color:var(--text-muted); font-size:0.75rem;">Added: ${item.dateAdded || item.createdAt?.split('T')[0] || '-'}</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              ${statusBadgeHtml}
+            </div>
+          </div>
+
+          <!-- Middle Financials Row -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-top:12px; background:var(--bg-glass); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+            <div>
+              <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Cost Price (ගැණුම්)</div>
+              <div style="font-size:1.05rem; font-weight:800; color:var(--text-primary); margin-top:2px;">${DB.formatCurrency(costPrice)}</div>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Retail Price (විකුණුම්)</div>
+              <div style="font-size:1.15rem; font-weight:900; color:var(--accent-green); margin-top:2px;">${DB.formatCurrency(sellingPrice)}</div>
+            </div>
+            <div>
+              <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Estimated Margin</div>
+              <div style="font-size:0.95rem; font-weight:800; color:${margin >= 0 ? 'var(--accent-gold)' : 'var(--accent-red)'}; margin-top:2px;">
+                ${DB.formatCurrency(margin)} (${marginPct}%)
+              </div>
+            </div>
+            ${item.transferHistory && item.transferHistory.length > 0 ? `
+              <div>
+                <div style="font-size:0.7rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Transfers</div>
+                <div style="font-size:0.82rem; font-weight:700; color:var(--accent-blue); margin-top:2px;">
+                  🔄 ${item.transferHistory.length} branch move(s)
+                </div>
+              </div>
+            ` : ''}
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:12px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.1);">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              ${isInStock && isPhoneOrRouter ? `
+                <button type="button" class="btn btn-sm btn-success" onclick="App.issueDeviceCreditFromStock('${item.id}')" style="font-weight:700; padding:6px 12px; background:linear-gradient(135deg, #0d9488, #059669); color:#fff; border:none;">
+                  <span>✍️</span> <span>${I18N.currentLang === 'si' ? 'ණය ගිවිසුමට දෙන්න' : 'Issue on Credit'}</span>
+                </button>
+              ` : ''}
+              ${isInStock ? `
+                <button type="button" class="btn btn-sm btn-ghost" onclick="App.showTransferStockModal('${item.id}')" style="border:1px solid rgba(59,130,246,0.35); color:var(--accent-blue); font-weight:700; padding:6px 12px;">
+                  <span>🔄</span> <span>${I18N.currentLang === 'si' ? 'ශාඛාවට මාරු කරන්න' : 'Transfer Branch'}</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" onclick="App.markStockItemSold('${item.id}')" style="border:1px solid rgba(34,197,94,0.35); color:var(--accent-green); font-weight:700; padding:6px 12px;">
+                  <span>💵</span> <span>${I18N.currentLang === 'si' ? 'විකුණන ලදී' : 'Mark Sold'}</span>
+                </button>
+              ` : ''}
+              ${isDeviceCredit && item.deviceCreditId ? `
+                <button type="button" class="btn btn-sm btn-ghost" onclick="App.showDeviceCreditDetailsModal('${item.deviceCreditId}')" style="border:1px solid rgba(139,92,246,0.35); color:var(--accent-purple); font-weight:700; padding:6px 12px;">
+                  <span>🔍</span> <span>${I18N.currentLang === 'si' ? 'ණය ගිවිසුම බලන්න' : 'View Credit Agreement'}</span>
+                </button>
+              ` : ''}
+            </div>
+
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-sm btn-ghost" onclick="App.showAddStockItemModal('${item.id}')" title="Edit Item" style="border:1px solid rgba(255,255,255,0.15); padding:6px 10px;">
+                <span>✏️</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" onclick="App.promptDeleteStockItem('${item.id}')" title="Delete Item" style="border:1px solid rgba(239,68,68,0.3); color:var(--accent-red); padding:6px 10px;">
+                <span>🗑️</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = cardsHtml;
+  },
+
+  showAddStockItemModal(itemId = null) {
+    const shops = DB.getShops(false);
+    const activeShopId = DB.getActiveShopId();
+    let existing = null;
+    if (itemId) {
+      existing = DB.getInventoryItem(itemId);
+    }
+
+    const isSi = I18N.currentLang === 'si';
+    const brands = ['Samsung', 'Xiaomi / Redmi', 'Apple iPhone', 'Vivo', 'Oppo', 'Realme', 'ZTE', 'Dialog', 'SLT-Mobitel', 'Anker', 'Baseus', 'JBL', 'Other'];
+
+    const bodyHtml = `
+      <form id="stockItemForm" style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Branch selection -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'ශාඛාව / Branch *' : 'Branch *'}</label>
+          <select class="form-select" id="stockShopId" required style="font-weight:700;">
+            ${shops.map(s => `
+              <option value="${s.id}" ${(existing?.shopId === s.id || (!existing && s.id === (this.invShopFilter !== 'all' ? this.invShopFilter : activeShopId))) ? 'selected' : ''}>
+                🏪 ${s.name}
+              </option>
+            `).join('')}
+          </select>
+        </div>
+
+        <!-- Category & Brand -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'වර්ගය (Category) *' : 'Category *'}</label>
+            <select class="form-select" id="stockCategory" required onchange="App.onStockCategoryChange()">
+              <option value="smartphone" ${existing?.category === 'smartphone' ? 'selected' : ''}>📱 Smartphone</option>
+              <option value="featurephone" ${existing?.category === 'featurephone' ? 'selected' : ''}>📞 Feature Phone</option>
+              <option value="router" ${existing?.category === 'router' ? 'selected' : ''}>📡 4G/5G Router</option>
+              <option value="accessory" ${existing?.category === 'accessory' ? 'selected' : ''}>🎧 Accessory</option>
+              <option value="sim" ${existing?.category === 'sim' ? 'selected' : ''}>💳 SIM / Scratch Card</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'සන්නාමය (Brand) *' : 'Brand *'}</label>
+            <input type="text" class="form-input" id="stockBrand" list="brandDatalist" required value="${existing?.brand || ''}" placeholder="e.g. Samsung / Xiaomi">
+            <datalist id="brandDatalist">
+              ${brands.map(b => `<option value="${b}">`).join('')}
+            </datalist>
+          </div>
+        </div>
+
+        <!-- Model Name -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'මාදිලිය සහ ධාරිතාව (Model & Spec) *' : 'Model & Spec *'}</label>
+          <input type="text" class="form-input" id="stockModel" required value="${existing?.model || ''}" placeholder="e.g. Galaxy A05s (4GB/128GB Black)">
+        </div>
+
+        <!-- IMEI / Serial Number -->
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label class="form-label" style="margin-bottom:0;">IMEI 1 / Serial No</label>
+              <button type="button" class="btn btn-xs btn-ghost" onclick="App.openImeiScannerModal('stockImei')" style="padding:1px 6px; font-size:0.72rem; color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4);">📷 Scan</button>
+            </div>
+            <input type="text" class="form-input" id="stockImei" value="${existing?.imei || ''}" placeholder="15 digits IMEI or S/N" style="font-family:monospace;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">IMEI 2 (Optional)</label>
+            <input type="text" class="form-input" id="stockImei2" value="${existing?.imei2 || ''}" placeholder="Secondary IMEI" style="font-family:monospace;">
+          </div>
+        </div>
+
+        <!-- Financials: Cost, Selling Price & Quantity -->
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ගැණුම් මිල (Cost Rs.) *' : 'Cost Price *'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="stockCostPrice" required value="${existing?.costPrice || ''}" placeholder="0.00" style="font-weight:700;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'විකුණුම් මිල (Selling Rs.) *' : 'Selling Price *'}</label>
+            <input type="number" step="0.01" min="0" class="form-input" id="stockSellingPrice" required value="${existing?.sellingPrice || ''}" placeholder="0.00" style="font-weight:800; color:var(--accent-green);">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ප්‍රමාණය (Quantity)' : 'Qty'}</label>
+            <input type="number" step="1" min="1" class="form-input" id="stockQuantity" value="${existing?.quantity || 1}" style="font-weight:700; text-align:center;">
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'සටහන (Optional Notes)' : 'Notes (Optional)'}</label>
+          <input type="text" class="form-input" id="stockNotes" value="${existing?.notes || ''}" placeholder="e.g. Intex warranty 1 year / Supplier: Colombo">
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      itemId ? (isSi ? '✏️ තොග විස්තර සංස්කරණය' : '✏️ Edit Stock Item') : (isSi ? '📦 අලුත් භාණ්ඩයක් තොගයට එක් කිරීම' : '📦 Add Item to Stock'),
+      bodyHtml,
+      [
+        { text: isSi ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
+        { text: isSi ? '💾 තොගය සුරකින්න' : '💾 Save Stock Item', class: 'btn-primary', onClick: () => this.saveStockItemModal(itemId) }
+      ]
+    );
+  },
+
+  onStockCategoryChange() {
+    const cat = document.getElementById('stockCategory')?.value;
+    const qtyInp = document.getElementById('stockQuantity');
+    if (cat === 'accessory' || cat === 'sim') {
+      if (qtyInp && qtyInp.value === '1') qtyInp.value = '10';
+    } else {
+      if (qtyInp) qtyInp.value = '1';
+    }
+  },
+
+  async saveStockItemModal(itemId = null) {
+    const shopId = document.getElementById('stockShopId')?.value || DB.getActiveShopId();
+    const category = document.getElementById('stockCategory')?.value || 'smartphone';
+    const brand = document.getElementById('stockBrand')?.value.trim();
+    const model = document.getElementById('stockModel')?.value.trim();
+    const imei = document.getElementById('stockImei')?.value.trim();
+    const imei2 = document.getElementById('stockImei2')?.value.trim();
+    const costPrice = parseFloat(document.getElementById('stockCostPrice')?.value) || 0;
+    const sellingPrice = parseFloat(document.getElementById('stockSellingPrice')?.value) || 0;
+    const quantity = parseInt(document.getElementById('stockQuantity')?.value, 10) || 1;
+    const notes = document.getElementById('stockNotes')?.value.trim();
+
+    const isSi = I18N.currentLang === 'si';
+
+    if (!model) {
+      this.showToast(isSi ? 'කරුණාකර මාදිලියේ නම ඇතුළත් කරන්න' : 'Please enter Model Name', 'error');
+      return;
+    }
+    if (sellingPrice <= 0) {
+      this.showToast(isSi ? 'කරුණාකර විකුණුම් මිල ඇතුළත් කරන්න' : 'Please enter Selling Price', 'error');
+      return;
+    }
+
+    const payload = {
+      id: itemId,
+      shopId,
+      category,
+      brand,
+      model,
+      imei,
+      imei2,
+      costPrice,
+      sellingPrice,
+      quantity,
+      notes,
+      status: itemId ? (DB.getInventoryItem(itemId)?.status || 'in_stock') : 'in_stock'
+    };
+
+    DB.saveInventoryItem(payload);
+    this.showToast(isSi ? '✅ තොගය සාර්ථකව යාවත්කාලීන විය!' : '✅ Stock Item Saved Successfully!', 'success');
+    this.closeModal();
+    if (this.currentPage === 'inventory') {
+      this.renderInventoryPage();
+    }
+  },
+
+  promptDeleteStockItem(itemId) {
+    this.showAdminPasswordModal(() => {
+      DB.deleteInventoryItem(itemId);
+      this.showToast(I18N.currentLang === 'si' ? 'භාණ්ඩය තොගයෙන් මකා දමන ලදී' : 'Stock item deleted', 'success');
+      if (this.currentPage === 'inventory') {
+        this.renderInventoryPage();
+      }
+    });
+  },
+
+  markStockItemSold(itemId) {
+    const item = DB.getInventoryItem(itemId);
+    if (!item) return;
+
+    const isSi = I18N.currentLang === 'si';
+    if (confirm(isSi ? `මෙම ${item.model} (IMEI: ${item.imei || '-'}) මුදලට විකුණන ලද ලෙස සලකුණු කරන්නද?` : `Mark ${item.model} as sold via Cash/POS?`)) {
+      DB.updateInventoryItemStatus(itemId, 'sold_cash', { soldDate: DB.getTodayDate() });
+      this.showToast(isSi ? '✅ භාණ්ඩය විකුණූ ලෙස සලකුණු විය' : '✅ Marked as Sold', 'success');
+      this.renderInventoryPage();
+    }
+  },
+
+  showTransferStockModal(itemId) {
+    const item = DB.getInventoryItem(itemId);
+    if (!item) return;
+
+    const shops = DB.getShops(true);
+    const otherShops = shops.filter(s => s.id !== item.shopId);
+    const isSi = I18N.currentLang === 'si';
+    const currentShop = shops.find(s => s.id === item.shopId);
+    const currentShopName = currentShop ? currentShop.name : 'Current Branch';
+
+    if (otherShops.length === 0) {
+      this.showToast(isSi ? 'මාරු කිරීමට වෙනත් ශාඛා නොමැත' : 'No other branches available for transfer', 'info');
+      return;
+    }
+
+    const bodyHtml = `
+      <form id="stockTransferForm" style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Item Overview -->
+        <div style="background:var(--bg-glass-card); padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="font-weight:800; font-size:1.05rem; color:var(--text-primary);">${item.brand ? item.brand + ' ' : ''}${item.model}</div>
+          <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px;">
+            IMEI: <code style="color:var(--accent-gold);">${item.imei || 'N/A'}</code> | Retail: <strong>${DB.formatCurrency(item.sellingPrice)}</strong>
+          </div>
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">
+            📤 ${isSi ? 'දැනට පවතින ශාඛාව:' : 'Current Branch:'} <strong>${currentShopName}</strong>
+          </div>
+        </div>
+
+        <!-- Destination Branch -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'යවන ශාඛාව (Destination Branch) *' : 'Destination Branch *'}</label>
+          <select class="form-select" id="trfDestShopId" required style="font-weight:700; font-size:0.95rem;">
+            ${otherShops.map(s => `
+              <option value="${s.id}">🏪 ${s.name}</option>
+            `).join('')}
+          </select>
+        </div>
+
+        <!-- Staff / Dispatcher -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'භාණ්ඩය භාරදුන් සේවක (Staff / Dispatcher)' : 'Dispatched By'}</label>
+          <input type="text" class="form-input" id="trfStaffName" placeholder="Staff Name">
+        </div>
+
+        <!-- Notes -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">${isSi ? 'මාරුකිරීමේ සටහන (Transfer Reason / Waybill Note)' : 'Waybill Note'}</label>
+          <input type="text" class="form-input" id="trfNote" placeholder="e.g. Sent with driver Thanushan for branch stock requirement">
+        </div>
+
+        <!-- Buttons -->
+        <div style="display:flex; gap:10px; margin-top:14px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal()" style="flex:1; padding:11px; font-weight:700;">
+            ${isSi ? 'අවලංගු කරන්න' : 'Cancel'}
+          </button>
+          <button type="button" class="btn btn-success" onclick="App.completeStockTransfer('${itemId}', true)" style="flex:2; padding:11px; font-weight:800; background:#16a34a; border:none; display:flex; align-items:center; justify-content:center; gap:6px;">
+            <span>📲</span> <span>${isSi ? 'මාරු කර Waybill එක WhatsApp කරන්න' : 'Transfer & WhatsApp Waybill'}</span>
+          </button>
+        </div>
+      </form>
+    `;
+
+    this.showModal(
+      isSi ? '🔄 ශාඛා අතර තොග මාරු කිරීම (Stock Transfer)' : '🔄 Inter-Branch Stock Transfer',
+      bodyHtml,
+      [
+        { text: isSi ? 'මාරු කිරීම පමණක් සිදුකරන්න' : 'Transfer Only', class: 'btn-primary', onClick: () => this.completeStockTransfer(itemId, false) }
+      ]
+    );
+  },
+
+  completeStockTransfer(itemId, sendWa = false) {
+    const destShopId = document.getElementById('trfDestShopId')?.value;
+    const staff = document.getElementById('trfStaffName')?.value.trim() || 'Staff';
+    const note = document.getElementById('trfNote')?.value.trim() || '';
+
+    if (!destShopId) return;
+
+    const item = DB.getInventoryItem(itemId);
+    const updated = DB.transferInventoryItem(itemId, destShopId, staff, note);
+    const isSi = I18N.currentLang === 'si';
+
+    this.closeModal();
+    this.showToast(isSi ? '✅ භාණ්ඩය සාර්ථකව නව ශාඛාවට මාරු විය!' : '✅ Stock Item Transferred Successfully!', 'success');
+
+    if (sendWa && updated && updated.transferHistory && updated.transferHistory.length > 0) {
+      const latestTrf = updated.transferHistory[updated.transferHistory.length - 1];
+      this.shareStockTransferWaybill(updated, latestTrf);
+    }
+
+    if (this.currentPage === 'inventory') {
+      this.renderInventoryPage();
+    }
+  },
+
+  shareStockTransferWaybill(item, transfer) {
+    const allShops = DB.getShops(true);
+    const fromShop = allShops.find(s => s.id === transfer.fromShopId);
+    const toShop = allShops.find(s => s.id === transfer.toShopId);
+    const fromName = fromShop ? fromShop.name : 'Origin Branch';
+    const toName = toShop ? toShop.name : 'Destination Branch';
+    const waybillNum = 'TRF-' + Date.now().toString().slice(-6);
+
+    const msg = `📦 *METHMI MOBILE (PVT) LTD*\n` +
+      `Inter-Branch Stock Transfer Waybill / ශාඛා අතර තොග මාරුකිරීම් පත්‍රිකාව\n` +
+      `=================================\n` +
+      `📄 Waybill No: #${waybillNum}\n` +
+      `📅 Date: ${transfer.date} (${DB.formatDateTime(transfer.timestamp || new Date().toISOString())})\n` +
+      `👤 Dispatch Staff: ${transfer.transferredBy || 'Staff'}\n` +
+      `---------------------------------\n` +
+      `📤 *FROM BRANCH:* ${fromName}\n` +
+      `📥 *TO BRANCH:* ${toName}\n` +
+      `---------------------------------\n` +
+      `📱 *ITEM DETAILS:*\n` +
+      `• Device / Item: ${item.brand ? item.brand + ' ' : ''}${item.model}\n` +
+      `• Category: ${item.category}\n` +
+      `• IMEI / Serial: ${item.imei || 'N/A'}\n` +
+      `• Retail Value: ${DB.formatCurrency(item.sellingPrice)}\n` +
+      (transfer.note ? `• Transfer Note: ${transfer.note}\n` : '') +
+      `=================================\n` +
+      `⚠️ කරුණාකර භාණ්ඩය ලැබුණු පසු පරීක්ෂා කර බලා මෙත්මි මොබයිල් පද්ධතියේ ලැබීම තහවුරු කරන්න.\n` +
+      `📞 Hotlines: 0752 335 533 / 0753 028 100\n` +
+      `Mutur • Serunuwara • Periyapalam`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  },
+
+  issueDeviceCreditFromStock(itemId) {
+    const item = DB.getInventoryItem(itemId);
+    if (!item) return;
+
+    this.showAddDeviceCreditModal();
+    setTimeout(() => {
+      const modelInp = document.getElementById('devModel');
+      const imeiInp = document.getElementById('devImei1');
+      const priceInp = document.getElementById('devTotalPrice');
+      const shopSelect = document.getElementById('devShopId');
+      const invHidden = document.getElementById('devCreditInventoryItemId');
+
+      if (modelInp) modelInp.value = `${item.brand ? item.brand + ' ' : ''}${item.model}`;
+      if (imeiInp) imeiInp.value = item.imei || '';
+      if (priceInp) priceInp.value = item.sellingPrice || '';
+      if (shopSelect && item.shopId) shopSelect.value = item.shopId;
+      if (invHidden) invHidden.value = item.id;
+      this.calcDevCreditFormBalance();
+    }, 150);
+  },
+
+  openSelectPhoneFromStockModal() {
+    const shopId = document.getElementById('devShopId')?.value || DB.getActiveShopId();
+    const inventory = DB.getInventory(shopId);
+    const inStockPhones = inventory.filter(i => (i.status === 'in_stock' || !i.status) && (i.category === 'smartphone' || i.category === 'featurephone' || i.category === 'router'));
+    const isSi = I18N.currentLang === 'si';
+
+    if (inStockPhones.length === 0) {
+      this.showToast(isSi ? 'මෙම ශාඛාවේ තොගයේ දුරකථන නොමැත' : 'No in-stock phones available in this branch', 'info');
+      return;
+    }
+
+    const listHtml = inStockPhones.map(item => `
+      <div style="background:var(--bg-glass-card); border:1px solid var(--border-glass); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+        <div>
+          <div style="font-weight:800; font-size:0.95rem; color:var(--text-primary);">${item.brand ? item.brand + ' ' : ''}${item.model}</div>
+          <div style="font-size:0.8rem; color:var(--accent-gold); font-family:monospace; margin-top:2px;">
+            IMEI: <strong>${item.imei || 'N/A'}</strong>
+          </div>
+          <div style="font-size:0.82rem; color:var(--accent-green); font-weight:700; margin-top:2px;">
+            Retail: ${DB.formatCurrency(item.sellingPrice)}
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" onclick="App.selectPhoneFromStock('${item.id}')" style="font-weight:700; padding:6px 14px;">
+          ✅ ${isSi ? 'තෝරන්න' : 'Select'}
+        </button>
+      </div>
+    `).join('');
+
+    this.showSubModal(
+      isSi ? '📦 තොගයේ ඇති දුරකථන ලැයිස්තුව' : '📦 Select Phone from In-Stock',
+      `<div style="max-height:60vh; overflow-y:auto;">${listHtml}</div>`,
+      [{ text: isSi ? 'වසන්න' : 'Close', class: 'btn-ghost', onClick: () => this.closeSubModal() }]
+    );
+  },
+
+  selectPhoneFromStock(itemId) {
+    const item = DB.getInventoryItem(itemId);
+    if (!item) return;
+
+    const modelInp = document.getElementById('devModel');
+    const imeiInp = document.getElementById('devImei1');
+    const priceInp = document.getElementById('devTotalPrice');
+    const invHidden = document.getElementById('devCreditInventoryItemId');
+
+    if (modelInp) modelInp.value = `${item.brand ? item.brand + ' ' : ''}${item.model}`;
+    if (imeiInp) imeiInp.value = item.imei || '';
+    if (priceInp) priceInp.value = item.sellingPrice || '';
+    if (invHidden) invHidden.value = item.id;
+
+    this.calcDevCreditFormBalance();
+    this.closeSubModal();
+    this.showToast(`✅ Selected: ${item.model}`, 'success');
+  },
+
+  openInventoryImeiScannerModal() {
+    this.openImeiScannerModal('invSearchInput');
   }
 };
+
 
 // ---- Initialize on DOM ready ----
 document.addEventListener('DOMContentLoaded', () => App.init());

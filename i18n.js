@@ -146,8 +146,8 @@ const I18N = {
       'add_shop': '➕ Add Shop',
 
       // Section 4: Grand Total
-      'upd_grand_sec_title': '💰 Section 4: Grand Total Capital',
-      'upd_grand_total': 'Grand Total Capital (SIMs + Bank + Cash Drawer)',
+      'upd_grand_sec_title': '💰 Section 4: Grand Total Capital [Section (1+2) + Section 3]',
+      'upd_grand_total': 'Grand Total Capital: [Section 1 + Section 2 (Reload)] + [Section 3 (Bank)]',
       'btn_save_update': '💾 Save Update',
       'btn_save_and_whatsapp': 'Save & Share WhatsApp',
       'btn_save_only': 'Save Only',
@@ -316,7 +316,15 @@ const I18N = {
 
       // Short-Term Device Credits
       'top_btn_dev_credit': '+ Device Credit',
-      'nav_dev_credits': 'Device Credits',
+      'nav_dev_credits': 'Phone Loans & Agreements',
+      'nav_inventory': 'Stock & Inventory',
+      'inv_title': 'Branch Stock & Barcode Inventory',
+      'inv_subtitle': 'Track phones, IMEI numbers, routers & accessories across branches',
+      'btn_add_stock': '+ Add Stock Item',
+      'stat_total_in_stock': 'Total In Stock',
+      'stat_stock_cost_val': 'Total Stock Cost',
+      'stat_stock_retail_val': 'Retail / Selling Value',
+      'stat_credit_issued': 'Credit Issued',
       'dev_cred_title': 'Short-Term Device Credit Customers',
       'dev_cred_subtitle': 'Track in-house mobile phone loans, customer NICs, IMEI & repayments',
       'btn_add_device_credit': '+ New Device Credit Agreement',
@@ -508,8 +516,8 @@ const I18N = {
       'add_shop': '➕ නව සාප්පුවක්',
 
       // Section 4: Grand Total
-      'upd_grand_sec_title': '💰 කොටස 4: සම්පූර්ණ ප්‍රාග්ධනය',
-      'upd_grand_total': 'සම්පූර්ණ ප්‍රාග්ධනය (සිම් + බැංකු + ලාච්චුවේ මුදල්)',
+      'upd_grand_sec_title': '💰 කොටස 4: සම්පූර්ණ ප්‍රාග්ධනය [කොටස (1+2) + කොටස 3]',
+      'upd_grand_total': 'සම්පූර්ණ ප්‍රාග්ධනය: [කොටස 1 + 2 (රීලෝඩ්)] + [කොටස 3 (බැංකු)]',
       'btn_save_update': '💾 Save කරන්න',
       'btn_save_and_whatsapp': 'Save කර WhatsApp යවන්න',
       'btn_save_only': 'Save පමණක් කරන්න',
@@ -679,6 +687,14 @@ const I18N = {
       // Short-Term Device Credits
       'top_btn_dev_credit': '+ දුරකථන ණය',
       'nav_dev_credits': 'ණයට දුන් දුරකථන',
+      'nav_inventory': 'තොග සහ උපකරණ (Stock)',
+      'inv_title': 'ශාඛා තොග සහ බාර්කෝඩ් කළමනාකරණය',
+      'inv_subtitle': 'සියලු ශාඛාවල දුරකථන, IMEI, රවුටර් සහ අමතර කොටස් තොග සටහන්',
+      'btn_add_stock': '+ අලුත් භාණ්ඩයක් එක් කරන්න',
+      'stat_total_in_stock': 'දැනට ඇති තොගය',
+      'stat_stock_cost_val': 'තොගයේ ගැණුම් මිල',
+      'stat_stock_retail_val': 'විකුණුම් වටිනාකම',
+      'stat_credit_issued': 'ණයට ලබාදුන්',
       'dev_cred_title': 'කෙටි කාලීන දුරකථන ණය පාරිභෝගික ලැයිස්තුව',
       'dev_cred_subtitle': 'සාප්පුවෙන් කෙටි කාලීන ණයට දුන් දුරකථන, පාරිභෝගික විස්තර, IMEI හා ගෙවීම් වාර්තාව',
       'btn_add_device_credit': '+ නව දුරකථන ණය ගිවිසුමක්',
@@ -818,8 +834,8 @@ const I18N = {
       'add_shop': '➕ புதிய கடை',
 
       // Section 4: Grand Total
-      'upd_grand_sec_title': '💰 பிரிவு 4: மொத்த மூலதனம்',
-      'upd_grand_total': 'மொத்த மூலதனம் (சிம்கள் + வங்கி + ரொக்கம்)',
+      'upd_grand_sec_title': '💰 பிரிவு 4: மொத்த மூலதனம் [பிரிவு (1+2) + பிரிவு 3]',
+      'upd_grand_total': 'மொத்த மூலதனம்: [பிரிவு 1 + 2 (ரீலோட்)] + [பிரிவு 3 (வங்கி)]',
       'btn_save_update': '💾 சேமி',
       'btn_save_and_whatsapp': 'Save செய்து WhatsApp-ல் பகிரவும்',
       'btn_save_only': 'Save மட்டும் செய்யவும்',
@@ -989,6 +1005,14 @@ const I18N = {
       // Short-Term Device Credits
       'top_btn_dev_credit': '+ சாதன கடன்',
       'nav_dev_credits': 'சாதன கடன்கள்',
+      'nav_inventory': 'கையிருப்பு & சாதனங்கள்',
+      'inv_title': 'கிளை கையிருப்பு & பார்-கோட் மேலாண்மை',
+      'inv_subtitle': 'தொலைபேசிகள், IMEI, ரவுட்டர்கள் மற்றும் உதிரிப்பாகங்களின் இருப்பு விபரங்கள்',
+      'btn_add_stock': '+ புதிய சாதனம் சேர்க்க',
+      'stat_total_in_stock': 'கையிருப்பு எண்ணிக்கை',
+      'stat_stock_cost_val': 'மொத்த அடக்க விலை',
+      'stat_stock_retail_val': 'விற்பனை மதிப்பு',
+      'stat_credit_issued': 'கடனுக்கு வழங்கப்பட்டவை',
       'dev_cred_title': 'குறுகிய கால சாதன கடன் வாடிக்கையாளர்கள்',
       'dev_cred_subtitle': 'கடை சாதன கடன்கள், வாடிக்கையாளர் விபரங்கள், IMEI மற்றும் கொடுப்பனவுகள்',
       'btn_add_device_credit': '+ புதிய சாதன கடன் ஒப்பந்தம்',

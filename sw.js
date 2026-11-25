@@ -1,12 +1,12 @@
-const CACHE_NAME = 'shop-tracker-v53.0';
+const CACHE_NAME = 'shop-tracker-v59.0';
 const ASSETS = [
   './',
   './index.html',
-  './style.css?v=53.0',
-  './app.js?v=53.0',
-  './data.js?v=53.0',
-  './i18n.js?v=53.0',
-  './firebase-init.js?v=53.0',
+  './style.css?v=59.0',
+  './app.js?v=59.0',
+  './data.js?v=59.0',
+  './i18n.js?v=59.0',
+  './firebase-init.js?v=59.0',
   './manifest.json',
   './icon.png',
   'https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js',
@@ -49,6 +49,21 @@ self.addEventListener('fetch', event => {
     url.includes('identitytoolkit') ||
     url.includes('securetoken.googleapis.com')
   ) {
+    return;
+  }
+
+  // For navigation requests (HTML page), use Network-First to guarantee immediate UI updates
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, networkResponse.clone()));
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match('./index.html') || caches.match('/'))
+    );
     return;
   }
 
