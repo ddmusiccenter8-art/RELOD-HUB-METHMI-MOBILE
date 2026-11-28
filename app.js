@@ -25,8 +25,154 @@ const App = {
   currentDenoms: null,
   lastReloadDenominations: null,
 
+  // V62.0 Super Admin vs Cashier Branch Terminal State
+  branchCashierLocked: false,
+  lockedBranchId: null,
+
+  isBranchCashier() {
+    return !!(this.branchCashierLocked && this.lockedBranchId);
+  },
+
+  isSuperAdmin() {
+    if (this.isBranchCashier()) return false;
+    const activeId = DB.getActiveShopId();
+    return DB.isMainShop(activeId) || this.isAdminSessionActive();
+  },
+
+  getBranchLockId() {
+    return this.isBranchCashier() ? this.lockedBranchId : null;
+  },
+
+  initBranchModeFromURL() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const branchParam = urlParams.get('branch') || urlParams.get('shop');
+      const adminParam = urlParams.get('admin') || urlParams.get('superadmin');
+
+      if (adminParam === '1' || adminParam === 'true') {
+        localStorage.removeItem('spt_branch_cashier_lock');
+        this.branchCashierLocked = false;
+        this.lockedBranchId = null;
+        const main = DB.getMainShop();
+        if (main) DB.setActiveShop(main.id);
+        return;
+      }
+
+      if (branchParam) {
+        const foundShop = DB.findShopBySlugOrId(branchParam);
+        if (foundShop) {
+          DB.setActiveShop(foundShop.id);
+          if (DB.isMainShop(foundShop.id)) {
+            localStorage.removeItem('spt_branch_cashier_lock');
+            this.branchCashierLocked = false;
+            this.lockedBranchId = null;
+          } else {
+            localStorage.setItem('spt_branch_cashier_lock', foundShop.id);
+            this.branchCashierLocked = true;
+            this.lockedBranchId = foundShop.id;
+          }
+          return;
+        }
+      }
+
+      const savedLockId = localStorage.getItem('spt_branch_cashier_lock');
+      if (savedLockId) {
+        const lockedShop = DB.getShop(savedLockId);
+        if (lockedShop && !DB.isMainShop(lockedShop.id)) {
+          this.branchCashierLocked = true;
+          this.lockedBranchId = lockedShop.id;
+          DB.setActiveShop(lockedShop.id);
+          return;
+        } else {
+          localStorage.removeItem('spt_branch_cashier_lock');
+        }
+      }
+
+      this.branchCashierLocked = false;
+      this.lockedBranchId = null;
+    } catch (e) {
+      console.warn('initBranchModeFromURL error:', e);
+    }
+  },
+
+  reverifyBranchLock() {
+    const savedLock = localStorage.getItem('spt_branch_cashier_lock');
+    if (savedLock) {
+      const shop = DB.getShop(savedLock);
+      if (shop && !DB.isMainShop(shop.id)) {
+        this.branchCashierLocked = true;
+        this.lockedBranchId = shop.id;
+        DB.setActiveShop(shop.id);
+      } else {
+        localStorage.removeItem('spt_branch_cashier_lock');
+        this.branchCashierLocked = false;
+        this.lockedBranchId = null;
+      }
+    }
+    this.refreshShopSelector();
+    this.updateActiveShopHeaderBadges();
+    this.updateAdminSecurityUI();
+  },
+
+  lockToBranchCashier(shopId) {
+    const shop = DB.getShop(shopId);
+    if (!shop) return;
+    localStorage.setItem('spt_branch_cashier_lock', shop.id);
+    this.branchCashierLocked = true;
+    this.lockedBranchId = shop.id;
+    DB.setActiveShop(shop.id);
+    this.refreshShopSelector();
+    this.updateActiveShopHeaderBadges();
+    this.updateTopBarBadges();
+    this.updateAdminSecurityUI();
+    this.navigateTo('dashboard');
+    this.showToast(I18N.currentLang === 'si' ? `🔒 ${shop.name} Cashier Terminal එකට සාර්ථකව මාරු විය!` : `🔒 Switched to ${shop.name} Cashier Terminal!`, 'info');
+  },
+
+  promptUnlockSuperAdmin() {
+    const isSi = I18N.currentLang === 'si';
+    this.showAdminPasswordModal(() => {
+      localStorage.removeItem('spt_branch_cashier_lock');
+      this.branchCashierLocked = false;
+      this.lockedBranchId = null;
+      const mainShop = DB.getMainShop();
+      if (mainShop) DB.setActiveShop(mainShop.id);
+      this.refreshShopSelector();
+      this.updateActiveShopHeaderBadges();
+      this.updateTopBarBadges();
+      this.updateAdminSecurityUI();
+      this.refreshPage(this.currentPage);
+      this.showToast(isSi ? '👑 Super Admin ප්‍රකාරය සාර්ථකව විවෘත විය!' : '👑 Super Admin mode unlocked successfully!', 'success');
+    }, isSi ? '👑 Super Admin Unlock කරන්න (PIN: 1234)' : '👑 Unlock Super Admin (PIN: 1234)');
+  },
+
+  shareBranchLinkWhatsApp(shopId, linkUrl, shopName) {
+    const isSi = I18N.currentLang === 'si';
+    const msg = `🏪 *Methmi Mobile - ${shopName} Cashier Terminal*\n\n`
+      + `ඔබගේ ශාඛාවේ Cashier Terminal එකට පිවිසීමට පහත සෘජු Link එක භාවිත කරන්න:\n`
+      + `🔗 ${linkUrl}\n\n`
+      + `📌 _(ඔබගේ ${shopName} ශාඛාවේ Reload, Shifts, Stock සහ Phone Agreements පමණක් මෙහි ඇත)_`;
+    const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+  },
+
+  copyBranchLink(shopId, linkUrl) {
+    const isSi = I18N.currentLang === 'si';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(linkUrl).then(() => {
+        this.showToast(isSi ? '📋 Branch Link එක Copy කරගත්තා!' : '📋 Branch Link copied to clipboard!', 'success');
+      }).catch(() => {
+        prompt(isSi ? 'Branch Link එක පහතින් Copy කරගන්න:' : 'Copy Branch Link:', linkUrl);
+      });
+    } else {
+      prompt(isSi ? 'Branch Link එක පහතින් Copy කරගන්න:' : 'Copy Branch Link:', linkUrl);
+    }
+  },
+
   // ---- Initialize (Instant Sub-100ms Render) ----
   init() {
+    // 0. Initialize Branch Lock & Role from URL / Storage
+    this.initBranchModeFromURL();
     // 1. Initialize Localization immediately (synchronous)
     I18N.translatePage();
     const langSel = document.getElementById('langSelector');
@@ -310,6 +456,10 @@ const App = {
   },
 
   navigateTo(page) {
+    if (page === 'shops' && this.isBranchCashier()) {
+      this.showToast(I18N.currentLang === 'si' ? '🔒 සාප්පු කළමනාකරණය Super Admin ට පමණි' : '🔒 Shop management is restricted to Super Admin', 'warning');
+      page = 'dashboard';
+    }
     this.currentPage = page;
     const currentHash = (window.location.hash || '').replace('#', '').split('?')[0];
     if (currentHash !== page && !window.location.hash.includes('sign')) {
@@ -523,6 +673,10 @@ const App = {
 
   setActiveShopAndRefresh(shopId, showToast = true) {
     if (!shopId) return;
+    if (this.isBranchCashier() && shopId !== this.lockedBranchId) {
+      this.showToast(I18N.currentLang === 'si' ? '🔒 මෙම Terminal එක වෙනත් ශාඛාවකට මාරු කළ නොහැක' : '🔒 Terminal locked to this branch', 'warning');
+      return;
+    }
     DB.setActiveShop(shopId);
     const shop = DB.getShop(shopId);
     const shopName = shop ? shop.name : (DB.getShops(false)[0]?.name || 'Shop');
@@ -562,10 +716,13 @@ const App = {
     const shopId = DB.getActiveShopId();
     const shop = DB.getShop(shopId);
     const shopName = shop ? shop.name : (DB.getShops(false)[0]?.name || 'Main Shop');
+    const isCashier = this.isBranchCashier();
+    const isMain = DB.isMainShop(shopId);
+    const displayName = isCashier ? `${shopName} [Cashier]` : (isMain ? `${shopName} 👑 [Super Admin]` : shopName);
 
     const elements = document.querySelectorAll('.active-shop-display-name, .shifts-active-shop-name, #quickActionsActiveShopName, #mobileActiveShopName');
     elements.forEach(el => {
-      el.textContent = shopName;
+      el.textContent = displayName;
     });
 
     const sel = document.getElementById('shopSelector');
@@ -590,7 +747,45 @@ const App = {
 
   refreshShopSelector() {
     const sel = document.getElementById('shopSelector');
+    const quickAddBtn = document.getElementById('quickAddShopBtn');
+    const container = sel ? sel.parentElement : null;
+
+    if (this.isBranchCashier()) {
+      const branchShop = DB.getShop(this.lockedBranchId);
+      const branchName = branchShop ? branchShop.name : 'Branch';
+      if (quickAddBtn) quickAddBtn.style.display = 'none';
+      if (sel) sel.style.display = 'none';
+
+      let pill = document.getElementById('branchCashierLockPill');
+      if (!pill && container) {
+        pill = document.createElement('div');
+        pill.id = 'branchCashierLockPill';
+        pill.style.cssText = 'flex:1; display:flex; align-items:center; gap:8px; padding:7px 12px; background:rgba(2,132,199,0.12); border:1px solid rgba(2,132,199,0.35); border-radius:var(--radius-sm); cursor:pointer;';
+        pill.title = 'Cashier Terminal (Click to unlock Super Admin with PIN)';
+        pill.onclick = () => App.promptUnlockSuperAdmin();
+        container.insertBefore(pill, sel);
+      }
+      if (pill) {
+        pill.style.display = 'flex';
+        pill.innerHTML = `
+          <span style="font-size:1.15rem;">🏪</span>
+          <div style="flex:1; overflow:hidden; line-height:1.2;">
+            <div style="font-weight:800; font-size:0.88rem; color:var(--text-primary); text-overflow:ellipsis; white-space:nowrap; overflow:hidden;">${branchName}</div>
+            <div style="font-size:0.68rem; color:var(--accent-gold); font-weight:700;">🔒 Cashier Terminal</div>
+          </div>
+          <span style="font-size:0.8rem; opacity:0.75;" title="Click to unlock Super Admin">🔑</span>
+        `;
+      }
+      return;
+    }
+
+    // Super Admin Mode
+    const pill = document.getElementById('branchCashierLockPill');
+    if (pill) pill.style.display = 'none';
+    if (quickAddBtn) quickAddBtn.style.display = 'block';
     if (!sel) return;
+    sel.style.display = 'block';
+
     const shops = DB.getShops(false);
     let activeId = DB.getActiveShopId();
     if ((!activeId || !shops.some(s => s.id === activeId)) && shops.length > 0) {
@@ -600,7 +795,10 @@ const App = {
     const currentValues = Array.from(sel.options).map(o => o.value).join(',');
     const newValues = shops.map(s => s.id).join(',');
     if (currentValues !== newValues || sel.options.length === 0) {
-      sel.innerHTML = shops.map(s => `<option value="${s.id}">🏪 ${s.name}</option>`).join('');
+      sel.innerHTML = shops.map(s => {
+        const isMain = DB.isMainShop(s.id);
+        return `<option value="${s.id}">${isMain ? '👑' : '🏪'} ${s.name}${isMain ? ' [Super Admin]' : ''}</option>`;
+      }).join('');
       if (shops.length === 0) sel.innerHTML = `<option value="">-- Select Shop --</option>`;
     }
     sel.value = activeId;
@@ -635,8 +833,9 @@ const App = {
   // ================================================================
   renderDashboard() {
     this.updateTopBarBadges();
-    const shopId = DB.getActiveShopId();
+    const shopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     if (!shopId) {
+      if (this.isBranchCashier()) return;
       this.renderNoDashboard();
       return;
     }
@@ -3128,46 +3327,132 @@ const App = {
     const shops = DB.getShops();
     const activeId = DB.getActiveShopId();
     const container = document.getElementById('shopList');
+    const isSi = I18N.currentLang === 'si';
 
     if (shops.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${I18N.currentLang === 'si' ? 'සාප්පු නැහැ' : 'No shops yet'}</div><div class="empty-sub">${I18N.currentLang === 'si' ? 'පළමු සාප්පුව එකතු කරන්න' : 'Add your first shop'}</div></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🏪</div><div class="empty-text">${isSi ? 'සාප්පු නැහැ' : 'No shops yet'}</div><div class="empty-sub">${isSi ? 'පළමු සාප්පුව එකතු කරන්න' : 'Add your first shop'}</div></div>`;
       return;
     }
 
-    let html = '';
-    shops.forEach(s => {
+    // Sort: Main Shop always first
+    const sortedShops = [...shops].sort((a, b) => {
+      const aMain = DB.isMainShop(a.id);
+      const bMain = DB.isMainShop(b.id);
+      if (aMain && !bMain) return -1;
+      if (!aMain && bMain) return 1;
+      return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+    });
+
+    let headerHtml = `
+      <div style="grid-column: 1 / -1; background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(2,132,199,0.1)); border: 1px solid rgba(245,158,11,0.3); border-radius: var(--radius-md); padding: 16px 20px; margin-bottom: 10px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <span style="font-size:1.4rem;">👑</span>
+          <h3 style="font-size:1.05rem; font-weight:800; color:var(--text-primary); margin:0;">
+            ${isSi ? 'Super Admin සහ ශාඛා Cashier Link පද්ධතිය' : 'Super Admin & Cashier Branch Links'}
+          </h3>
+        </div>
+        <p style="font-size:0.85rem; color:var(--text-secondary); margin:0; line-height:1.5;">
+          ${isSi 
+            ? '<strong>Main Shop</strong> එක Super Admin ලෙස ක්‍රියා කරන අතර සියලු ශාඛාවල එකතුව සහ වාර්තා පරිපාලනය කරයි. අන් සෑම ශාඛාවකටම (Cashiers) ඔවුන්ගේ <strong>සෘජු Link එක WhatsApp කරන්න</strong>. ඔවුන් Login වූ පසු ඔවුන්ට පෙනෙන්නේ ඔවුන්ගේ ශාඛාවේ Data පමණි.'
+            : '<strong>Main Shop</strong> acts as Super Admin with company-wide oversight. Share the dedicated <strong>Cashier Links</strong> with branch staff via WhatsApp. Cashiers will strictly access their own branch data.'}
+        </p>
+      </div>
+    `;
+
+    let html = headerHtml;
+    sortedShops.forEach(s => {
       const updates = DB.getUpdatesForShop(s.id);
       const isActive = s.id === activeId;
+      const isMain = DB.isMainShop(s.id);
       const comp = DB.getShopLatestComparison(s.id);
       let profitHtml = '';
       if (comp) {
          const diff = comp.overall.diff;
          const type = comp.overall.type;
-         profitHtml = `<div style="margin-top: 6px; font-weight: 800; font-size: 0.95rem; color: ${type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)'}">
+         profitHtml = `<div style="margin-top: 6px; font-weight: 800; font-size: 0.92rem; color: ${type === 'profit' ? 'var(--accent-green)' : type === 'loss' ? 'var(--accent-red)' : 'var(--text-muted)'}">
            ${type === 'profit' ? '✅ Profit: ' : type === 'loss' ? '❌ Loss: ' : '➖ '}${DB.formatCurrency(Math.abs(diff))}
          </div>`;
       } else {
-         profitHtml = `<div style="margin-top: 6px; font-size: 0.85rem; color: var(--text-muted);">➖ No Data Yet</div>`;
+         profitHtml = `<div style="margin-top: 6px; font-size: 0.82rem; color: var(--text-muted);">➖ No Data Yet</div>`;
       }
 
+      const slug = DB.getShopSlug(s);
+      const liveUrl = `https://ddmusiccenter8-art.github.io/RELOD-HUB-METHMI-MOBILE/?branch=${encodeURIComponent(slug)}`;
+
       html += `
-        <div class="shop-card ${isActive ? 'active' : ''}" style="cursor: pointer;" onclick="if(event.target.tagName !== 'BUTTON') App.switchShop('${s.id}')">
-          <div class="shop-name">${isActive ? '✅' : '🏪'} ${s.name}</div>
-          <div class="shop-meta" style="margin-bottom: 8px;">📌 Updates: ${updates.length} | 📅 Created: ${DB.formatDate(s.createdAt.split('T')[0])}</div>
+        <div class="shop-card ${isActive ? 'active' : ''}" style="cursor: default; border: 2px solid ${isMain ? 'rgba(245,158,11,0.4)' : (isActive ? 'var(--accent-blue)' : 'var(--border-glass)')}; background: ${isMain ? 'linear-gradient(180deg, rgba(245,158,11,0.06), var(--bg-card))' : 'var(--bg-card)'};">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div>
+              <div class="shop-name" style="display:flex; align-items:center; gap:6px;">
+                <span>${isMain ? '👑' : '🏪'}</span>
+                <span>${s.name}</span>
+              </div>
+              <div style="margin-top:4px;">
+                ${isMain 
+                  ? `<span class="badge" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:#fff; font-weight:800; font-size:0.74rem; padding:3px 9px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">👑 SUPER ADMIN</span>`
+                  : `<span class="badge" style="background:rgba(2,132,199,0.15); color:var(--accent-blue); border:1px solid rgba(2,132,199,0.3); font-weight:700; font-size:0.74rem; padding:3px 9px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">🔒 Cashier Terminal</span>`
+                }
+              </div>
+            </div>
+            ${isActive ? '<span class="date-pill" style="background:var(--accent-blue); color:#fff; font-weight:800;">✅ Active</span>' : ''}
+          </div>
+
+          <div class="shop-meta" style="margin-top: 10px; margin-bottom: 6px;">
+            📌 Updates: ${updates.length} | 📅 Created: ${DB.formatDate((s.createdAt || '').split('T')[0] || DB.getTodayDate())}
+          </div>
           ${profitHtml}
-          <div class="shop-actions" style="margin-top: 14px;">
-            ${!isActive ? `<button class="btn btn-primary btn-sm" onclick="App.switchShop('${s.id}')">🔄 Select</button>` : '<span class="date-pill">✅ Active</span>'}
+
+          ${!isMain ? `
+            <!-- Dedicated Branch Cashier Link Card -->
+            <div style="margin-top:14px; background:rgba(15,23,42,0.65); border:1px solid rgba(59,130,246,0.3); border-radius:var(--radius-sm); padding:10px 12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                <span style="font-size:0.76rem; font-weight:700; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+                  <span>🔗</span> <span>${isSi ? 'Cashier සෘජු Link එක (Branch Link):' : 'Direct Cashier Link:'}</span>
+                </span>
+                <span style="font-size:0.7rem; color:var(--accent-green); font-weight:700;">● Scoped to ${s.name} only</span>
+              </div>
+              <div style="font-family:monospace; font-size:0.76rem; color:var(--accent-blue); background:rgba(0,0,0,0.35); padding:6px 8px; border-radius:4px; word-break:break-all; user-select:all; border:1px dashed rgba(59,130,246,0.35); margin-bottom:8px;">
+                ${liveUrl}
+              </div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-sm" onclick="App.copyBranchLink('${s.id}', '${liveUrl}')" style="background:linear-gradient(135deg, #2563eb, #1d4ed8); color:#fff; font-weight:700; font-size:0.76rem; padding:6px 12px; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px;">
+                  📋 ${isSi ? 'Copy Link' : 'Copy Link'}
+                </button>
+                <button type="button" class="btn btn-sm" onclick="App.shareBranchLinkWhatsApp('${s.id}', '${liveUrl}', '${s.name.replace(/'/g, "\\'")}')" style="background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:700; font-size:0.76rem; padding:6px 12px; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px;">
+                  📲 ${isSi ? 'WhatsApp කරන්න' : 'WhatsApp Link'}
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="App.lockToBranchCashier('${s.id}')" title="Test how this cashier sees their shop" style="font-size:0.76rem; padding:6px 10px; border:1px solid rgba(255,255,255,0.12);">
+                  🔒 ${isSi ? 'Cashier ලෙස බලන්න' : 'Test Terminal'}
+                </button>
+              </div>
+            </div>
+          ` : `
+            <div style="margin-top:12px; padding:8px 12px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); border-radius:var(--radius-sm); font-size:0.78rem; color:var(--text-secondary);">
+              👑 <strong>Master Super Admin:</strong> ${isSi ? 'මෙම සාප්පුව සියලු ශාඛාවල සමස්ත වාර්තා, ණය සහ ගනුදෙනු පාලනය කරයි.' : 'Main headquarters with full aggregated oversight of all branches.'}
+            </div>
+          `}
+
+          <div class="shop-actions" style="margin-top: 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+            ${!isActive ? `<button class="btn btn-primary btn-sm" onclick="App.switchShop('${s.id}')">🔄 Select</button>` : ''}
             <button class="btn btn-ghost btn-sm" onclick="App.editShop('${s.id}')">✏️ Edit</button>
-            <button class="btn btn-danger btn-sm" onclick="App.confirmDeleteShop('${s.id}', '${s.name.replace(/'/g, "\\'")}')">🗑️</button>
+            ${!isMain ? `<button class="btn btn-danger btn-sm" onclick="App.confirmDeleteShop('${s.id}', '${s.name.replace(/'/g, "\\'")}')">🗑️</button>` : ''}
           </div>
         </div>`;
     });
     container.innerHTML = html;
   },
 
-  
   // ---- Mobile 1-Tap Shop Switcher Modal ----
   showShopSwitcherModal() {
+    if (this.isBranchCashier()) {
+      const branchShop = DB.getShop(this.lockedBranchId);
+      const isSi = I18N.currentLang === 'si';
+      this.showToast(isSi 
+        ? `🔒 මෙම දුරකථනය ${branchShop ? branchShop.name : ''} Cashier Terminal එකට සීමා කර ඇත` 
+        : `🔒 Locked to ${branchShop ? branchShop.name : ''} Cashier Terminal`, 'warning');
+      return;
+    }
+
     const shops = DB.getShops(false);
     let activeId = DB.getActiveShopId();
     if ((!activeId || !shops.some(s => s.id === activeId)) && shops.length > 0) {
@@ -3177,6 +3462,7 @@ const App = {
 
     let shopsHtml = shops.map(s => {
       const isActive = s.id === activeId;
+      const isMain = DB.isMainShop(s.id);
       return `
         <div onclick="App.switchShopFromModal('${s.id}')" style="
           display: flex;
@@ -3186,14 +3472,16 @@ const App = {
           margin-bottom: 8px;
           border-radius: var(--radius-md);
           background: ${isActive ? 'rgba(2, 132, 199, 0.12)' : 'var(--bg-card)'};
-          border: 2px solid ${isActive ? 'var(--accent-blue)' : 'var(--border-glass)'};
+          border: 2px solid ${isActive ? 'var(--accent-blue)' : (isMain ? 'rgba(245,158,11,0.3)' : 'var(--border-glass)')};
           cursor: pointer;
           transition: var(--transition);
         ">
           <div style="display:flex; align-items:center; gap:12px;">
-            <div style="font-size:1.6rem; line-height:1;">🏪</div>
+            <div style="font-size:1.6rem; line-height:1;">${isMain ? '👑' : '🏪'}</div>
             <div>
-              <div style="font-weight:800; font-size:1.05rem; color:${isActive ? 'var(--accent-blue)' : 'var(--text-primary)'};">${s.name}</div>
+              <div style="font-weight:800; font-size:1.05rem; color:${isActive ? 'var(--accent-blue)' : 'var(--text-primary)'};">
+                ${s.name} ${isMain ? '👑 [Super Admin]' : ''}
+              </div>
               <div style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
                 ${isActive ? '✅ ' + (I18N.currentLang === 'si' ? 'දැනට ක්‍රියාකාරී ශාඛාව' : 'Currently Active Branch') : (I18N.currentLang === 'si' ? 'මෙම ශාඛාවට මාරු වීමට ඔබන්න' : 'Tap to switch to this branch')}
               </div>
@@ -3377,7 +3665,7 @@ const App = {
 
   renderCreditsPage() {
     this.updateTopBarBadges();
-    const shopId = DB.getActiveShopId();
+    const shopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     const credits = DB.getCredits(shopId, true);
     const routers = DB.getRouterExpenses(shopId);
     const topups = DB.getDistributorTopups(shopId);
@@ -3859,7 +4147,7 @@ const App = {
       this.showToast('Please create a shop first', 'error');
       return;
     }
-    const activeShopId = DB.getActiveShopId() || shops[0].id;
+    const activeShopId = this.isBranchCashier() ? this.lockedBranchId : (DB.getActiveShopId() || shops[0].id);
     const today = DB.getTodayDate();
     const savedReps = DB.getSavedReps ? DB.getSavedReps() : [];
 
@@ -3868,14 +4156,33 @@ const App = {
     d3.setDate(d3.getDate() + 3);
     const d3Str = `${d3.getFullYear()}-${String(d3.getMonth() + 1).padStart(2, '0')}-${String(d3.getDate()).padStart(2, '0')}`;
 
-    const shopSelectHtml = shops.length > 1 ? `
+    let shopSelectHtml = '';
+    if (this.isBranchCashier()) {
+      const branchShop = DB.getShop(this.lockedBranchId);
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">${isSi ? 'ශාඛාව (Branch)' : 'Branch'}</label>
+        <div style="padding:10px 14px; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:8px;">
+          <span>🏪</span> <span>${branchShop ? branchShop.name : 'Branch'}</span> <span style="font-size:0.75rem; color:var(--accent-gold); margin-left:auto;">🔒 Cashier</span>
+        </div>
+        <input type="hidden" id="repCreditShop" value="${this.lockedBranchId}">
+      </div>
+      `;
+    } else if (shops.length > 1) {
+      shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">${isSi ? 'සාප්පුව (Shop / Branch) *' : 'Shop / Branch *'}</label>
         <select id="repCreditShop" class="form-select">
-          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+          ${shops.map(s => {
+            const isMain = DB.isMainShop(s.id);
+            return `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>${isMain ? '👑' : '🏪'} ${s.name} ${isMain ? '[Super Admin]' : ''}</option>`;
+          }).join('')}
         </select>
       </div>
-    ` : `<input type="hidden" id="repCreditShop" value="${activeShopId}">`;
+      `;
+    } else {
+      shopSelectHtml = `<input type="hidden" id="repCreditShop" value="${activeShopId}">`;
+    }
 
     const bodyHtml = `
       <form id="addRepCreditForm" style="display:flex; flex-direction:column; gap:12px;">
@@ -4498,14 +4805,28 @@ Thank you! - ${shopName}`;
       return;
     }
 
-    let activeShopId = DB.getActiveShopId();
+    let activeShopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     let shopSelectHtml = '';
-    if (!activeShopId || shops.length > 1) {
+    if (this.isBranchCashier()) {
+      const branchShop = DB.getShop(this.lockedBranchId);
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">${isSi ? 'ශාඛාව (Branch)' : 'Branch'}</label>
+        <div style="padding:10px 14px; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:8px;">
+          <span>🏪</span> <span>${branchShop ? branchShop.name : 'Branch'}</span> <span style="font-size:0.75rem; color:var(--accent-gold); margin-left:auto;">🔒 Cashier</span>
+        </div>
+        <input type="hidden" id="quickCreditShop" value="${this.lockedBranchId}">
+      </div>
+      `;
+    } else if (!activeShopId || shops.length > 1) {
       shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">${isSi ? 'Shop (සාප්පුව) *' : 'Shop *'}</label>
         <select id="quickCreditShop" class="form-select">
-          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+          ${shops.map(s => {
+            const isMain = DB.isMainShop(s.id);
+            return `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>${isMain ? '👑' : '🏪'} ${s.name} ${isMain ? '[Super Admin]' : ''}</option>`;
+          }).join('')}
         </select>
       </div>
       `;
@@ -4596,14 +4917,28 @@ Thank you! - ${shopName}`;
       return;
     }
 
-    let activeShopId = DB.getActiveShopId();
+    let activeShopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     let shopSelectHtml = '';
-    if (!activeShopId || shops.length > 1) {
+    if (this.isBranchCashier()) {
+      const branchShop = DB.getShop(this.lockedBranchId);
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">${isSi ? 'ශාඛාව (Branch)' : 'Branch'}</label>
+        <div style="padding:10px 14px; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:8px;">
+          <span>🏪</span> <span>${branchShop ? branchShop.name : 'Branch'}</span> <span style="font-size:0.75rem; color:var(--accent-gold); margin-left:auto;">🔒 Cashier</span>
+        </div>
+        <input type="hidden" id="quickRouterShop" value="${this.lockedBranchId}">
+      </div>
+      `;
+    } else if (!activeShopId || shops.length > 1) {
       shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">${isSi ? 'Shop (සාප්පුව) *' : 'Shop *'}</label>
         <select id="quickRouterShop" class="form-select">
-          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+          ${shops.map(s => {
+            const isMain = DB.isMainShop(s.id);
+            return `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>${isMain ? '👑' : '🏪'} ${s.name} ${isMain ? '[Super Admin]' : ''}</option>`;
+          }).join('')}
         </select>
       </div>
       `;
@@ -4693,14 +5028,28 @@ Thank you! - ${shopName}`;
       return;
     }
 
-    let activeShopId = DB.getActiveShopId();
+    let activeShopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     let shopSelectHtml = '';
-    if (!activeShopId || shops.length > 1) {
+    if (this.isBranchCashier()) {
+      const branchShop = DB.getShop(this.lockedBranchId);
+      shopSelectHtml = `
+      <div class="form-group" style="margin-bottom:12px;">
+        <label class="form-label">${isSi ? 'ශාඛාව (Branch)' : 'Branch'}</label>
+        <div style="padding:10px 14px; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:8px;">
+          <span>🏪</span> <span>${branchShop ? branchShop.name : 'Branch'}</span> <span style="font-size:0.75rem; color:var(--accent-gold); margin-left:auto;">🔒 Cashier</span>
+        </div>
+        <input type="hidden" id="quickTopupShop" value="${this.lockedBranchId}">
+      </div>
+      `;
+    } else if (!activeShopId || shops.length > 1) {
       shopSelectHtml = `
       <div class="form-group" style="margin-bottom:12px;">
         <label class="form-label">${isSi ? 'Shop (සාප්පුව) *' : 'Shop *'}</label>
         <select id="quickTopupShop" class="form-select">
-          ${shops.map(s => `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
+          ${shops.map(s => {
+            const isMain = DB.isMainShop(s.id);
+            return `<option value="${s.id}" ${s.id === activeShopId ? 'selected' : ''}>${isMain ? '👑' : '🏪'} ${s.name} ${isMain ? '[Super Admin]' : ''}</option>`;
+          }).join('')}
         </select>
       </div>
       `;
@@ -4873,30 +5222,60 @@ Thank you! - ${shopName}`;
   },
 
   updateAdminSecurityUI() {
+    // Sidebar nav control for Shops & Data Backup
+    const shopsNav = document.querySelector('.nav-links a[data-page="shops"]');
+    if (shopsNav && shopsNav.parentElement) {
+      shopsNav.parentElement.style.display = this.isBranchCashier() ? 'none' : 'block';
+    }
+    const exportBtn = document.getElementById('exportBtn');
+    if (exportBtn) exportBtn.style.display = this.isBranchCashier() ? 'none' : 'block';
+    const importBtn = document.getElementById('importBtn');
+    if (importBtn) importBtn.style.display = this.isBranchCashier() ? 'none' : 'block';
+
     const pill = document.getElementById('adminRoleSecurityPill');
     if (!pill) return;
     const isSi = I18N.currentLang === 'si';
+
+    if (this.isBranchCashier()) {
+      pill.innerHTML = `
+        <span style="font-size:0.9rem;">🔒</span>
+        <span>Cashier Terminal</span>
+        <span style="font-size:0.68rem; opacity:0.8; margin-left:4px; color:var(--accent-gold);">[Unlock Admin]</span>
+      `;
+      pill.style.background = 'rgba(2, 132, 199, 0.15)';
+      pill.style.color = 'var(--accent-blue)';
+      pill.style.borderColor = 'rgba(2, 132, 199, 0.4)';
+      pill.style.boxShadow = 'none';
+      pill.title = isSi ? 'Super Admin වෙත මාරු වීමට ඔබන්න (PIN: 1234)' : 'Click to unlock Super Admin (PIN: 1234)';
+      pill.onclick = () => App.promptUnlockSuperAdmin();
+      return;
+    }
+
+    // Restore regular toggleAdminSession handler
+    pill.onclick = () => App.toggleAdminSession();
     const active = this.isAdminSessionActive();
     if (active) {
       pill.innerHTML = `
         <span style="font-size:0.9rem;">👑</span>
-        <span>${isSi ? 'Admin Unlocked' : 'Admin Mode'}</span>
+        <span>${isSi ? 'Super Admin Unlocked' : 'Super Admin Mode'}</span>
         <span style="font-size:0.7rem; opacity:0.8; margin-left:4px;">[Lock]</span>
       `;
       pill.style.background = 'rgba(234, 179, 8, 0.18)';
       pill.style.color = '#fbbf24';
       pill.style.borderColor = 'rgba(234, 179, 8, 0.45)';
       pill.style.boxShadow = '0 0 12px rgba(234, 179, 8, 0.3)';
+      pill.title = isSi ? 'Admin Mode අගුලු දැමීමට ඔබන්න' : 'Click to lock Admin Mode';
     } else {
       pill.innerHTML = `
-        <span style="font-size:0.9rem;">🔒</span>
-        <span>${isSi ? 'Staff Mode' : 'Staff Mode'}</span>
+        <span style="font-size:0.9rem;">👑</span>
+        <span>${isSi ? 'Super Admin' : 'Super Admin'}</span>
         <span style="font-size:0.7rem; opacity:0.75; margin-left:4px;">[Unlock]</span>
       `;
       pill.style.background = 'rgba(14, 24, 52, 0.7)';
       pill.style.color = 'var(--text-secondary)';
       pill.style.borderColor = 'var(--border-glass)';
       pill.style.boxShadow = 'none';
+      pill.title = isSi ? 'Admin PIN ඇතුළත් කර අගුලු හරින්න' : 'Click to unlock with Admin PIN';
     }
   },
 
@@ -5647,12 +6026,16 @@ Thank you! - ${shopName}`;
   },
 
   setShiftShopFilter(val) {
-    this.shiftShopFilter = val;
-    if (val !== 'all') {
-      DB.setActiveShop(val);
-      this.refreshShopSelector();
-      this.updateActiveShopHeaderBadges();
-      this.updateTopBarBadges();
+    if (this.isBranchCashier()) {
+      this.shiftShopFilter = this.lockedBranchId;
+    } else {
+      this.shiftShopFilter = val;
+      if (val !== 'all') {
+        DB.setActiveShop(val);
+        this.refreshShopSelector();
+        this.updateActiveShopHeaderBadges();
+        this.updateTopBarBadges();
+      }
     }
     this.renderShiftsPage();
   },
@@ -5770,18 +6153,32 @@ setShiftViewMode(mode) {
     // Populate shiftShopFilter dropdown
     const shopSelect = document.getElementById('shiftShopFilter');
     const shops = DB.getShops(false);
-    const selectedShop = this.shiftShopFilter !== undefined ? this.shiftShopFilter : (DB.getActiveShopId() || 'all');
-    this.shiftShopFilter = selectedShop;
+    let selectedShop = this.shiftShopFilter;
+    if (this.isBranchCashier()) {
+      selectedShop = this.lockedBranchId;
+      this.shiftShopFilter = this.lockedBranchId;
+    } else if (selectedShop === undefined) {
+      selectedShop = DB.getActiveShopId() || 'all';
+      this.shiftShopFilter = selectedShop;
+    }
 
     if (shopSelect) {
-      shopSelect.innerHTML = `<option value="all" ${selectedShop === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
-      shops.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = '🏪 ' + s.name;
-        if (s.id === selectedShop) opt.selected = true;
-        shopSelect.appendChild(opt);
-      });
+      if (this.isBranchCashier()) {
+        const branchShop = DB.getShop(this.lockedBranchId);
+        shopSelect.innerHTML = `<option value="${this.lockedBranchId}" selected>🏪 ${branchShop ? branchShop.name : 'Branch'} 🔒 [Cashier Terminal]</option>`;
+        shopSelect.disabled = true;
+      } else {
+        shopSelect.disabled = false;
+        shopSelect.innerHTML = `<option value="all" ${selectedShop === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
+        shops.forEach(s => {
+          const isMain = DB.isMainShop(s.id);
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = (isMain ? '👑 ' : '🏪 ') + s.name + (isMain ? ' [Super Admin]' : '');
+          if (s.id === selectedShop) opt.selected = true;
+          shopSelect.appendChild(opt);
+        });
+      }
     }
 
     const targetShopId = selectedShop === 'all' ? null : selectedShop;
@@ -6349,7 +6746,7 @@ setShiftViewMode(mode) {
   },
 
   showShiftSummaryModal(existingShift = null, targetShopId = null) {
-    const activeId = targetShopId || existingShift?.shopId || DB.getActiveShopId();
+    const activeId = this.isBranchCashier() ? this.lockedBranchId : (targetShopId || existingShift?.shopId || DB.getActiveShopId());
     const shops = DB.getShops(false);
     if (!activeId || shops.length === 0) {
       this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error');
@@ -6406,9 +6803,14 @@ setShiftViewMode(mode) {
       <form id="shiftSummaryForm" style="display:flex; flex-direction:column; gap:10px;">
         <div class="form-group" style="margin-bottom:2px; background:rgba(79,70,229,0.06); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid rgba(79,70,229,0.25);">
           <label class="form-label" style="font-weight:800; color:var(--accent-purple); margin-bottom:4px;">🏪 Branch / Shop (ශාඛාව)</label>
+          ${this.isBranchCashier() ? `
+            <div style="font-weight:800; color:var(--accent-blue); padding:6px 0;">🏪 ${shop ? shop.name : ''} <span style="font-size:0.75rem; background:rgba(14,165,233,0.15); padding:2px 8px; border-radius:12px; margin-left:6px;">🔒 Cashier</span></div>
+            <input type="hidden" id="shiftModalShopSelect" value="${shopId}">
+          ` : `
           <select class="form-input" id="shiftModalShopSelect" style="font-weight:700;" onchange="App.showShiftSummaryModal(null, this.value)">
             ${shops.map(s => `<option value="${s.id}" ${s.id === shopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
           </select>
+          `}
         </div>
         <div style="font-size:0.82rem; color:var(--text-secondary); display:flex; justify-content:space-between; align-items:center; padding-bottom:6px; border-bottom:1px solid var(--border-glass);">
           <div>🏪 <strong>${shop ? shop.name : ''}</strong> | 📅 ${DB.formatDate(today)} ${isEditMode ? '<span class="badge" style="background:#f59e0b; color:#000; font-weight:800; margin-left:6px; padding:2px 6px;">✏️ EDITING TODAY</span>' : ''}</div>
@@ -7090,7 +7492,7 @@ setShiftViewMode(mode) {
   tempBtxReceiptSizeKB: 0,
 
   showQuickAddBankDepositModal(initialMode = 'deposit') {
-    const defaultShopId = DB.getActiveShopId();
+    const defaultShopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     const shops = DB.getShops(true);
     const today = DB.getTodayDate();
     const now = new Date();
@@ -7102,7 +7504,8 @@ setShiftViewMode(mode) {
 
     let shopOptions = '';
     shops.forEach(s => {
-      shopOptions += `<option value="${s.id}" ${s.id === defaultShopId ? 'selected' : ''}>🏪 ${s.name}</option>`;
+      const isMain = DB.isMainShop(s.id);
+      shopOptions += `<option value="${s.id}" ${s.id === defaultShopId ? 'selected' : ''}>${isMain ? '👑' : '🏪'} ${s.name}${isMain ? ' [Super Admin]' : ''}</option>`;
     });
 
     const isSi = I18N.currentLang === 'si';
@@ -7129,12 +7532,22 @@ setShiftViewMode(mode) {
 
         <!-- 3. Branch & Staff Row -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-          <div class="form-group" style="margin-bottom:0;">
-            <label class="form-label">${isSi ? 'ශාඛාව (Branch / Shop)' : 'Branch / Shop'} *</label>
-            <select class="form-select" id="quickBtxShopId" required>
-              ${shopOptions}
-            </select>
-          </div>
+          ${this.isBranchCashier() ? `
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">${isSi ? 'ශාඛාව (Branch)' : 'Branch'}</label>
+              <div style="padding:9px 12px; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:6px; font-size:0.85rem;">
+                <span>🏪</span> <span>${DB.getShop(this.lockedBranchId)?.name || 'Branch'}</span> <span style="font-size:0.72rem; color:var(--accent-gold); margin-left:auto;">🔒 Cashier</span>
+              </div>
+              <input type="hidden" id="quickBtxShopId" value="${this.lockedBranchId}">
+            </div>
+          ` : `
+            <div class="form-group" style="margin-bottom:0;">
+              <label class="form-label">${isSi ? 'ශාඛාව (Branch / Shop)' : 'Branch / Shop'} *</label>
+              <select class="form-select" id="quickBtxShopId" required>
+                ${shopOptions}
+              </select>
+            </div>
+          `}
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">${isSi ? 'භාරදුන් / යැවූ කෙනා (Staff)' : 'Handed / Deposited By'} *</label>
             <input type="text" class="form-input" id="quickBtxStaffName" placeholder="e.g. Kasun / Dinuka / Cashier" required>
@@ -7472,7 +7885,7 @@ setShiftViewMode(mode) {
   // MORNING SHIFT OPEN (CASH DRAWER FLOAT & NOTE COUNTER)
   // ================================================================
   showMorningShiftModal(targetShopId = null) {
-    const activeId = targetShopId || DB.getActiveShopId();
+    const activeId = this.isBranchCashier() ? this.lockedBranchId : (targetShopId || DB.getActiveShopId());
     const shops = DB.getShops(false);
     if (!activeId || shops.length === 0) {
       this.showToast(I18N.t('select_shop') || 'Please select a shop first', 'error');
@@ -7503,9 +7916,14 @@ setShiftViewMode(mode) {
       <form id="morningShiftForm" style="display:flex; flex-direction:column; gap:12px;">
         <div class="form-group" style="margin-bottom:0; background:rgba(79,70,229,0.06); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid rgba(79,70,229,0.25);">
           <label class="form-label" style="font-weight:800; color:var(--accent-purple); margin-bottom:4px;">🏪 Branch / Shop (ශාඛාව)</label>
+          ${this.isBranchCashier() ? `
+            <div style="font-weight:800; color:var(--accent-blue); padding:6px 0;">🏪 ${shop ? shop.name : ''} <span style="font-size:0.75rem; background:rgba(14,165,233,0.15); padding:2px 8px; border-radius:12px; margin-left:6px;">🔒 Cashier</span></div>
+            <input type="hidden" id="morningShiftShopSelect" value="${shopId}">
+          ` : `
           <select class="form-input" id="morningShiftShopSelect" style="font-weight:700;" onchange="App.showMorningShiftModal(this.value)">
             ${shops.map(s => `<option value="${s.id}" ${s.id === shopId ? 'selected' : ''}>🏪 ${s.name}</option>`).join('')}
           </select>
+          `}
         </div>
         <div style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:2px;">
           📅 Date: <strong>${DB.formatDate(today)}</strong>
@@ -7691,7 +8109,7 @@ setShiftViewMode(mode) {
   },
 
   showAddExpenseModal(returnToShiftModal = false) {
-    const shopId = DB.getActiveShopId();
+    const shopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     if (!shopId) { this.showToast(I18N.t('select_shop_first') || 'Please select a shop first', 'error'); return; }
     const isSi = I18N.currentLang === 'si';
     const categories = isSi ? 
@@ -8400,7 +8818,11 @@ setShiftViewMode(mode) {
   },
 
   setDevCreditShopFilter(shopId) {
-    this.devCreditShopFilter = shopId;
+    if (this.isBranchCashier()) {
+      this.devCreditShopFilter = this.lockedBranchId;
+    } else {
+      this.devCreditShopFilter = shopId;
+    }
     this.renderDeviceCreditsPage();
   },
 
@@ -8423,22 +8845,36 @@ setShiftViewMode(mode) {
     const shops = DB.getShops(false);
     const allShopsList = DB.getShops(true);
     const activeShopId = DB.getActiveShopId();
-    // Default to 'all' so all branches' agreements are visible with their branch badge, or user-selected filter
-    const selectedShopFilter = this.devCreditShopFilter !== undefined ? this.devCreditShopFilter : 'all';
-    this.devCreditShopFilter = selectedShopFilter;
 
-    if (shopFilterEl) {
-      shopFilterEl.innerHTML = `<option value="all" ${selectedShopFilter === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
-      shops.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = '🏪 ' + s.name;
-        if (s.id === selectedShopFilter) opt.selected = true;
-        shopFilterEl.appendChild(opt);
-      });
+    let selectedShopFilter = this.devCreditShopFilter;
+    if (this.isBranchCashier()) {
+      selectedShopFilter = this.lockedBranchId;
+      this.devCreditShopFilter = this.lockedBranchId;
+    } else if (selectedShopFilter === undefined) {
+      selectedShopFilter = 'all';
+      this.devCreditShopFilter = 'all';
     }
 
-    const targetShopId = selectedShopFilter === 'all' ? null : selectedShopFilter;
+    if (shopFilterEl) {
+      if (this.isBranchCashier()) {
+        const branchShop = DB.getShop(this.lockedBranchId);
+        shopFilterEl.innerHTML = `<option value="${this.lockedBranchId}" selected>🏪 ${branchShop ? branchShop.name : 'Branch'} 🔒 [Cashier Terminal]</option>`;
+        shopFilterEl.disabled = true;
+      } else {
+        shopFilterEl.disabled = false;
+        shopFilterEl.innerHTML = `<option value="all" ${selectedShopFilter === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
+        shops.forEach(s => {
+          const isMain = DB.isMainShop(s.id);
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = (isMain ? '👑 ' : '🏪 ') + s.name + (isMain ? ' [Super Admin]' : '');
+          if (s.id === selectedShopFilter) opt.selected = true;
+          shopFilterEl.appendChild(opt);
+        });
+      }
+    }
+
+    const targetShopId = this.isBranchCashier() ? this.lockedBranchId : (selectedShopFilter === 'all' ? null : selectedShopFilter);
     const stats = DB.getDeviceCreditStats(targetShopId);
 
     // Update KPI cards
@@ -8695,7 +9131,7 @@ setShiftViewMode(mode) {
     const banner = document.getElementById('dashDevCreditReminderBanner');
     if (!banner) return;
 
-    const shopId = DB.getActiveShopId();
+    const shopId = this.isBranchCashier() ? this.lockedBranchId : DB.getActiveShopId();
     const dueCredits = DB.getDueDeviceCredits(shopId);
 
     if (!dueCredits || dueCredits.length === 0) {
@@ -8801,21 +9237,38 @@ setShiftViewMode(mode) {
     const bodyHtml = `
       <form id="devCreditForm" onsubmit="event.preventDefault(); App.saveDeviceCreditAgreement('${editCreditId || ''}', false); return false;" style="display:flex; flex-direction:column; gap:16px;">
         <!-- 0. Branch / Shop Selection -->
-        <div class="form-group" style="margin-bottom:0; background:rgba(99,102,241,0.06); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(99,102,241,0.25);">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <label class="form-label" style="margin-bottom:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
-              <span>🏪</span> <span>${I18N.currentLang === 'si' ? 'ශාඛාව / Shop (Branch)' : 'Shop / Branch'} *</span>
-            </label>
-            <span style="font-size:0.75rem; color:var(--text-muted);">${I18N.currentLang === 'si' ? 'ණය නිකුත් කරන ශාඛාව' : 'Branch issuing credit'}</span>
+        ${this.isBranchCashier() ? `
+          <div class="form-group" style="margin-bottom:0; background:rgba(2,132,199,0.08); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(2,132,199,0.3);">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label class="form-label" style="margin-bottom:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                <span>🏪</span> <span>${I18N.currentLang === 'si' ? 'ශාඛාව / Shop (Branch)' : 'Shop / Branch'} *</span>
+              </label>
+              <span style="font-size:0.75rem; color:var(--accent-gold); font-weight:700;">🔒 Cashier Terminal</span>
+            </div>
+            <div style="font-weight:800; font-size:1.02rem; color:var(--accent-blue); margin-top:4px;">
+              🏪 ${DB.getShop(this.lockedBranchId)?.name || 'Branch'}
+            </div>
+            <input type="hidden" id="devShopId" value="${this.lockedBranchId}">
           </div>
-          <select class="form-select" id="devShopId" required style="font-weight:700; font-size:0.95rem;">
-            ${shops.map(s => `
-              <option value="${s.id}" ${(existing?.shopId === s.id || (!existing && s.id === (this.devCreditShopFilter !== 'all' ? this.devCreditShopFilter : activeShopId))) ? 'selected' : ''}>
-                🏪 ${s.name}
-              </option>
-            `).join('')}
-          </select>
-        </div>
+        ` : `
+          <div class="form-group" style="margin-bottom:0; background:rgba(99,102,241,0.06); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(99,102,241,0.25);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <label class="form-label" style="margin-bottom:0; font-weight:700; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                <span>🏪</span> <span>${I18N.currentLang === 'si' ? 'ශාඛාව / Shop (Branch)' : 'Shop / Branch'} *</span>
+              </label>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${I18N.currentLang === 'si' ? 'ණය නිකුත් කරන ශාඛාව' : 'Branch issuing credit'}</span>
+            </div>
+            <select class="form-select" id="devShopId" required style="font-weight:700; font-size:0.95rem;">
+              ${shops.map(s => {
+                const isMain = DB.isMainShop(s.id);
+                return `
+                <option value="${s.id}" ${(existing?.shopId === s.id || (!existing && s.id === (this.devCreditShopFilter !== 'all' ? this.devCreditShopFilter : activeShopId))) ? 'selected' : ''}>
+                  ${isMain ? '👑' : '🏪'} ${s.name} ${isMain ? '[Super Admin]' : ''}
+                </option>
+              `}).join('')}
+            </select>
+          </div>
+        `}
 
         <!-- 1. Customer Section -->
         <div class="section-divider blue" style="margin-top:0;">
@@ -11611,7 +12064,11 @@ setShiftViewMode(mode) {
   invStatusFilter: 'in_stock',
 
   setInventoryShopFilter(val) {
-    this.invShopFilter = val;
+    if (this.isBranchCashier()) {
+      this.invShopFilter = this.lockedBranchId;
+    } else {
+      this.invShopFilter = val;
+    }
     this.renderInventoryPage();
   },
 
@@ -11632,20 +12089,35 @@ setShiftViewMode(mode) {
     const shopFilterEl = document.getElementById('invShopFilter');
     const shops = DB.getShops(false);
     const allShopsList = DB.getShops(true);
-    const selectedShopFilter = this.invShopFilter || 'all';
-
-    if (shopFilterEl && shopFilterEl.options.length <= 1) {
-      shopFilterEl.innerHTML = `<option value="all" ${selectedShopFilter === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
-      shops.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = '🏪 ' + s.name;
-        if (s.id === selectedShopFilter) opt.selected = true;
-        shopFilterEl.appendChild(opt);
-      });
+    let selectedShopFilter = this.invShopFilter;
+    if (this.isBranchCashier()) {
+      selectedShopFilter = this.lockedBranchId;
+      this.invShopFilter = this.lockedBranchId;
+    } else if (!selectedShopFilter) {
+      selectedShopFilter = 'all';
+      this.invShopFilter = 'all';
     }
 
-    const targetShopId = selectedShopFilter === 'all' ? null : selectedShopFilter;
+    if (shopFilterEl) {
+      if (this.isBranchCashier()) {
+        const branchShop = DB.getShop(this.lockedBranchId);
+        shopFilterEl.innerHTML = `<option value="${this.lockedBranchId}" selected>🏪 ${branchShop ? branchShop.name : 'Branch'} 🔒 [Cashier Terminal]</option>`;
+        shopFilterEl.disabled = true;
+      } else {
+        shopFilterEl.disabled = false;
+        shopFilterEl.innerHTML = `<option value="all" ${selectedShopFilter === 'all' ? 'selected' : ''}>🏪 ${I18N.currentLang === 'si' ? 'සියලුම ශාඛා (All Branches)' : 'All Branches'}</option>`;
+        shops.forEach(s => {
+          const isMain = DB.isMainShop(s.id);
+          const opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = (isMain ? '👑 ' : '🏪 ') + s.name + (isMain ? ' [Super Admin]' : '');
+          if (s.id === selectedShopFilter) opt.selected = true;
+          shopFilterEl.appendChild(opt);
+        });
+      }
+    }
+
+    const targetShopId = this.isBranchCashier() ? this.lockedBranchId : (selectedShopFilter === 'all' ? null : selectedShopFilter);
     const stats = DB.getInventoryStats(targetShopId);
 
     // Update KPI cards
@@ -11885,16 +12357,28 @@ setShiftViewMode(mode) {
     const bodyHtml = `
       <form id="stockItemForm" style="display:flex; flex-direction:column; gap:14px;">
         <!-- Branch selection -->
-        <div class="form-group" style="margin-bottom:0;">
-          <label class="form-label">${isSi ? 'ශාඛාව / Branch *' : 'Branch *'}</label>
-          <select class="form-select" id="stockShopId" required style="font-weight:700;">
-            ${shops.map(s => `
-              <option value="${s.id}" ${(existing?.shopId === s.id || (!existing && s.id === (this.invShopFilter !== 'all' ? this.invShopFilter : activeShopId))) ? 'selected' : ''}>
-                🏪 ${s.name}
-              </option>
-            `).join('')}
-          </select>
-        </div>
+        ${this.isBranchCashier() ? `
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ශාඛාව / Branch' : 'Branch'}</label>
+            <div style="padding:10px 14px; background:rgba(2,132,199,0.1); border:1px solid rgba(2,132,199,0.3); border-radius:var(--radius-sm); font-weight:700; color:var(--accent-blue); display:flex; align-items:center; gap:8px;">
+              <span>🏪</span> <span>${DB.getShop(this.lockedBranchId)?.name || 'Branch'}</span> <span style="font-size:0.75rem; color:var(--accent-gold); margin-left:auto;">🔒 Cashier</span>
+            </div>
+            <input type="hidden" id="stockShopId" value="${this.lockedBranchId}">
+          </div>
+        ` : `
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">${isSi ? 'ශාඛාව / Branch *' : 'Branch *'}</label>
+            <select class="form-select" id="stockShopId" required style="font-weight:700;">
+              ${shops.map(s => {
+                const isMain = DB.isMainShop(s.id);
+                return `
+                <option value="${s.id}" ${(existing?.shopId === s.id || (!existing && s.id === (this.invShopFilter !== 'all' ? this.invShopFilter : activeShopId))) ? 'selected' : ''}>
+                  ${isMain ? '👑' : '🏪'} ${s.name} ${isMain ? '[Super Admin]' : ''}
+                </option>
+              `}).join('')}
+            </select>
+          </div>
+        `}
 
         <!-- Category & Brand -->
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">

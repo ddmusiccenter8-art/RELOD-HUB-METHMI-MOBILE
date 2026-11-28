@@ -667,6 +667,54 @@ const DB = {
     return this.getShops().find(s => s.id === id) || null;
   },
 
+  getMainShop() {
+    const shops = this.getShops(false);
+    return shops.find(s => s.isMain || (s.name && s.name.toUpperCase().includes('MAIN'))) || shops[0] || null;
+  },
+
+  isMainShop(shopId) {
+    if (!shopId) return false;
+    const shop = this.getShop(shopId);
+    if (!shop) return false;
+    if (shop.isMain) return true;
+    if (shop.name && shop.name.toUpperCase().includes('MAIN')) return true;
+    const shops = this.getShops(false);
+    return shops.length > 0 && shops[0].id === shopId;
+  },
+
+  getShopSlug(shop) {
+    if (!shop) return '';
+    if (this.isMainShop(shop.id)) return 'main';
+    const clean = (shop.name || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return clean || shop.id;
+  },
+
+  findShopBySlugOrId(slugOrId) {
+    if (!slugOrId) return null;
+    const q = String(slugOrId).toLowerCase().trim();
+    const shops = this.getShops(false);
+    if (q === 'main' || q === 'admin') {
+      return this.getMainShop();
+    }
+    // 1. Exact ID
+    let found = shops.find(s => s.id && s.id.toLowerCase() === q);
+    if (found) return found;
+    // 2. Exact slug
+    found = shops.find(s => this.getShopSlug(s) === q);
+    if (found) return found;
+    // 3. Normalized name comparison
+    const normQ = q.replace(/[\s\-_]+/g, '');
+    found = shops.find(s => (s.name || '').toLowerCase().replace(/[\s\-_]+/g, '') === normQ);
+    if (found) return found;
+    // 4. Substring match
+    found = shops.find(s => (s.name || '').toLowerCase().includes(normQ) || normQ.includes((s.name || '').toLowerCase()));
+    return found || null;
+  },
+
   getShop(id) {
     if (!id) return null;
     return this.getShops(true).find(s => s.id === id) || null;
@@ -690,8 +738,9 @@ const DB = {
     if (!shopId || shopId === 'all') {
       return this.getUpdates().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     }
+    const isMain = this.isMainShop(shopId);
     return this.getUpdates()
-      .filter(u => u.shopId === shopId)
+      .filter(u => u.shopId === shopId || (isMain && !u.shopId))
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
 
@@ -1161,7 +1210,10 @@ const DB = {
   // ---- Customer Credits ----
   getCredits(shopId = null, includeSettled = true) {
     let credits = JSON.parse(localStorage.getItem(this.CREDITS_KEY) || '[]');
-    if (shopId) credits = credits.filter(c => c.shopId === shopId);
+    if (shopId && shopId !== 'all') {
+      const isMain = this.isMainShop(shopId);
+      credits = credits.filter(c => c.shopId === shopId || (isMain && !c.shopId));
+    }
     if (!includeSettled) credits = credits.filter(c => c.status === 'pending');
     return credits.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
@@ -1396,7 +1448,10 @@ const DB = {
   // ---- Router Reload Expenses ----
   getRouterExpenses(shopId = null) {
     let list = this._getStorage(this.ROUTER_EXPENSES_KEY, []);
-    if (shopId) list = list.filter(r => r.shopId === shopId);
+    if (shopId && shopId !== 'all') {
+      const isMain = this.isMainShop(shopId);
+      list = list.filter(r => r.shopId === shopId || (isMain && !r.shopId));
+    }
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
 
@@ -1475,7 +1530,10 @@ const DB = {
   // ---- Distributor Top-ups Received ----
   getDistributorTopups(shopId = null) {
     let list = this._getStorage(this.DISTRIBUTOR_TOPUPS_KEY, []);
-    if (shopId) list = list.filter(t => t.shopId === shopId);
+    if (shopId && shopId !== 'all') {
+      const isMain = this.isMainShop(shopId);
+      list = list.filter(t => t.shopId === shopId || (isMain && !t.shopId));
+    }
     return list.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
   },
 
@@ -1572,7 +1630,10 @@ const DB = {
   // ---- Daily Evening Shift Summaries & POS Tally ----
   getShifts(shopId = null) {
     let list = this._getStorage(this.SHIFTS_KEY, []);
-    if (shopId) list = list.filter(s => s.shopId === shopId);
+    if (shopId && shopId !== 'all') {
+      const isMain = this.isMainShop(shopId);
+      list = list.filter(s => s.shopId === shopId || (isMain && !s.shopId));
+    }
     if (!Array.isArray(list) || list.length === 0) return [];
 
     // Automatic unified grouping by (shopId, date) to prevent duplicate daily rows
@@ -2497,7 +2558,8 @@ const DB = {
     try {
       const all = this._getStorage(this.DEVICE_CREDITS_KEY, []);
       if (shopId && shopId !== 'all') {
-        return all.filter(c => !c.shopId || c.shopId === shopId);
+        const isMain = this.isMainShop(shopId);
+        return all.filter(c => c.shopId === shopId || (isMain && !c.shopId));
       }
       return all;
     } catch {
@@ -2842,7 +2904,10 @@ const DB = {
   getRepCredits(shopId = null, includeSettled = true) {
     try {
       let list = this._getStorage(this.REP_CREDITS_KEY, []);
-      if (shopId && shopId !== 'all') list = list.filter(r => r.shopId === shopId);
+      if (shopId && shopId !== 'all') {
+        const isMain = this.isMainShop(shopId);
+        list = list.filter(r => r.shopId === shopId || (isMain && !r.shopId));
+      }
       if (!includeSettled) list = list.filter(r => r.status === 'pending');
       return list.sort((a, b) => new Date(b.timestamp || b.takenDate) - new Date(a.timestamp || a.takenDate));
     } catch (e) {
