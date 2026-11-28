@@ -586,6 +586,8 @@ const DB = {
     const shop = {
       id: 'shop_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       name: name.trim(),
+      cashierPassword: '1234567',
+      cashiers: [],
       createdAt: new Date().toISOString()
     };
     shops.push(shop);
@@ -599,15 +601,70 @@ const DB = {
     return shop;
   },
 
-  updateShop(id, name) {
-    const shops = this.getShops();
+  updateShop(id, dataOrName) {
+    const shops = this.getShops(true);
     const idx = shops.findIndex(s => s.id === id);
     if (idx !== -1) {
-      shops[idx].name = name.trim();
+      if (typeof dataOrName === 'string') {
+        shops[idx].name = dataOrName.trim();
+      } else if (typeof dataOrName === 'object') {
+        Object.assign(shops[idx], dataOrName);
+        if (shops[idx].name) shops[idx].name = shops[idx].name.trim();
+      }
       this.saveShops(shops);
       this._syncToFirebase('payment_tracker_shops', id, shops[idx]);
     }
     return shops[idx];
+  },
+
+  getShopPassword(shopId) {
+    const s = this.getShop(shopId);
+    if (!s) return '1234567';
+    return (s.cashierPassword || '1234567').trim();
+  },
+
+  setShopCashierPassword(shopId, password) {
+    const shops = this.getShops(true);
+    const s = shops.find(sh => sh.id === shopId);
+    if (!s) return false;
+    s.cashierPassword = (password || '').trim() || '1234567';
+    this.saveShops(shops);
+    this._syncToFirebase('payment_tracker_shops', shopId, s);
+    return true;
+  },
+
+  getShopCashiers(shopId) {
+    const s = this.getShop(shopId);
+    if (!s) return [];
+    if (Array.isArray(s.cashiers) && s.cashiers.length > 0) {
+      return s.cashiers.filter(Boolean);
+    }
+    return [];
+  },
+
+  addCashierToShop(shopId, cashierName) {
+    const name = (cashierName || '').trim();
+    if (!name) return false;
+    const shops = this.getShops(true);
+    const s = shops.find(sh => sh.id === shopId);
+    if (!s) return false;
+    if (!Array.isArray(s.cashiers)) s.cashiers = [];
+    if (!s.cashiers.includes(name)) {
+      s.cashiers.push(name);
+      this.saveShops(shops);
+      this._syncToFirebase('payment_tracker_shops', shopId, s);
+    }
+    return true;
+  },
+
+  removeCashierFromShop(shopId, cashierName) {
+    const shops = this.getShops(true);
+    const s = shops.find(sh => sh.id === shopId);
+    if (!s || !Array.isArray(s.cashiers)) return false;
+    s.cashiers = s.cashiers.filter(c => c !== cashierName);
+    this.saveShops(shops);
+    this._syncToFirebase('payment_tracker_shops', shopId, s);
+    return true;
   },
 
   deleteShop(id) {
@@ -669,17 +726,21 @@ const DB = {
 
   getMainShop() {
     const shops = this.getShops(false);
-    return shops.find(s => s.isMain || (s.name && s.name.toUpperCase().includes('MAIN'))) || shops[0] || null;
+    if (!shops || shops.length === 0) return null;
+    // 1. Primary rule: Find the shop with "MAIN" in its name (e.g. "MAIN SHOP")
+    let main = shops.find(s => s.name && s.name.toUpperCase().includes('MAIN'));
+    if (main) return main;
+    // 2. Explicit flag isSuperAdmin
+    main = shops.find(s => s.isSuperAdmin);
+    if (main) return main;
+    // 3. Fallback only if no shop is named MAIN
+    return shops[0] || null;
   },
 
   isMainShop(shopId) {
     if (!shopId) return false;
-    const shop = this.getShop(shopId);
-    if (!shop) return false;
-    if (shop.isMain) return true;
-    if (shop.name && shop.name.toUpperCase().includes('MAIN')) return true;
-    const shops = this.getShops(false);
-    return shops.length > 0 && shops[0].id === shopId;
+    const main = this.getMainShop();
+    return !!(main && main.id === shopId);
   },
 
   getShopSlug(shop) {
@@ -2012,10 +2073,9 @@ const DB = {
   // ---- Daily Expenses & Owner Wallet ----
   getExpenses(shopId = null, date = null) {
     let list = this._getStorage(this.EXPENSES_KEY, []);
-    if (shopId) {
-      const activeShops = this.getShops(false);
-      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
-      list = list.filter(e => e.shopId === shopId || (isFirstShop && (!e.shopId || e.shopId === 'main')));
+    if (shopId && shopId !== 'all') {
+      const isMain = this.isMainShop(shopId);
+      list = list.filter(e => e.shopId === shopId || (isMain && (!e.shopId || e.shopId === 'main')));
     }
     if (date) list = list.filter(e => e.date === date);
     return list.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
@@ -3116,10 +3176,9 @@ const DB = {
   // ---- Bank Deposits & Cash Outs ----
   getBankTransactions(shopId = null, date = null) {
     let list = this._getStorage(this.BANK_TRANSACTIONS_KEY, []);
-    if (shopId) {
-      const activeShops = this.getShops(false);
-      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
-      list = list.filter(t => t.shopId === shopId || (isFirstShop && (!t.shopId || t.shopId === 'main')));
+    if (shopId && shopId !== 'all') {
+      const isMain = this.isMainShop(shopId);
+      list = list.filter(t => t.shopId === shopId || (isMain && (!t.shopId || t.shopId === 'main')));
     }
     if (date) list = list.filter(t => t.date === date);
     return list.sort((a, b) => new Date(b.timestamp || b.date) - new Date(a.timestamp || a.date));
@@ -3256,9 +3315,8 @@ const DB = {
   getInventory(shopId = null, filterStatus = null) {
     let list = this._getStorage(this.INVENTORY_KEY, []);
     if (shopId && shopId !== 'all') {
-      const activeShops = this.getShops(true);
-      const isFirstShop = activeShops.length > 0 && activeShops[0].id === shopId;
-      list = list.filter(item => item.shopId === shopId || (isFirstShop && (!item.shopId || item.shopId === 'main')));
+      const isMain = this.isMainShop(shopId);
+      list = list.filter(item => item.shopId === shopId || (isMain && (!item.shopId || item.shopId === 'main')));
     }
     if (filterStatus && filterStatus !== 'all') {
       list = list.filter(item => item.status === filterStatus);

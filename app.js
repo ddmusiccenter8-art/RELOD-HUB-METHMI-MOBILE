@@ -25,9 +25,11 @@ const App = {
   currentDenoms: null,
   lastReloadDenominations: null,
 
-  // V62.0 Super Admin vs Cashier Branch Terminal State
+  // V63.0 Super Admin vs Cashier Branch Terminal & Login Portal State
   branchCashierLocked: false,
   lockedBranchId: null,
+  currentBranchCashierName: null,
+  isBranchSessionAuthenticated: false,
 
   isBranchCashier() {
     return !!(this.branchCashierLocked && this.lockedBranchId);
@@ -43,6 +45,33 @@ const App = {
     return this.isBranchCashier() ? this.lockedBranchId : null;
   },
 
+  getBranchSession(shopId) {
+    try {
+      const raw = localStorage.getItem('spt_branch_session_' + shopId);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch(e) {
+      return null;
+    }
+  },
+
+  setBranchSession(shopId, cashierName) {
+    try {
+      const sessionData = { cashierName, loggedInAt: Date.now() };
+      localStorage.setItem('spt_branch_session_' + shopId, JSON.stringify(sessionData));
+      this.currentBranchCashierName = cashierName;
+      this.isBranchSessionAuthenticated = true;
+    } catch(e) {}
+  },
+
+  clearBranchSession(shopId) {
+    try {
+      localStorage.removeItem('spt_branch_session_' + shopId);
+      this.currentBranchCashierName = null;
+      this.isBranchSessionAuthenticated = false;
+    } catch(e) {}
+  },
+
   initBranchModeFromURL() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -53,6 +82,8 @@ const App = {
         localStorage.removeItem('spt_branch_cashier_lock');
         this.branchCashierLocked = false;
         this.lockedBranchId = null;
+        this.currentBranchCashierName = null;
+        this.isBranchSessionAuthenticated = false;
         const main = DB.getMainShop();
         if (main) DB.setActiveShop(main.id);
         return;
@@ -66,10 +97,20 @@ const App = {
             localStorage.removeItem('spt_branch_cashier_lock');
             this.branchCashierLocked = false;
             this.lockedBranchId = null;
+            this.currentBranchCashierName = null;
+            this.isBranchSessionAuthenticated = false;
           } else {
             localStorage.setItem('spt_branch_cashier_lock', foundShop.id);
             this.branchCashierLocked = true;
             this.lockedBranchId = foundShop.id;
+            const session = this.getBranchSession(foundShop.id);
+            if (session && session.cashierName) {
+              this.currentBranchCashierName = session.cashierName;
+              this.isBranchSessionAuthenticated = true;
+            } else {
+              this.currentBranchCashierName = null;
+              this.isBranchSessionAuthenticated = false;
+            }
           }
           return;
         }
@@ -82,6 +123,14 @@ const App = {
           this.branchCashierLocked = true;
           this.lockedBranchId = lockedShop.id;
           DB.setActiveShop(lockedShop.id);
+          const session = this.getBranchSession(lockedShop.id);
+          if (session && session.cashierName) {
+            this.currentBranchCashierName = session.cashierName;
+            this.isBranchSessionAuthenticated = true;
+          } else {
+            this.currentBranchCashierName = null;
+            this.isBranchSessionAuthenticated = false;
+          }
           return;
         } else {
           localStorage.removeItem('spt_branch_cashier_lock');
@@ -90,6 +139,8 @@ const App = {
 
       this.branchCashierLocked = false;
       this.lockedBranchId = null;
+      this.currentBranchCashierName = null;
+      this.isBranchSessionAuthenticated = false;
     } catch (e) {
       console.warn('initBranchModeFromURL error:', e);
     }
@@ -103,15 +154,273 @@ const App = {
         this.branchCashierLocked = true;
         this.lockedBranchId = shop.id;
         DB.setActiveShop(shop.id);
+        const session = this.getBranchSession(shop.id);
+        if (session && session.cashierName) {
+          this.currentBranchCashierName = session.cashierName;
+          this.isBranchSessionAuthenticated = true;
+        } else {
+          this.currentBranchCashierName = null;
+          this.isBranchSessionAuthenticated = false;
+          this.renderBranchLoginOverlay();
+        }
       } else {
         localStorage.removeItem('spt_branch_cashier_lock');
         this.branchCashierLocked = false;
         this.lockedBranchId = null;
+        this.currentBranchCashierName = null;
+        this.isBranchSessionAuthenticated = false;
       }
     }
     this.refreshShopSelector();
     this.updateActiveShopHeaderBadges();
     this.updateAdminSecurityUI();
+  },
+
+  renderBranchLoginOverlay() {
+    if (!this.isBranchCashier()) return;
+    const shopId = this.lockedBranchId;
+    const shop = DB.getShop(shopId);
+    if (!shop) return;
+
+    let overlay = document.getElementById('branchCashierLoginOverlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'branchCashierLoginOverlay';
+      overlay.style.cssText = 'position:fixed; top:0; left:0; width:100vw; height:100vh; height:100dvh; z-index:999999; background:radial-gradient(circle at 50% 30%, #0f172a 0%, #020617 100%); display:flex; align-items:center; justify-content:center; padding:16px; backdrop-filter:blur(10px); box-sizing:border-box;';
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+
+    const cashiers = DB.getShopCashiers(shopId);
+    const isSi = I18N.currentLang === 'si';
+
+    overlay.innerHTML = `
+      <div style="
+        background: rgba(30, 41, 59, 0.95);
+        border: 1.5px solid rgba(59, 130, 246, 0.4);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7), 0 0 35px rgba(59, 130, 246, 0.2);
+        border-radius: 20px;
+        width: 100%;
+        max-width: 430px;
+        padding: 26px 22px;
+        color: #f8fafc;
+        box-sizing: border-box;
+      ">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <div style="
+            width: 66px;
+            height: 66px;
+            margin: 0 auto 12px auto;
+            border-radius: 18px;
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(99, 102, 241, 0.25));
+            border: 1.5px solid rgba(59, 130, 246, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.1rem;
+            box-shadow: 0 8px 20px rgba(2, 132, 199, 0.3);
+          ">🏪</div>
+          <span class="badge" style="background: rgba(2, 132, 199, 0.25); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); font-weight: 800; font-size: 0.74rem; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+            🔒 Cashier Terminal Login
+          </span>
+          <h2 style="font-size: 1.6rem; font-weight: 800; color: #fff; margin: 10px 0 4px 0; letter-spacing: -0.5px;">
+            ${shop.name}
+          </h2>
+          <div style="font-size: 0.82rem; color: #94a3b8;">
+            Methmi Mobile POS & Reload Hub
+          </div>
+        </div>
+
+        <form onsubmit="event.preventDefault(); App.submitBranchCashierLogin();" style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Cashier Name Dropdown -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-weight: 700; color: #e2e8f0; font-size: 0.86rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>👤</span> <span>${isSi ? 'ඔබගේ නම (Select Cashier):' : 'Select Cashier / Staff:'}</span>
+            </label>
+            <select id="loginCashierSelect" class="form-input" style="height: 44px; font-size: 0.96rem; font-weight: 700; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.18); border-radius: 10px; color: #fff;" required onchange="App.onBranchLoginSelectCashier(this.value)">
+              <option value="">-- ${isSi ? 'කැෂියර් නම තෝරන්න' : 'Select Cashier'} --</option>
+              ${cashiers.map(c => `<option value="${c}">👤 ${c}</option>`).join('')}
+              <option value="__NEW__">➕ ${isSi ? 'වෙනත් නමක් (Enter Other Name)...' : 'Other Name...'}</option>
+            </select>
+            <input type="text" id="loginCustomCashierName" class="form-input" placeholder="${isSi ? 'ඔබගේ නම මෙතන ලියන්න (Enter your name)' : 'Enter your name'}" style="display: none; margin-top: 8px; height: 40px; background: #0f172a; border: 1.5px solid #38bdf8; color: #fff;" />
+          </div>
+
+          <!-- Branch Password -->
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" style="font-weight: 700; color: #e2e8f0; font-size: 0.86rem; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+              <span>🔑</span> <span>${isSi ? 'මුරපදය (Branch Password / PIN):' : 'Branch Password:'}</span>
+            </label>
+            <div style="position: relative;">
+              <input type="password" id="loginBranchPassword" class="form-input" placeholder="•••••••" autocomplete="current-password" style="height: 44px; font-size: 1.25rem; letter-spacing: 3px; font-weight: 800; background: #0f172a; border: 1.5px solid rgba(255,255,255,0.18); border-radius: 10px; padding-right: 48px; color: #fff;" required />
+              <button type="button" onclick="App.toggleBranchLoginPasswordVisibility()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 1.2rem; color: #94a3b8; cursor: pointer; padding: 4px;" title="Show/Hide Password">👁️</button>
+            </div>
+            <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 5px;">
+              ${isSi ? 'Head Office (Main Shop) එකෙන් ලබාදුන් මුරපදය ඇතුළත් කරන්න.' : 'Enter the password provided by Super Admin.'}
+            </div>
+          </div>
+
+          <!-- Error Alert Container -->
+          <div id="loginErrorMessage" style="display: none; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.45); border-radius: 8px; padding: 8px 12px; font-size: 0.82rem; color: #fca5a5; line-height: 1.4;"></div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn btn-primary" style="height: 46px; font-size: 1.02rem; font-weight: 800; border-radius: 10px; background: linear-gradient(135deg, #0284c7, #2563eb); border: none; box-shadow: 0 4px 16px rgba(2, 132, 199, 0.4); margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; width: 100%;">
+            <span>🔓</span> <span>${isSi ? 'Terminal එකට Login වන්න' : 'Login to Terminal'}</span>
+          </button>
+        </form>
+
+        <div style="margin-top: 18px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;">
+          <button type="button" onclick="App.promptUnlockSuperAdmin()" style="background: none; border: none; color: #64748b; font-size: 0.76rem; cursor: pointer; text-decoration: underline;">
+            👑 ${isSi ? 'Super Admin PIN එකෙන් Unlock කරන්න' : 'Unlock Super Admin (PIN: 1234)'}
+          </button>
+        </div>
+      </div>
+    `;
+
+    setTimeout(() => {
+      const select = document.getElementById('loginCashierSelect');
+      if (select) select.focus();
+    }, 120);
+  },
+
+  onBranchLoginSelectCashier(val) {
+    const customInput = document.getElementById('loginCustomCashierName');
+    if (!customInput) return;
+    if (val === '__NEW__') {
+      customInput.style.display = 'block';
+      customInput.required = true;
+      customInput.focus();
+    } else {
+      customInput.style.display = 'none';
+      customInput.required = false;
+      customInput.value = '';
+    }
+  },
+
+  toggleBranchLoginPasswordVisibility() {
+    const inp = document.getElementById('loginBranchPassword');
+    if (!inp) return;
+    inp.type = inp.type === 'password' ? 'text' : 'password';
+  },
+
+  submitBranchCashierLogin() {
+    const shopId = this.lockedBranchId;
+    const shop = DB.getShop(shopId);
+    if (!shop) return;
+    const isSi = I18N.currentLang === 'si';
+
+    const select = document.getElementById('loginCashierSelect');
+    const customInp = document.getElementById('loginCustomCashierName');
+    const passInp = document.getElementById('loginBranchPassword');
+    const errorBox = document.getElementById('loginErrorMessage');
+
+    let cashierName = select ? select.value.trim() : '';
+    if (cashierName === '__NEW__' && customInp) {
+      cashierName = customInp.value.trim();
+    }
+
+    if (!cashierName) {
+      if (errorBox) {
+        errorBox.style.display = 'block';
+        errorBox.innerHTML = `⚠️ ${isSi ? 'කරුණාකර ඔබගේ නම තෝරන්න හෝ ඇතුළත් කරන්න.' : 'Please select or enter your name.'}`;
+      }
+      return;
+    }
+
+    const enteredPass = passInp ? passInp.value.trim() : '';
+    const actualPass = DB.getShopPassword(shopId);
+
+    if (enteredPass !== actualPass && enteredPass !== '1234') { // master PIN 1234 also works
+      if (errorBox) {
+        errorBox.style.display = 'block';
+        errorBox.innerHTML = `❌ ${isSi ? 'මුරපදය (Password) වැරදියි! කරුණාකර නිවැරදි මුරපදය ඇතුළත් කරන්න.' : 'Incorrect password! Please enter the valid branch password.'}`;
+      }
+      if (passInp) {
+        passInp.value = '';
+        passInp.focus();
+        passInp.style.borderColor = '#ef4444';
+      }
+      return;
+    }
+
+    // Auto-save custom cashier name to shop cashiers so it appears next time
+    if (cashierName && (!shop.cashiers || !shop.cashiers.includes(cashierName))) {
+      DB.addCashierToShop(shopId, cashierName);
+    }
+
+    this.setBranchSession(shopId, cashierName);
+
+    // Hide overlay
+    const overlay = document.getElementById('branchCashierLoginOverlay');
+    if (overlay) overlay.style.display = 'none';
+
+    this.showToast(isSi 
+      ? `👋 ආයුබෝවන් ${cashierName}! (${shop.name} Cashier Active)` 
+      : `👋 Welcome ${cashierName}! (${shop.name} Active)`, 'success');
+
+    this.refreshShopSelector();
+    this.updateActiveShopHeaderBadges();
+    this.renderDashboard();
+  },
+
+  logoutBranchCashier() {
+    const isSi = I18N.currentLang === 'si';
+    if (confirm(isSi ? 'ඔබට Cashier Terminal එකෙන් Logout වීමට අවශ්‍යද?' : 'Are you sure you want to log out of this cashier terminal?')) {
+      this.clearBranchSession(this.lockedBranchId);
+      this.refreshShopSelector();
+      this.renderBranchLoginOverlay();
+      this.showToast(isSi ? '🚪 Logout විය' : 'Logged out', 'info');
+    }
+  },
+
+  onShiftCashierSelectChange(selectEl, targetInputId) {
+    const val = selectEl.value;
+    const targetInp = document.getElementById(targetInputId);
+    if (!targetInp) return;
+    if (val === '__CUSTOM__') {
+      targetInp.style.display = 'block';
+      targetInp.value = '';
+      targetInp.focus();
+    } else if (val) {
+      targetInp.value = val;
+      targetInp.style.display = 'none';
+    }
+  },
+
+  promptChangeShopPassword(shopId) {
+    const s = DB.getShop(shopId);
+    if (!s) return;
+    const isSi = I18N.currentLang === 'si';
+    const currentPass = DB.getShopPassword(shopId);
+    const newPass = prompt(isSi 
+      ? `"${s.name}" ශාඛාව සඳහා නව Cashier මුරපදයක් (Password / PIN) ඇතුළත් කරන්න:` 
+      : `Enter new Cashier Password for "${s.name}":`, currentPass);
+    if (newPass !== null && newPass.trim() !== '') {
+      DB.setShopCashierPassword(shopId, newPass.trim());
+      this.renderShops();
+      this.showToast(isSi ? `🔑 "${s.name}" මුරපදය සාර්ථකව වෙනස් කරා!` : `🔑 Password updated for "${s.name}"!`, 'success');
+    }
+  },
+
+  quickAddCashierToShop(shopId) {
+    const input = document.getElementById('newCashierInput_' + shopId);
+    const name = input ? input.value.trim() : '';
+    const isSi = I18N.currentLang === 'si';
+    if (!name) {
+      this.showToast(isSi ? 'කරුණාකර කැෂියර් නමක් ඇතුළත් කරන්න' : 'Please enter cashier name', 'warning');
+      return;
+    }
+    DB.addCashierToShop(shopId, name);
+    this.renderShops();
+    this.showToast(isSi ? `👤 "${name}" සාර්ථකව එකතු කරා!` : `👤 "${name}" added!`, 'success');
+  },
+
+  confirmRemoveCashierFromShop(shopId, cashierName) {
+    const isSi = I18N.currentLang === 'si';
+    if (confirm(isSi ? `"${cashierName}" කැෂියර් ලැයිස්තුවෙන් ඉවත් කරන්නද?` : `Remove "${cashierName}" from cashier list?`)) {
+      DB.removeCashierFromShop(shopId, cashierName);
+      this.renderShops();
+      this.showToast(isSi ? `🗑️ "${cashierName}" ඉවත් කරා` : `Removed "${cashierName}"`, 'info');
+    }
   },
 
   lockToBranchCashier(shopId) {
@@ -120,13 +429,14 @@ const App = {
     localStorage.setItem('spt_branch_cashier_lock', shop.id);
     this.branchCashierLocked = true;
     this.lockedBranchId = shop.id;
+    this.clearBranchSession(shop.id);
     DB.setActiveShop(shop.id);
     this.refreshShopSelector();
     this.updateActiveShopHeaderBadges();
     this.updateTopBarBadges();
     this.updateAdminSecurityUI();
     this.navigateTo('dashboard');
-    this.showToast(I18N.currentLang === 'si' ? `🔒 ${shop.name} Cashier Terminal එකට සාර්ථකව මාරු විය!` : `🔒 Switched to ${shop.name} Cashier Terminal!`, 'info');
+    this.renderBranchLoginOverlay();
   },
 
   promptUnlockSuperAdmin() {
@@ -135,6 +445,10 @@ const App = {
       localStorage.removeItem('spt_branch_cashier_lock');
       this.branchCashierLocked = false;
       this.lockedBranchId = null;
+      this.currentBranchCashierName = null;
+      this.isBranchSessionAuthenticated = false;
+      const overlay = document.getElementById('branchCashierLoginOverlay');
+      if (overlay) overlay.style.display = 'none';
       const mainShop = DB.getMainShop();
       if (mainShop) DB.setActiveShop(mainShop.id);
       this.refreshShopSelector();
@@ -148,24 +462,32 @@ const App = {
 
   shareBranchLinkWhatsApp(shopId, linkUrl, shopName) {
     const isSi = I18N.currentLang === 'si';
-    const msg = `🏪 *Methmi Mobile - ${shopName} Cashier Terminal*\n\n`
-      + `ඔබගේ ශාඛාවේ Cashier Terminal එකට පිවිසීමට පහත සෘජු Link එක භාවිත කරන්න:\n`
-      + `🔗 ${linkUrl}\n\n`
-      + `📌 _(ඔබගේ ${shopName} ශාඛාවේ Reload, Shifts, Stock සහ Phone Agreements පමණක් මෙහි ඇත)_`;
+    const s = DB.getShop(shopId);
+    const password = DB.getShopPassword(shopId);
+    const cashiers = DB.getShopCashiers(shopId);
+    const msg = `🏪 *Methmi Mobile - ${shopName} Cashier Login*\n\n`
+      + `ඔබගේ ශාඛාවේ Cashier Terminal එකට Login වීමට පහත තොරතුරු භාවිත කරන්න:\n\n`
+      + `🔗 *සෘජු Link එක*: ${linkUrl}\n`
+      + `🔑 *මුරපදය (Password)*: *${password}*\n`
+      + (cashiers.length > 0 ? `👤 *කැෂියර්වරුන් (Cashiers)*: ${cashiers.join(', ')}\n\n` : `\n`)
+      + `📌 _(Link එකෙන් පිවිස ඔබගේ නම තෝරා මුරපදය ඇතුළත් කර Login වන්න. ඔබගේ ශාඛාවේ Reload, Shifts, Stock සහ Phone Agreements පමණක් මෙහි ඇත)_`;
     const waUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
     window.open(waUrl, '_blank');
   },
 
   copyBranchLink(shopId, linkUrl) {
     const isSi = I18N.currentLang === 'si';
+    const s = DB.getShop(shopId);
+    const password = DB.getShopPassword(shopId);
+    const textToCopy = `🏪 Methmi Mobile - ${s ? s.name : ''} Cashier Login\n🔗 Link: ${linkUrl}\n🔑 Password: ${password}`;
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(linkUrl).then(() => {
-        this.showToast(isSi ? '📋 Branch Link එක Copy කරගත්තා!' : '📋 Branch Link copied to clipboard!', 'success');
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        this.showToast(isSi ? '📋 Link එක සහ Password Copy කරගත්තා!' : '📋 Link & Password copied!', 'success');
       }).catch(() => {
-        prompt(isSi ? 'Branch Link එක පහතින් Copy කරගන්න:' : 'Copy Branch Link:', linkUrl);
+        prompt(isSi ? 'මෙම විස්තර Copy කරගන්න:' : 'Copy details:', textToCopy);
       });
     } else {
-      prompt(isSi ? 'Branch Link එක පහතින් Copy කරගන්න:' : 'Copy Branch Link:', linkUrl);
+      prompt(isSi ? 'මෙම විස්තර Copy කරගන්න:' : 'Copy details:', textToCopy);
     }
   },
 
@@ -173,6 +495,9 @@ const App = {
   init() {
     // 0. Initialize Branch Lock & Role from URL / Storage
     this.initBranchModeFromURL();
+    if (this.isBranchCashier() && !this.isBranchSessionAuthenticated) {
+      setTimeout(() => this.renderBranchLoginOverlay(), 60);
+    }
     // 1. Initialize Localization immediately (synchronous)
     I18N.translatePage();
     const langSel = document.getElementById('langSelector');
@@ -231,6 +556,9 @@ const App = {
       this.updateTopBarBadges();
       this.refreshPage(this.currentPage);
       this.updateDashboardShiftStatusBanner();
+      if (this.isBranchCashier() && !this.isBranchSessionAuthenticated) {
+        this.renderBranchLoginOverlay();
+      }
     }).catch(err => {
       console.warn('DB.initialize background error:', err);
     });
@@ -767,13 +1095,17 @@ const App = {
       }
       if (pill) {
         pill.style.display = 'flex';
+        const cashierDisplay = this.currentBranchCashierName ? `👤 ${this.currentBranchCashierName}` : '🔒 Cashier Terminal';
         pill.innerHTML = `
           <span style="font-size:1.15rem;">🏪</span>
           <div style="flex:1; overflow:hidden; line-height:1.2;">
             <div style="font-weight:800; font-size:0.88rem; color:var(--text-primary); text-overflow:ellipsis; white-space:nowrap; overflow:hidden;">${branchName}</div>
-            <div style="font-size:0.68rem; color:var(--accent-gold); font-weight:700;">🔒 Cashier Terminal</div>
+            <div style="font-size:0.68rem; color:var(--accent-gold); font-weight:700;">${cashierDisplay}</div>
           </div>
-          <span style="font-size:0.8rem; opacity:0.75;" title="Click to unlock Super Admin">🔑</span>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <button type="button" onclick="event.stopPropagation(); App.logoutBranchCashier();" title="Logout / Switch Cashier" style="background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.35); color:#fca5a5; border-radius:5px; font-size:0.7rem; padding:3px 7px; cursor:pointer; font-weight:700;">🚪 Logout</button>
+            <span style="font-size:0.82rem; opacity:0.8; padding:2px;" title="Click to unlock Super Admin (PIN: 1234)">🔑</span>
+          </div>
         `;
       }
       return;
@@ -3403,27 +3735,66 @@ const App = {
           ${profitHtml}
 
           ${!isMain ? `
-            <!-- Dedicated Branch Cashier Link Card -->
-            <div style="margin-top:14px; background:rgba(15,23,42,0.65); border:1px solid rgba(59,130,246,0.3); border-radius:var(--radius-sm); padding:10px 12px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span style="font-size:0.76rem; font-weight:700; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
-                  <span>🔗</span> <span>${isSi ? 'Cashier සෘජු Link එක (Branch Link):' : 'Direct Cashier Link:'}</span>
-                </span>
-                <span style="font-size:0.7rem; color:var(--accent-green); font-weight:700;">● Scoped to ${s.name} only</span>
+            <!-- Dedicated Branch Cashier Management & Login Link Card -->
+            <div style="margin-top:14px; background:rgba(15,23,42,0.7); border:1px solid rgba(59,130,246,0.35); border-radius:var(--radius-sm); padding:12px;">
+              <!-- 1. Password row -->
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; background:rgba(0,0,0,0.25); padding:6px 10px; border-radius:6px;">
+                <div style="font-size:0.8rem; font-weight:700; color:var(--text-secondary); display:flex; align-items:center; gap:6px;">
+                  <span>🔑</span>
+                  <span>${isSi ? 'මුරපදය (Password):' : 'Password:'}</span>
+                  <span style="font-family:monospace; font-weight:800; color:var(--accent-gold); font-size:1rem; background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); padding:2px 8px; border-radius:4px; letter-spacing:1px;">
+                    ${DB.getShopPassword(s.id)}
+                  </span>
+                </div>
+                <button type="button" class="btn btn-xs btn-ghost" onclick="App.promptChangeShopPassword('${s.id}')" style="font-size:0.75rem; border:1px solid rgba(255,255,255,0.15); padding:2px 8px; color:var(--accent-blue);">
+                  ✏️ ${isSi ? 'වෙනස් කරන්න' : 'Change'}
+                </button>
               </div>
-              <div style="font-family:monospace; font-size:0.76rem; color:var(--accent-blue); background:rgba(0,0,0,0.35); padding:6px 8px; border-radius:4px; word-break:break-all; user-select:all; border:1px dashed rgba(59,130,246,0.35); margin-bottom:8px;">
-                ${liveUrl}
+
+              <!-- 2. Cashiers list & Quick Add -->
+              <div style="margin-bottom:10px;">
+                <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary); margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+                  <span>👤 ${isSi ? 'කැෂියර්වරුන් (Cashiers / Staff):' : 'Branch Cashiers:'}</span>
+                  <span style="font-size:0.72rem; color:var(--text-muted);">${(s.cashiers || []).length} registered</span>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
+                  ${(s.cashiers && s.cashiers.length > 0) ? s.cashiers.map(c => `
+                    <span class="badge" style="background:rgba(99,102,241,0.2); color:#c7d2fe; border:1px solid rgba(99,102,241,0.35); font-size:0.75rem; padding:3px 8px; border-radius:12px; display:inline-flex; align-items:center; gap:4px;">
+                      👤 ${c}
+                      <button type="button" onclick="App.confirmRemoveCashierFromShop('${s.id}', '${c.replace(/'/g, "\\'")}')" style="background:none; border:none; color:var(--accent-red); cursor:pointer; font-size:0.85rem; padding:0 2px; line-height:1;" title="Remove Cashier">×</button>
+                    </span>
+                  `).join('') : `<span style="font-size:0.75rem; color:var(--text-muted); font-style:italic;">${isSi ? 'කැෂියර්වරුන් එකතු කර නැත' : 'No cashiers added yet'}</span>`}
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <input type="text" id="newCashierInput_${s.id}" class="form-input form-input-sm" placeholder="${isSi ? 'අලුත් Cashier නමක් (උදා: Kasun)' : 'New Cashier name'}" style="font-size:0.8rem; height:32px; flex:1;" onkeydown="if(event.key==='Enter'){event.preventDefault(); App.quickAddCashierToShop('${s.id}');}">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="App.quickAddCashierToShop('${s.id}')" style="font-size:0.78rem; padding:4px 10px; font-weight:700;">
+                    ➕ ${isSi ? 'Add' : 'Add'}
+                  </button>
+                </div>
               </div>
-              <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                <button type="button" class="btn btn-sm" onclick="App.copyBranchLink('${s.id}', '${liveUrl}')" style="background:linear-gradient(135deg, #2563eb, #1d4ed8); color:#fff; font-weight:700; font-size:0.76rem; padding:6px 12px; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px;">
-                  📋 ${isSi ? 'Copy Link' : 'Copy Link'}
-                </button>
-                <button type="button" class="btn btn-sm" onclick="App.shareBranchLinkWhatsApp('${s.id}', '${liveUrl}', '${s.name.replace(/'/g, "\\'")}')" style="background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:700; font-size:0.76rem; padding:6px 12px; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px;">
-                  📲 ${isSi ? 'WhatsApp කරන්න' : 'WhatsApp Link'}
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm" onclick="App.lockToBranchCashier('${s.id}')" title="Test how this cashier sees their shop" style="font-size:0.76rem; padding:6px 10px; border:1px solid rgba(255,255,255,0.12);">
-                  🔒 ${isSi ? 'Cashier ලෙස බලන්න' : 'Test Terminal'}
-                </button>
+
+              <!-- 3. Direct Cashier Link & WhatsApp Button -->
+              <div style="margin-top:8px; border-top:1px solid rgba(255,255,255,0.06); padding-top:8px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                  <span style="font-size:0.76rem; font-weight:700; color:var(--text-secondary); display:flex; align-items:center; gap:4px;">
+                    <span>🔗</span> <span>${isSi ? 'Cashier සෘජු Link එක (Direct Login Link):' : 'Direct Cashier Link:'}</span>
+                  </span>
+                  <span style="font-size:0.7rem; color:var(--accent-green); font-weight:700;">● Scoped to ${s.name} only</span>
+                </div>
+                <div style="font-family:monospace; font-size:0.76rem; color:var(--accent-blue); background:rgba(0,0,0,0.35); padding:6px 8px; border-radius:4px; word-break:break-all; user-select:all; border:1px dashed rgba(59,130,246,0.35); margin-bottom:8px;">
+                  ${liveUrl}
+                </div>
+                <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                  <button type="button" class="btn btn-sm" onclick="App.copyBranchLink('${s.id}', '${liveUrl}')" style="background:linear-gradient(135deg, #2563eb, #1d4ed8); color:#fff; font-weight:700; font-size:0.76rem; padding:6px 12px; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px;">
+                    📋 ${isSi ? 'Copy Link & PIN' : 'Copy Link & PIN'}
+                  </button>
+                  <button type="button" class="btn btn-sm" onclick="App.shareBranchLinkWhatsApp('${s.id}', '${liveUrl}', '${s.name.replace(/'/g, "\\'")}')" style="background:linear-gradient(135deg, #10b981, #059669); color:#fff; font-weight:700; font-size:0.76rem; padding:6px 12px; border-radius:6px; border:none; display:inline-flex; align-items:center; gap:4px;">
+                    📲 ${isSi ? 'WhatsApp කරන්න' : 'WhatsApp Link'}
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm" onclick="App.lockToBranchCashier('${s.id}')" title="Test how this cashier sees their shop" style="font-size:0.76rem; padding:6px 10px; border:1px solid rgba(255,255,255,0.12);">
+                    🔒 ${isSi ? 'Login Screen එක බලන්න' : 'Test Login'}
+                  </button>
+                </div>
               </div>
             </div>
           ` : `
@@ -3544,6 +3915,7 @@ const App = {
   editShop(shopId) {
     const shop = DB.getShops().find(s => s.id === shopId);
     if (!shop) return;
+    const isMain = DB.isMainShop(shopId);
 
     this.showModal(
       I18N.currentLang === 'si' ? '✏️ සාප්පුව edit කරන්න' : '✏️ Edit Shop',
@@ -3552,6 +3924,12 @@ const App = {
         <label class="form-label">${I18N.currentLang === 'si' ? 'සාප්පුවේ නම' : 'Shop Name'}</label>
         <input type="text" class="form-input" id="editShopName" value="${shop.name}">
       </div>
+      ${!isMain ? `
+        <div class="form-group" style="margin-top:12px;">
+          <label class="form-label">${I18N.currentLang === 'si' ? 'Cashier මුරපදය (Branch Password / PIN)' : 'Branch Password / PIN'}</label>
+          <input type="text" class="form-input" id="editShopPassword" value="${DB.getShopPassword(shop.id)}" placeholder="1234567" style="font-family:monospace; font-weight:700;">
+        </div>
+      ` : ''}
       `,
       [
         { text: I18N.currentLang === 'si' ? 'අවලංගු' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
@@ -3562,7 +3940,10 @@ const App = {
               this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර නමක් ඇතුළත් කරන්න' : 'Please enter a shop name', 'error');
               return;
             }
-            DB.updateShop(shopId, name);
+            const updateData = { name };
+            const passInp = document.getElementById('editShopPassword');
+            if (passInp) updateData.cashierPassword = passInp.value.trim() || '1234567';
+            DB.updateShop(shopId, updateData);
             this.closeModal();
             this.refreshShopSelector();
             this.renderShops();
@@ -6784,7 +7165,8 @@ setShiftViewMode(mode) {
     const defaultExpenses = Math.max(parseFloat(targetShift?.drawerExpenses || targetShift?.totalExpenses) || 0, todayExpensesTotal);
 
     const isMorningOnlyTarget = targetShift && (targetShift.shiftType === 'morning' || targetShift.status === 'morning_active');
-    const initialCashier = targetShift ? (targetShift.cashierName || targetShift.cashier || '') : (morningShift ? (morningShift.cashierName || morningShift.cashier || '') : '');
+    const initialCashier = this.currentBranchCashierName || (targetShift ? (targetShift.cashierName || targetShift.cashier || '') : (morningShift ? (morningShift.cashierName || morningShift.cashier || '') : ''));
+    const shopCashiers = DB.getShopCashiers(shopId);
     const initialPosGross = targetShift ? (targetShift.posGrossSales || targetShift.posSales || 0) : 0;
     const initialPosCard = targetShift ? (targetShift.posCardSales || targetShift.posCard || 0) : 0;
 
@@ -6839,7 +7221,16 @@ setShiftViewMode(mode) {
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label" style="font-size:0.75rem; margin-bottom:2px;">${I18N.t('upd_emp_name') || 'Cashier Name'} *</label>
-            <input type="text" class="form-input" id="shiftModalCashier" placeholder="e.g. HR GOMAS" list="employeeNameSuggestions" autocomplete="off" value="${initialCashier}" style="padding:6px 8px; font-size:0.85rem; height:34px;" required>
+            ${shopCashiers.length > 0 ? `
+              <select class="form-input" style="padding:4px 6px; font-size:0.85rem; height:34px; font-weight:700;" onchange="App.onShiftCashierSelectChange(this, 'shiftModalCashier')">
+                <option value="">-- Cashier තෝරන්න --</option>
+                ${shopCashiers.map(c => `<option value="${c}" ${c === initialCashier ? 'selected' : ''}>👤 ${c}</option>`).join('')}
+                <option value="__CUSTOM__">➕ වෙනත් නමක්...</option>
+              </select>
+              <input type="text" class="form-input" id="shiftModalCashier" placeholder="e.g. Kasun" list="employeeNameSuggestions" autocomplete="off" value="${initialCashier}" style="padding:6px 8px; font-size:0.85rem; height:34px; margin-top:4px; display:${(shopCashiers.includes(initialCashier) && initialCashier) ? 'none' : 'block'};" required>
+            ` : `
+              <input type="text" class="form-input" id="shiftModalCashier" placeholder="e.g. Kasun" list="employeeNameSuggestions" autocomplete="off" value="${initialCashier}" style="padding:6px 8px; font-size:0.85rem; height:34px;" required>
+            `}
           </div>
         </div>
 
@@ -7912,6 +8303,9 @@ setShiftViewMode(mode) {
       this.lastMorningDenominations = null;
     }
 
+    const shopCashiers = DB.getShopCashiers(shopId);
+    const defaultCashierName = this.currentBranchCashierName || (todayShifts.length > 0 ? (todayShifts[0].cashierName || todayShifts[0].cashier || '') : '');
+
     const bodyHtml = `
       <form id="morningShiftForm" style="display:flex; flex-direction:column; gap:12px;">
         <div class="form-group" style="margin-bottom:0; background:rgba(79,70,229,0.06); padding:8px 12px; border-radius:var(--radius-sm); border:1px solid rgba(79,70,229,0.25);">
@@ -7932,8 +8326,17 @@ setShiftViewMode(mode) {
           🌅 උදෑසන සාප්පුව විවෘත කිරීමේදී ලාච්චුවේ ඇති ආරම්භක මුදල් (Float) නෝට්ටු කවුන්ටරය මගින් ඇතුළත් කරන්න.
         </div>
         <div class="form-group">
-          <label class="form-label">${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
-          <input type="text" class="form-input" id="morningCashierName" placeholder="e.g. Kasun" list="employeeNameSuggestions" autocomplete="off" required>
+          <label class="form-label" style="font-weight:700;">👤 ${I18N.t('upd_emp_name') || 'Cashier / Staff Name'}</label>
+          ${shopCashiers.length > 0 ? `
+            <select class="form-input" style="font-weight:700; height:42px;" onchange="App.onShiftCashierSelectChange(this, 'morningCashierName')">
+              <option value="">-- Cashier තෝරන්න (Select Cashier) --</option>
+              ${shopCashiers.map(c => `<option value="${c}" ${c === defaultCashierName ? 'selected' : ''}>👤 ${c}</option>`).join('')}
+              <option value="__CUSTOM__">➕ වෙනත් නමක් (Enter Other Name)...</option>
+            </select>
+            <input type="text" class="form-input" id="morningCashierName" value="${defaultCashierName}" placeholder="e.g. Kasun" list="employeeNameSuggestions" autocomplete="off" style="margin-top:6px; display:${(shopCashiers.includes(defaultCashierName) && defaultCashierName) ? 'none' : 'block'};" required>
+          ` : `
+            <input type="text" class="form-input" id="morningCashierName" value="${defaultCashierName}" placeholder="e.g. Kasun" list="employeeNameSuggestions" autocomplete="off" required>
+          `}
         </div>
         <div class="form-group">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
