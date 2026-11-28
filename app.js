@@ -10969,7 +10969,104 @@ setShiftViewMode(mode) {
     return msg;
   },
 
-  sendDevicePaymentReceipt(creditId, paymentId = null, lang = null) {
+  generateDevicePaymentReceiptText(credit, targetPayment, lang, shopName) {
+    const isSettled = credit.balanceDue <= 0.01 || credit.status === 'settled';
+    const totalPaid = (credit.downPayment || 0) + (credit.payments ? credit.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : 0);
+    const payAmt = targetPayment ? (parseFloat(targetPayment.amount) || 0) : (isSettled ? totalPaid : (credit.downPayment || 0));
+    const payDate = targetPayment ? targetPayment.date : (credit.agreementDate || DB.getTodayDate());
+    const payNote = targetPayment ? (targetPayment.note || (isSettled ? 'Full Settlement Payment' : 'Cash in Shop')) : (isSettled ? 'Full Settlement' : 'Initial Down Payment');
+    const cashier = targetPayment ? (targetPayment.cashier || 'Staff') : 'Cashier';
+    const receiptNum = targetPayment ? targetPayment.id.replace('pay_', 'REC-') : 'REC-' + credit.id.slice(-6).toUpperCase();
+
+    if (lang === 'ta') {
+      return `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `${isSettled ? '🎉 *அதிகாரபூர்வ முழு தீர்வு ரசீது (FULL SETTLEMENT RECEIPT)*' : '🧾 *அதிகாரபூர்வ கட்டண ரசீது (PAYMENT RECEIPT)*'}\n` +
+        `=================================\n` +
+        `📄 ரசீது இல: #${receiptNum}\n` +
+        `📅 திகதி: ${payDate}\n` +
+        `🏪 கிளை: ${shopName}\n` +
+        `👤 பணியாளர்: ${cashier}\n` +
+        `---------------------------------\n` +
+        `👤 *வாடிக்கையாளர்:* ${credit.customerName}\n` +
+        `📱 *தொலைபேசி மாடல்:* ${credit.phoneModel}\n` +
+        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
+        `📞 *தொலைபேசி இல:* ${credit.primaryPhone}\n` +
+        `---------------------------------\n` +
+        `💵 *கட்டண விபரம் (PAYMENT DETAILS):*\n` +
+        `• சாதனத்தின் மொத்த விலை: ${DB.formatCurrency(credit.totalPrice)}\n` +
+        `• இப்போது செலுத்திய தொகை: *${DB.formatCurrency(payAmt)}*\n` +
+        `• குறிப்பு: ${payNote}\n` +
+        `=================================\n` +
+        `📊 *கணக்கு நிலை (ACCOUNT BALANCE):*\n` +
+        `• இதுவரை செலுத்திய மொத்தத் தொகை: *${DB.formatCurrency(totalPaid)}*\n` +
+        `👉 *மீதி நிலுவைத் தொகை: ${isSettled ? 'Rs. 0.00' : DB.formatCurrency(credit.balanceDue)}*\n` +
+        `🌟 நிலை: ${isSettled ? '✅ முழுமையாக தீர்க்கப்பட்டது (FULLY SETTLED)' : '⏳ தவணை நிலுவை உள்ளது (ACTIVE LOAN)'}\n` +
+        `=================================\n` +
+        `${isSettled ? '🎉 வாழ்த்துக்கள்! உங்கள் கடன் முழுமையாக செலுத்தி முடிக்கப்பட்டுள்ளது. மெத்மி மொபைலுடன் இணைந்திருப்பதற்கு நன்றி!\n=================================\n' : 'நன்றி! உங்கள் கொடுப்பனவு வெற்றிகரமாக பெறப்பட்டது.\n=================================\n'}` +
+        `📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+        `Mutur • Serunuwara • Periyapalam`;
+    } else if (lang === 'en') {
+      return `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `${isSettled ? '🎉 *OFFICIAL FULL SETTLEMENT RECEIPT*' : '🧾 *OFFICIAL PAYMENT RECEIPT*'}\n` +
+        `=================================\n` +
+        `📄 Receipt No: #${receiptNum}\n` +
+        `📅 Date: ${payDate}\n` +
+        `🏪 Branch: ${shopName}\n` +
+        `👤 Staff: ${cashier}\n` +
+        `---------------------------------\n` +
+        `👤 *Customer:* ${credit.customerName}\n` +
+        `📱 *Device Model:* ${credit.phoneModel}\n` +
+        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
+        `📞 *Phone:* ${credit.primaryPhone}\n` +
+        `---------------------------------\n` +
+        `💵 *PAYMENT SUMMARY:*\n` +
+        `• Total Agreed Price: ${DB.formatCurrency(credit.totalPrice)}\n` +
+        `• Amount Paid: *${DB.formatCurrency(payAmt)}*\n` +
+        `• Payment Note: ${payNote}\n` +
+        `=================================\n` +
+        `📊 *ACCOUNT STATUS:*\n` +
+        `• Total Paid to Date: *${DB.formatCurrency(totalPaid)}*\n` +
+        `👉 *Remaining Balance: ${isSettled ? 'Rs. 0.00' : DB.formatCurrency(credit.balanceDue)}*\n` +
+        `🌟 STATUS: ${isSettled ? '✅ FULLY SETTLED & CLEARED' : '⏳ ACTIVE INSTALLMENT BALANCE'}\n` +
+        `=================================\n` +
+        `${isSettled ? '🎉 Congratulations! Your device credit loan is fully settled & cleared. Thank you for choosing Methmi Mobile!\n=================================\n' : 'Thank you! Your payment has been received successfully.\n=================================\n'}` +
+        `📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+        `Mutur • Serunuwara • Periyapalam`;
+    } else {
+      // Sinhala
+      return `🏢 *METHMI MOBILE (PVT) LTD*\n` +
+        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
+        `${isSettled ? '🎉 *නිල සම්පූර්ණ පියවීම් රිසිට්පත (FULL SETTLEMENT RECEIPT)*' : '🧾 *නිල ගෙවීම් රිසිට්පත (OFFICIAL PAYMENT RECEIPT)*'}\n` +
+        `=================================\n` +
+        `📄 රිසිට්පත් අංකය: #${receiptNum}\n` +
+        `📅 දිනය: ${payDate}\n` +
+        `🏪 ශාඛාව: ${shopName}\n` +
+        `👤 සේවක: ${cashier}\n` +
+        `---------------------------------\n` +
+        `👤 *පාරිභෝගිකයා:* ${credit.customerName}\n` +
+        `📱 *දුරකථන මාදිලිය:* ${credit.phoneModel}\n` +
+        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
+        `📞 *දුරකථන අංකය:* ${credit.primaryPhone}\n` +
+        `---------------------------------\n` +
+        `💵 *ගෙවීම් විස්තර (PAYMENT DETAILS):*\n` +
+        `• එකඟ වූ මුළු මිල: ${DB.formatCurrency(credit.totalPrice)}\n` +
+        `• දැන් ගෙවූ මුදල: *${DB.formatCurrency(payAmt)}*\n` +
+        `• ගෙවීම් සටහන: ${payNote}\n` +
+        `=================================\n` +
+        `📊 *ගිණුම් තත්ත්වය (ACCOUNT BALANCE):*\n` +
+        `• මෙතෙක් ගෙවූ මුළු මුදල: *${DB.formatCurrency(totalPaid)}*\n` +
+        `👉 *ඉතිරි හිඟ ශේෂය (Balance Due): ${isSettled ? 'Rs. 0.00' : DB.formatCurrency(credit.balanceDue)}*\n` +
+        `🌟 තත්ත්වය: ${isSettled ? '✅ ණය මුදල සම්පූර්ණයෙන් පියවා අවසන් (FULLY SETTLED)' : '⏳ සක්‍රිය ණය ශේෂයක් පවතී (ACTIVE LOAN)'}\n` +
+        `=================================\n` +
+        `${isSettled ? '🎉 සුබ පැතුම්! ඔබගේ දුරකථන ණය මුදල සම්පූර්ණයෙන්ම ගෙවා අවසන් කර ඇත. මෙත්මි මොබයිල් ආයතනය කෙරෙහි තැබූ විශ්වාසයට ස්තූතියි!\n=================================\n' : 'ස්තූතියි! ඔබගේ ගෙවීම සාර්ථකව සටහන් විය.\n=================================\n'}` +
+        `📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
+        `Mutur • Serunuwara • Periyapalam`;
+    }
+  },
+
+  openDevicePaymentReceiptModal(creditId, paymentId = null, selectedLang = null) {
     const credit = DB.getDeviceCredits().find(c => c.id === creditId);
     if (!credit) return;
 
@@ -10981,117 +11078,207 @@ setShiftViewMode(mode) {
       targetPayment = credit.payments[credit.payments.length - 1];
     }
 
-    const payAmt = targetPayment ? targetPayment.amount : (credit.downPayment || 0);
-    const payDate = targetPayment ? targetPayment.date : (credit.agreementDate || DB.getTodayDate());
-    const payNote = targetPayment ? (targetPayment.note || 'Cash in Shop') : 'Initial Down Payment';
-    const cashier = targetPayment ? (targetPayment.cashier || 'Staff') : 'Cashier';
-    const receiptNum = targetPayment ? targetPayment.id.replace('pay_', 'REC-') : 'REC-' + credit.id.slice(-6).toUpperCase();
-
-    const currentLang = lang || credit.agreementLanguage || I18N.currentLang || 'si';
+    const currentLang = selectedLang || credit.agreementLanguage || I18N.currentLang || 'si';
 
     const shop = DB.getShop(credit.shopId);
     const shopName = shop ? shop.name : 'Methmi Mobile';
 
-    const totalPaid = (credit.downPayment || 0) + (credit.payments ? credit.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : 0);
     const isSettled = credit.balanceDue <= 0.01 || credit.status === 'settled';
+    const totalPaid = (credit.downPayment || 0) + (credit.payments ? credit.payments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0) : 0);
+    const payAmt = targetPayment ? (parseFloat(targetPayment.amount) || 0) : (isSettled ? totalPaid : (credit.downPayment || 0));
 
-    let msg = '';
-    if (currentLang === 'ta') {
-      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
-        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
-        `🧾 *அதிகாரபூர்வ கட்டண ரசீது (PAYMENT RECEIPT)*\n` +
-        `=================================\n` +
-        `📄 ரசீது இல: #${receiptNum}\n` +
-        `📅 திகதி: ${payDate}\n` +
-        `🏪 கிளை: ${shopName}\n` +
-        `👤 பணியாளர்: ${cashier}\n` +
-        `---------------------------------\n` +
-        `👤 *வாடிக்கையாளர்:* ${credit.customerName}\n` +
-        `📱 *தொலைபேசி:* ${credit.phoneModel}\n` +
-        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
-        `📞 *தொலைபேசி:* ${credit.primaryPhone}\n` +
-        `---------------------------------\n` +
-        `💵 *கட்டண விபரம்:*\n` +
-        `• மொத்த சாதன விலை: ${DB.formatCurrency(credit.totalPrice)}\n` +
-        `• இப்போது செலுத்திய தொகை: *${DB.formatCurrency(payAmt)}*\n` +
-        `• விபரம்: ${payNote}\n` +
-        `=================================\n` +
-        `📊 *கணக்கு நிலை:*\n` +
-        `• இதுவரை செலுத்திய மொத்தத் தொகை: ${DB.formatCurrency(totalPaid)}\n` +
-        `👉 *மீதி நிலுவைத் தொகை: ${DB.formatCurrency(credit.balanceDue)}*\n` +
-        `நிலை: ${isSettled ? '✅ முழுமையாக தீர்க்கப்பட்டது (FULLY SETTLED)' : '⏳ மீதி நிலுவை உள்ளது (ACTIVE LOAN)'}\n` +
-        `=================================\n` +
-        `நன்றி! Thank you for choosing Methmi Mobile.\n` +
-        `📞 0752 335 533 / 0753 028 100\n` +
-        `Mutur • Serunuwara • Periyapalam`;
-    } else if (currentLang === 'en') {
-      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
-        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
-        `🧾 *OFFICIAL PAYMENT RECEIPT*\n` +
-        `=================================\n` +
-        `📄 Receipt No: #${receiptNum}\n` +
-        `📅 Date: ${payDate}\n` +
-        `🏪 Branch: ${shopName}\n` +
-        `👤 Staff: ${cashier}\n` +
-        `---------------------------------\n` +
-        `👤 *Customer:* ${credit.customerName}\n` +
-        `📱 *Device:* ${credit.phoneModel}\n` +
-        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
-        `📞 *Phone:* ${credit.primaryPhone}\n` +
-        `---------------------------------\n` +
-        `💵 *PAYMENT SUMMARY:*\n` +
-        `• Total Agreed Price: ${DB.formatCurrency(credit.totalPrice)}\n` +
-        `• Payment Received: *${DB.formatCurrency(payAmt)}*\n` +
-        `• Payment Note: ${payNote}\n` +
-        `=================================\n` +
-        `📊 *ACCOUNT BALANCE:*\n` +
-        `• Total Paid to Date: ${DB.formatCurrency(totalPaid)}\n` +
-        `👉 *Remaining Balance: ${DB.formatCurrency(credit.balanceDue)}*\n` +
-        `STATUS: ${isSettled ? '✅ FULLY SETTLED & CLEARED' : '⏳ ACTIVE INSTALLMENT BALANCE'}\n` +
-        `=================================\n` +
-        `Thank you for your payment!\n` +
-        `📞 Hotline: 0752 335 533 / 0753 028 100\n` +
-        `Mutur • Serunuwara • Periyapalam`;
-    } else {
-      // Sinhala
-      msg = `🏢 *METHMI MOBILE (PVT) LTD*\n` +
-        `(Reg BR: PV-00352350 | Web: methmimobile.com)\n` +
-        `🧾 *නිල ගෙවීම් රිසිට්පත (OFFICIAL PAYMENT RECEIPT)*\n` +
-        `=================================\n` +
-        `📄 රිසිට්පත් අංකය: #${receiptNum}\n` +
-        `📅 දිනය: ${payDate}\n` +
-        `🏪 ශාඛාව: ${shopName}\n` +
-        `👤 සේවක: ${cashier}\n` +
-        `---------------------------------\n` +
-        `👤 *පාරිභෝගිකයා:* ${credit.customerName}\n` +
-        `📱 *දුරකථනය:* ${credit.phoneModel}\n` +
-        `🔢 *IMEI:* ${credit.imeiNumber || 'N/A'}\n` +
-        `📞 *දුරකථන අංකය:* ${credit.primaryPhone}\n` +
-        `---------------------------------\n` +
-        `💵 *ගෙවීම් විස්තර:*\n` +
-        `• සම්පූර්ණ එකඟ වූ මිල: ${DB.formatCurrency(credit.totalPrice)}\n` +
-        `• දැන් ගෙවූ මුදල: *${DB.formatCurrency(payAmt)}*\n` +
-        `• ගෙවීම් සටහන: ${payNote}\n` +
-        `=================================\n` +
-        `📊 *ගිණුම් තත්ත්වය:*\n` +
-        `• මෙතෙක් ගෙවූ මුළු මුදල: ${DB.formatCurrency(totalPaid)}\n` +
-        `👉 *ඉතිරි හිඟ ශේෂය (Balance Due): ${DB.formatCurrency(credit.balanceDue)}*\n` +
-        `තත්ත්වය: ${isSettled ? '✅ ණය මුදල සම්පූර්ණයෙන් පියවා අවසන් (FULLY SETTLED)' : '⏳ සක්‍රිය ණය ශේෂයක් පවතී (ACTIVE LOAN)'}\n` +
-        `=================================\n` +
-        `ස්තූතියි! ඔබගේ ගෙවීම සාර්ථකව සටහන් විය.\n` +
-        `📞 Hotlines: 0752 335 533 / 0753 028 100 / 0768 364 413\n` +
-        `Mutur • Serunuwara • Periyapalam`;
-    }
+    const generatedMsg = this.generateDevicePaymentReceiptText(credit, targetPayment, currentLang, shopName);
 
-    let phone = (credit.primaryPhone || '').replace(/\D/g, '');
+    // Format phone
+    let rawPhone = credit.primaryPhone || '';
+    let phone = rawPhone.replace(/\D/g, '');
     if (phone.startsWith('0')) {
       phone = '94' + phone.substring(1);
     } else if (phone && !phone.startsWith('94')) {
       phone = '94' + phone;
     }
 
-    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    const isSi = I18N.currentLang === 'si';
+
+    // Build installment options if customer has multiple payments
+    const paymentsList = credit.payments || [];
+    let paymentSelectHtml = '';
+    if (paymentsList.length > 0) {
+      paymentSelectHtml = `
+        <div style="margin-bottom:10px;">
+          <label class="form-label" style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:4px; display:block;">
+            ${isSi ? 'රිසිට්පත් වර්ගය / වාරිකය තෝරන්න (Select Receipt Target):' : 'Select Receipt Target:'}
+          </label>
+          <select class="form-select" id="receiptPaymentSelect" onchange="App.openDevicePaymentReceiptModal('${credit.id}', this.value, '${currentLang}')" style="font-size:0.85rem; padding:6px 10px; font-weight:700;">
+            ${isSettled ? `<option value="" ${!paymentId ? 'selected' : ''}>🎉 සම්පූර්ණ පියවීම් රිසිට්පත (Full Settlement - Rs. 0.00 Balance)</option>` : ''}
+            ${paymentsList.map((p, idx) => `
+              <option value="${p.id}" ${paymentId === p.id ? 'selected' : ''}>
+                💵 ${idx + 1} වන ගෙවීම: ${DB.formatCurrency(p.amount)} (${p.date}) - ${p.note || 'Installment'}
+              </option>
+            `).join('')}
+            ${!isSettled && credit.downPayment ? `<option value="" ${!paymentId ? 'selected' : ''}>💵 මූලික ගෙවීම (Down Payment: ${DB.formatCurrency(credit.downPayment)})</option>` : ''}
+          </select>
+        </div>
+      `;
+    }
+
+    const bodyHtml = `
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <!-- Customer & Receipt Overview Header -->
+        <div style="background:var(--bg-glass-card); padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--border-glass);">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+            <div>
+              <div style="font-weight:800; font-size:1.05rem; color:var(--text-primary); display:flex; align-items:center; gap:6px;">
+                <span>👤 ${credit.customerName}</span>
+                <span class="branch-pill-badge" style="font-size:0.75rem;">🏪 ${shopName}</span>
+                ${isSettled 
+                  ? `<span style="background:rgba(16,185,129,0.2); color:var(--accent-green); border:1px solid rgba(16,185,129,0.4); padding:2px 8px; border-radius:12px; font-size:0.72rem; font-weight:800;">🎉 FULLY SETTLED</span>` 
+                  : `<span style="background:rgba(245,158,11,0.2); color:var(--accent-gold); border:1px solid rgba(245,158,11,0.4); padding:2px 8px; border-radius:12px; font-size:0.72rem; font-weight:800;">⏳ ACTIVE LOAN</span>`}
+              </div>
+              <div style="font-size:0.83rem; color:var(--text-secondary); margin-top:2px;">
+                📱 ${credit.phoneModel} | IMEI: <code>${credit.imeiNumber || 'N/A'}</code>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.72rem; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Receipt Amount</div>
+              <div style="font-size:1.3rem; font-weight:900; color:var(--accent-green);">${DB.formatCurrency(payAmt)}</div>
+              <div style="font-size:0.78rem; font-weight:700; color:${isSettled ? 'var(--accent-green)' : 'var(--accent-red)'};">
+                ${isSettled ? (isSi ? '✅ සම්පූර්ණ ණය පියවා අවසන්' : '✅ Fully Settled (Rs. 0.00)') : `${isSi ? 'ඉතිරි ශේෂය' : 'Balance Due'}: ${DB.formatCurrency(credit.balanceDue)}`}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        ${paymentSelectHtml}
+
+        <!-- Language Switcher & WhatsApp Recipient Phone -->
+        <div style="background:rgba(255,255,255,0.03); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:0.82rem; font-weight:800; color:var(--accent-gold); display:flex; align-items:center; gap:4px;">
+              <span>🌐</span> <span>${isSi ? 'රිසිට්පත් භාෂාව (Language):' : 'Receipt Language:'}</span>
+            </span>
+            <div class="tab-pills" style="gap:4px;">
+              <button type="button" class="tab-pill ${currentLang === 'si' ? 'active' : ''}" style="padding:5px 12px; font-size:0.8rem; font-weight:700;" onclick="App.openDevicePaymentReceiptModal('${credit.id}', '${paymentId || ''}', 'si')">
+                🇱🇰 සිංහල
+              </button>
+              <button type="button" class="tab-pill ${currentLang === 'ta' ? 'active' : ''}" style="padding:5px 12px; font-size:0.8rem; font-weight:700;" onclick="App.openDevicePaymentReceiptModal('${credit.id}', '${paymentId || ''}', 'ta')">
+                🇮🇳 தமிழ்
+              </button>
+              <button type="button" class="tab-pill ${currentLang === 'en' ? 'active' : ''}" style="padding:5px 12px; font-size:0.8rem; font-weight:700;" onclick="App.openDevicePaymentReceiptModal('${credit.id}', '${paymentId || ''}', 'en')">
+                🌐 English
+              </button>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:0.78rem; font-weight:700; color:var(--text-muted);">WhatsApp:</span>
+            <input type="text" id="waReceiptPhone" class="form-input" value="${phone}" style="width:140px; padding:4px 8px; font-size:0.85rem; font-family:monospace; font-weight:700; text-align:center;">
+          </div>
+        </div>
+
+        <!-- Editable Message Preview Area -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label class="form-label" style="font-size:0.78rem; font-weight:700; text-transform:uppercase; color:var(--text-muted); margin-bottom:0;">
+              ${isSi ? 'රිසිට්පත පෙරදසුන (WhatsApp Receipt Preview):' : 'WhatsApp Receipt Preview (Editable):'}
+            </label>
+            <button type="button" class="btn btn-xs btn-ghost" onclick="App.copyDevicePaymentReceiptText()" style="font-size:0.72rem; padding:2px 8px;">
+              📋 ${isSi ? 'පිටපත් කරගන්න (Copy)' : 'Copy Receipt'}
+            </button>
+          </div>
+          <textarea id="waReceiptTextPreview" class="form-input" rows="9" style="width:100%; font-family:monospace; font-size:0.83rem; line-height:1.45; background:var(--bg-glass); border:1px solid var(--border-glass); border-radius:var(--radius-sm); resize:vertical;">${generatedMsg}</textarea>
+        </div>
+
+        <!-- Direct 1-Click Multi-Language Send Buttons -->
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:6px;">
+          <button type="button" class="btn btn-sm btn-ghost" onclick="App.dispatchDevicePaymentReceiptWhatsApp('si', '${credit.id}', '${paymentId || ''}')" style="border:1px solid rgba(255,255,255,0.2); font-weight:700; font-size:0.78rem; padding:6px;">
+            🇱🇰 සිංහලෙන් යවන්න
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="App.dispatchDevicePaymentReceiptWhatsApp('ta', '${credit.id}', '${paymentId || ''}')" style="border:1px solid rgba(255,255,255,0.2); font-weight:700; font-size:0.78rem; padding:6px;">
+            🇮🇳 தமிழில் அனுப்பவும்
+          </button>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="App.dispatchDevicePaymentReceiptWhatsApp('en', '${credit.id}', '${paymentId || ''}')" style="border:1px solid rgba(255,255,255,0.2); font-weight:700; font-size:0.78rem; padding:6px;">
+            🌐 Send in English
+          </button>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display:flex; gap:10px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.1);">
+          <button type="button" class="btn btn-ghost" onclick="App.closeModal()" style="flex:1; padding:12px; font-weight:700;">
+            ${isSi ? 'වසන්න (Close)' : 'Close'}
+          </button>
+          <button type="button" class="btn btn-success" onclick="App.dispatchDevicePaymentReceiptWhatsApp()" style="flex:2; padding:12px; font-weight:800; font-size:1.02rem; background:linear-gradient(135deg, #16a34a 0%, #15803d 100%); color:#fff; border:none; border-radius:var(--radius-sm); box-shadow:0 4px 15px rgba(22,163,74,0.4); display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;">
+            <span>📲</span> <span>${isSi ? 'WhatsApp මඟින් රිසිට්පත යවන්න' : 'Send Receipt via WhatsApp'}</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    this.showModal(
+      `🧾 Official Payment Receipt - ${credit.customerName}`,
+      bodyHtml,
+      [
+        { text: isSi ? 'වසන්න' : 'Close', class: 'btn-ghost', onClick: () => this.closeModal() }
+      ]
+    );
+  },
+
+  copyDevicePaymentReceiptText() {
+    const textarea = document.getElementById('waReceiptTextPreview');
+    if (!textarea) return;
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      this.showToast(I18N.currentLang === 'si' ? '✅ රිසිට්පත පිටපත් විය!' : '✅ Receipt copied to clipboard!', 'info');
+    }).catch(() => {
+      textarea.select();
+      document.execCommand('copy');
+      this.showToast(I18N.currentLang === 'si' ? '✅ රිසිට්පත පිටපත් විය!' : '✅ Receipt copied!', 'info');
+    });
+  },
+
+  dispatchDevicePaymentReceiptWhatsApp(targetLang = null, creditId = null, paymentId = null) {
+    let msgText = '';
+    if (targetLang && creditId) {
+      const credit = DB.getDeviceCredits().find(c => c.id === creditId);
+      if (credit) {
+        let targetPayment = null;
+        if (paymentId && credit.payments && credit.payments.length > 0) {
+          targetPayment = credit.payments.find(p => p.id === paymentId);
+        }
+        if (!targetPayment && credit.payments && credit.payments.length > 0) {
+          targetPayment = credit.payments[credit.payments.length - 1];
+        }
+        const shop = DB.getShop(credit.shopId);
+        msgText = this.generateDevicePaymentReceiptText(credit, targetPayment, targetLang, shop ? shop.name : 'Methmi Mobile');
+      }
+    }
+    if (!msgText) {
+      msgText = document.getElementById('waReceiptTextPreview')?.value || '';
+    }
+
+    const phoneInput = document.getElementById('waReceiptPhone');
+    let rawPhone = phoneInput ? phoneInput.value.trim() : '';
+    let phone = rawPhone.replace(/\D/g, '');
+    if (phone.startsWith('0')) {
+      phone = '94' + phone.substring(1);
+    } else if (phone && !phone.startsWith('94')) {
+      phone = '94' + phone;
+    }
+
+    if (!phone) {
+      this.showToast(I18N.currentLang === 'si' ? 'කරුණාකර වලංගු WhatsApp අංකයක් ඇතුළත් කරන්න' : 'Please enter a valid WhatsApp number', 'error');
+      return;
+    }
+
+    const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msgText)}`;
     window.open(waUrl, '_blank');
+    this.closeModal();
+  },
+
+  sendDevicePaymentReceipt(creditId, paymentId = null, lang = null) {
+    if (!lang) {
+      this.openDevicePaymentReceiptModal(creditId, paymentId);
+      return;
+    }
+    this.dispatchDevicePaymentReceiptWhatsApp(lang, creditId, paymentId);
   },
 
   isTorchOn: false,
