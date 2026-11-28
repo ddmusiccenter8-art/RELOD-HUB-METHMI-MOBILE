@@ -373,7 +373,7 @@ const I18N = {
       'dev_period_14': '14 Days (2 Weeks)',
       'dev_period_30': '30 Days (1 Month)',
       'dev_period_custom': 'Custom Due Date',
-      'btn_save_agreement': '💾 Save Agreement',
+      'btn_save_agreement': '🚀 Submit Agreement',
       'btn_save_payment': '💾 Record Payment'
     },
     si: {
@@ -743,7 +743,7 @@ const I18N = {
       'dev_period_14': 'දින 14 (සති 2ක්)',
       'dev_period_30': 'දින 30 (මාසයක්)',
       'dev_period_custom': 'වෙනත් දිනයක්',
-      'btn_save_agreement': '💾 ගිවිසුම සුරකින්න',
+      'btn_save_agreement': '🚀 සබ්මිට් කරන්න (Submit)',
       'btn_save_payment': '💾 ගෙවීම සුරකින්න'
     },
     ta: {
@@ -1061,7 +1061,7 @@ const I18N = {
       'dev_period_14': '14 நாட்கள் (2 வாரங்கள்)',
       'dev_period_30': '30 நாட்கள் (1 மாதம்)',
       'dev_period_custom': 'தனிப்பயன் தேதி',
-      'btn_save_agreement': '💾 ஒப்பந்தத்தை சேமி',
+      'btn_save_agreement': '🚀 சமர்ப்பிக்கவும் (Submit)',
       'btn_save_payment': '💾 கொடுப்பனவை சேமி'
     }
   },

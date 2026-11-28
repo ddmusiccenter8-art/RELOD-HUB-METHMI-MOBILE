@@ -8799,7 +8799,7 @@ setShiftViewMode(mode) {
       : (I18N.currentLang === 'si' ? '📱 නව කෙටි කාලීන දුරකථන ණය ගිවිසුමක්' : '📱 New Short-Term Device Credit Agreement');
 
     const bodyHtml = `
-      <form id="devCreditForm" style="display:flex; flex-direction:column; gap:16px;">
+      <form id="devCreditForm" onsubmit="event.preventDefault(); App.saveDeviceCreditAgreement('${editCreditId || ''}', false); return false;" style="display:flex; flex-direction:column; gap:16px;">
         <!-- 0. Branch / Shop Selection -->
         <div class="form-group" style="margin-bottom:0; background:rgba(99,102,241,0.06); padding:10px 14px; border-radius:var(--radius-sm); border:1px solid rgba(99,102,241,0.25);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
@@ -9018,8 +9018,8 @@ setShiftViewMode(mode) {
       bodyHtml,
       [
         { text: I18N.currentLang === 'si' ? 'අවලංගු කරන්න' : 'Cancel', class: 'btn-ghost', onClick: () => this.closeModal() },
-        { text: I18N.t('btn_save_agreement') || '💾 Save Agreement', id: 'btnSaveDevCredit', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId, false) },
-        { text: I18N.currentLang === 'si' ? '✍️ එවෙලෙම අත්සන් කරන්න' : '✍️ Save & Sign Now', id: 'btnSaveSignDevCredit', class: 'btn-warning', onClick: () => this.saveDeviceCreditAgreement(editCreditId, true) }
+        { text: I18N.currentLang === 'si' ? '🚀 සබ්මිට් කරන්න (Submit)' : (I18N.t('btn_save_agreement') || '🚀 Submit Agreement'), id: 'btnSaveDevCredit', class: 'btn-primary', onClick: () => this.saveDeviceCreditAgreement(editCreditId, false) },
+        { text: I18N.currentLang === 'si' ? '✍️ සබ්මිට් කර අත්සන් කරන්න' : '✍️ Submit & Sign Now', id: 'btnSaveSignDevCredit', class: 'btn-warning', onClick: () => this.saveDeviceCreditAgreement(editCreditId, true) }
       ]
     );
 
@@ -9187,13 +9187,13 @@ setShiftViewMode(mode) {
         btnSave.disabled = false;
         btnSave.style.opacity = '1';
         btnSave.style.cursor = 'pointer';
-        btnSave.innerHTML = I18N.t('btn_save_agreement') || '💾 Save Agreement';
+        btnSave.innerHTML = I18N.currentLang === 'si' ? '🚀 සබ්මිට් කරන්න (Submit)' : (I18N.t('btn_save_agreement') || '🚀 Submit Agreement');
       }
       if (btnSaveSign) {
         btnSaveSign.disabled = false;
         btnSaveSign.style.opacity = '1';
         btnSaveSign.style.cursor = 'pointer';
-        btnSaveSign.innerHTML = I18N.currentLang === 'si' ? '✍️ එවෙලෙම අත්සන් කරන්න' : '✍️ Save & Sign Now';
+        btnSaveSign.innerHTML = I18N.currentLang === 'si' ? '✍️ සබ්මිට් කර අත්සන් කරන්න' : '✍️ Submit & Sign Now';
       }
       if (banner) {
         const attachedCount = Object.values(this.tempDevCreditPhotos || {}).filter(Boolean).length;
@@ -9432,31 +9432,15 @@ setShiftViewMode(mode) {
       agreementLanguage: 'si'
     };
 
-    // Transition modal into Active Cloud Upload Mode
-    const modalFooter = document.querySelector('.modal-actions');
-    if (modalFooter) modalFooter.style.display = 'none';
-
-    const modalBody = document.querySelector('.modal-body');
-    if (modalBody) {
-      modalBody.innerHTML = `
-        <div id="devCreditSubmitOverlay" style="text-align:center; padding:32px 16px;">
-          <div style="font-size:3.5rem; margin-bottom:12px; animation: bounce 1.2s infinite alternate;">☁️</div>
-          <h3 style="font-size:1.25rem; font-weight:800; color:var(--text-primary); margin-bottom:8px;">
-            ${I18N.currentLang === 'si' ? 'Cloud වෙත Live Upload වෙමින් පවතී...' : 'Live Uploading to Cloud...'}
-          </h3>
-          <p style="font-size:0.88rem; color:var(--text-secondary); max-width:400px; margin:0 auto 20px auto; line-height:1.5;">
-            ${I18N.currentLang === 'si'
-              ? `<strong>${custName}</strong> මහතාගේ ගිවිසුම සහ ලේඛන සියලු දුරකථන සහ පරිගණක සඳහා එකවර සජීවීව (Live Sync) උඩුගත කෙරේ...`
-              : `Uploading agreement & attached photos for <strong>${custName}</strong> across all connected devices...`}
-          </p>
-          <div style="width:100%; max-width:320px; height:8px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden; margin:0 auto 16px; border:1px solid rgba(255,255,255,0.15);">
-            <div style="width:100%; height:100%; background:linear-gradient(90deg, #6366f1, #10b981, #6366f1); background-size:200% 100%; animation: shimmer 1.5s infinite linear;"></div>
-          </div>
-          <div id="devCreditUploadStep" style="font-size:0.82rem; color:var(--accent-gold); font-weight:700;">
-            💾 ${I18N.currentLang === 'si' ? 'දත්ත ගබඩා කර Cloud වෙත සමමුහුර්ත කෙරේ...' : 'Storing data and synchronizing with Firestore Cloud...'}
-          </div>
-        </div>
-      `;
+    // Disable buttons to indicate progress
+    const btnSave = document.getElementById('btnSaveDevCredit');
+    const btnSaveSign = document.getElementById('btnSaveSignDevCredit');
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.innerHTML = '⏳ Submitting...';
+    }
+    if (btnSaveSign) {
+      btnSaveSign.disabled = true;
     }
 
     let savedRecord = null;
@@ -9483,71 +9467,60 @@ setShiftViewMode(mode) {
       }
     }
 
-    const stepEl = document.getElementById('devCreditUploadStep');
-    if (stepEl) {
-      stepEl.textContent = I18N.currentLang === 'si' ? '☁️ Cloud Server වෙත සජීවීව ලියාපදිංචි කෙරේ...' : '☁️ Registering live on cloud server...';
-    }
+    // 1. Immediately Close the modal screen so it never stays open or stuck!
+    this.closeModal();
 
-    try {
-      if (savedRecord) {
-        await DB.syncDeviceCreditToCloud(savedRecord.id, savedRecord);
-      }
-    } catch (syncErr) {
-      console.warn('Cloud sync error on agreement save:', syncErr);
-    }
+    // 2. Clear temp photo cache
+    this.tempDevCreditPhotos = {};
 
+    // 3. Reset filters to ensure the newly submitted item is visible in list
+    this.devCreditActiveFilter = 'all';
+    const tabs = document.querySelectorAll('#devCreditFilterTabs .tab-pill');
+    tabs.forEach(btn => {
+      if (btn.getAttribute('data-filter') === 'all') btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+
+    // 4. Immediately Navigate to the Device Credits list page and render!
+    this.navigateTo('device-credits');
+    this.renderDeviceCreditsPage();
     this.updateTopBarBadges();
-    if (this.currentPage === 'device-credits') {
-      this.renderDeviceCreditsPage();
+
+    // 5. Highlight the newly created / edited agreement row with smooth green glow
+    if (savedRecord) {
+      setTimeout(() => {
+        const row = document.getElementById(`devCreditRow_${savedRecord.id}`) || document.getElementById(`devCreditCard_${savedRecord.id}`);
+        if (row) {
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.style.outline = '3px solid var(--accent-green)';
+          row.style.boxShadow = '0 0 25px rgba(16, 185, 129, 0.45)';
+          row.style.transition = 'all 0.4s ease';
+          setTimeout(() => {
+            row.style.outline = '';
+            row.style.boxShadow = '';
+          }, 3500);
+        }
+      }, 150);
     }
-    if (this.currentPage === 'dashboard') {
-      this.renderDashboard();
+
+    // 6. Show prominent success toast notification
+    const successMsg = I18N.currentLang === 'si'
+      ? `✅ ${custName} මහතාගේ ණය ගිවිසුම සාර්ථකව Submit විය! (Live Cloud Saved)`
+      : `✅ Agreement Submitted Successfully for ${custName}!`;
+    this.showToast(successMsg, 'success');
+
+    // 7. Non-blocking Background Cloud Sync
+    if (savedRecord) {
+      DB.syncDeviceCreditToCloud(savedRecord.id, savedRecord).catch(syncErr => {
+        console.warn('Cloud sync error on agreement save:', syncErr);
+      });
     }
 
-    if (modalBody) {
-      modalBody.innerHTML = `
-        <div style="text-align:center; padding:32px 16px;">
-          <div style="font-size:3.5rem; margin-bottom:12px;">🎉</div>
-          <h3 style="font-size:1.3rem; font-weight:800; color:var(--accent-green); margin-bottom:8px;">
-            ${I18N.currentLang === 'si' ? 'ගිවිසුම සාර්ථකව Live Upload විය!' : 'Agreement Live Uploaded Successfully!'}
-          </h3>
-          <p style="font-size:0.9rem; color:var(--text-secondary); max-width:420px; margin:0 auto 20px auto; line-height:1.5;">
-            ${I18N.currentLang === 'si'
-              ? `<strong>${custName}</strong> මහතාගේ දුරකථන ණය ගිවිසුම සාර්ථකව සටහන් විය. දැන් සියලු දුරකථන සහ පරිගණක වල සජීවීව දිස්වේ.`
-              : `Device credit agreement for <strong>${custName}</strong> is saved and verified live on Cloud.`}
-          </p>
-
-          <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:var(--radius-sm); padding:12px 16px; max-width:380px; margin:0 auto 24px auto; text-align:left; font-size:0.85rem;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-              <span style="color:var(--text-muted);">Customer:</span>
-              <strong>${custName}</strong>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-              <span style="color:var(--text-muted);">Phone & Model:</span>
-              <span>${model}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
-              <span style="color:var(--text-muted);">IMEI:</span>
-              <span style="font-family:monospace; color:var(--accent-gold);">${imei1}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding-top:6px; border-top:1px dashed rgba(255,255,255,0.15); margin-top:6px;">
-              <span style="color:var(--text-muted);">Balance Due:</span>
-              <strong style="color:var(--accent-red); font-size:1rem;">${DB.formatCurrency(savedRecord?.balanceDue || 0)}</strong>
-            </div>
-          </div>
-
-          <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-            ${openSignImmediately ? `
-              <button type="button" class="btn btn-warning" onclick="App.closeModal(); App.openCreditAgreementModal('${savedRecord.id}', 'si');" style="font-weight:700; padding:10px 22px; font-size:0.95rem;">
-                ✍️ ${I18N.currentLang === 'si' ? 'දැන් අත්සන් කරන්න (Open Agreement)' : 'Open Agreement to Sign'}
-              </button>
-            ` : ''}
-            <button type="button" class="btn btn-primary" onclick="App.closeModal(); App.renderDeviceCreditsPage();" style="font-weight:800; padding:10px 28px; font-size:0.95rem;">
-              🚀 ${I18N.currentLang === 'si' ? 'සම්පූර්ණයි (Complete)' : 'Complete & Done'}
-            </button>
-          </div>
-        </div>
-      `;
+    // 8. If "Submit & Sign Now" was clicked, open signing canvas after 200ms
+    if (openSignImmediately && savedRecord) {
+      setTimeout(() => {
+        this.openCreditAgreementModal(savedRecord.id, 'si');
+      }, 200);
     }
   },
 
@@ -9626,7 +9599,7 @@ setShiftViewMode(mode) {
     const modalFooter = document.querySelector('.modal-actions');
     if (modalFooter) modalFooter.style.display = 'none';
 
-    const modalBody = document.querySelector('.modal-body');
+    const modalBody = document.getElementById('modalBody') || document.querySelector('.modal-body');
     if (modalBody) {
       modalBody.innerHTML = `
         <div style="text-align:center; padding:30px 16px;">
